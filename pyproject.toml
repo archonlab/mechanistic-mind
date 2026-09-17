@@ -8,6 +8,7 @@ version = "0.5.4"
 description = "Mechanistic Mind 1.0 — Tiktaalik (Beta 1). Primary interface: Psy Observer Web."
 readme = "README.md"
 requires-python = ">=3.11"
+license = "AGPL-3.0-or-later"
 dependencies = []
 
 # Beta 1 public entry is Psy Observer Web launchers / python -m mechanistic_mind.ui.psy_observer_web
