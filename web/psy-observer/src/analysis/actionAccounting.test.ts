@@ -113,8 +113,9 @@ describe('tick-level action occupancy accounting', () => {
     assert.equal(Number(b.agents[0].actions.longest_wait_streak), 20);
     const ev = b.important_events.find((e) => e.kind === 'SUSTAINED_WAIT');
     assert.ok(ev);
-    assert.equal(ev!.tick, 0); // streak start
+    assert.equal(ev!.tick, 19); // threshold-reaching tick
     assert.ok(String(ev!.reason).includes('t0–t19'));
+    assert.ok(String(ev!.reason).includes('at t19'));
   });
 
   it('TEST5: multiple SCENARIO_SELECTED in one tick do not inflate occupancy/streaks', () => {

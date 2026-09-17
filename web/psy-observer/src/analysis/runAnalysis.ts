@@ -13,8 +13,10 @@ import {
   recordFirst,
   updateResourceSeries,
   canonicalBody,
+  SUSTAINED_WAIT_THRESHOLD,
+  SUSTAINED_MOVE_THRESHOLD,
 } from './aggregates.ts';
-import type { AnalysisState } from './aggregates.ts';
+import type { AnalysisState, AgentAgg } from './aggregates.ts';
 import { buildAgentAnalyses, buildComparison } from './agentAnalysis.ts';
 import { buildInteractions } from './interactionAnalysis.ts';
 import { buildImportantEvents, maybeAddKeyframe } from './importantEvents.ts';
@@ -157,6 +159,8 @@ function ingestTimeline(state: AnalysisState, timeline: any[]) {
           maybeAddKeyframe(state, tick, `first move ${aid}`, frameAgentsFromTimeline(ev), !!ev.contact, state.map_w, state.map_h);
         }
       }
+      // Threshold events only when THIS agent's canonical action was applied this tick.
+      if (applied) maybeEmitSustainedThreshold(state, agg, tick);
     }
 
     // Contact FSM advances once per unique simulation tick.
@@ -188,39 +192,80 @@ function ingestTimeline(state: AnalysisState, timeline: any[]) {
       }
     }
 
-    // Sustained WAIT / MOVE: only after a newly applied action updates streaks.
-    for (const aid of Object.keys(state.agents)) {
-      const agg = state.agents[aid];
-      if (agg.wait_streak === 20 && recordFirst(state, `long_wait_${aid}_${tick}`, tick)) {
-        const streakStart = tick - 19;
+    state.last_processed_timeline_tick = Math.max(state.last_processed_timeline_tick, tick);
+  }
+}
+
+/**
+ * Emit at most one SUSTAINED_* threshold event per continuous canonical streak.
+ * Primary tick = threshold-reaching simulation tick (not streak start).
+ * Identity: (agent_id, kind, streak_start_tick).
+ */
+function maybeEmitSustainedThreshold(state: AnalysisState, agg: AgentAgg, reachTick: number) {
+  const aid = agg.agent_id;
+  const coverageStart = state.start_tick;
+
+  if (
+    agg.wait_streak === SUSTAINED_WAIT_THRESHOLD
+    && !agg.sustained_wait_threshold_emitted
+    && agg.wait_streak_start_tick != null
+  ) {
+    const streakStart = agg.wait_streak_start_tick;
+    // Never fabricate pre-coverage / negative spans.
+    if (streakStart >= 0 && (coverageStart == null || streakStart >= coverageStart)) {
+      const id = `sustained_wait_${aid}_s${streakStart}`;
+      if (recordFirst(state, id, reachTick)) {
+        agg.sustained_wait_threshold_emitted = true;
         pushImportant(state, {
-          tick: streakStart,
+          tick: reachTick,
           category: 'TRANSITION',
           kind: 'SUSTAINED_WAIT',
           title: `SUSTAINED WAIT (${aid})`,
           reason:
-            `${aid} reached a WAIT streak of 20 consecutive simulation ticks `
-            + `(tick-level occupancy t${streakStart}–t${tick}).`,
+            `${aid} reached ${SUSTAINED_WAIT_THRESHOLD} consecutive WAIT simulation ticks at t${reachTick} `
+            + `(streak threshold span t${streakStart}–t${reachTick}).`,
           evidence_class: 'DERIVED',
           agent_ids: [aid],
+          refs: { streak_start: streakStart, threshold_tick: reachTick, threshold: SUSTAINED_WAIT_THRESHOLD },
         });
       }
-      if (agg.move_streak === 10 && recordFirst(state, `sustained_move_${aid}_${tick}`, tick)) {
-        const streakStart = tick - 9;
+    } else {
+      // Origin not establishable from available evidence — arm so we don't spam.
+      agg.sustained_wait_threshold_emitted = true;
+    }
+  }
+
+  if (
+    agg.move_streak === SUSTAINED_MOVE_THRESHOLD
+    && !agg.sustained_move_threshold_emitted
+    && agg.move_streak_start_tick != null
+  ) {
+    const streakStart = agg.move_streak_start_tick;
+    if (streakStart >= 0 && (coverageStart == null || streakStart >= coverageStart)) {
+      // FIRST MOVE consistency: never emit MOVE streak before first canonical MOVE.
+      if (agg.first_move_tick != null && streakStart < agg.first_move_tick) {
+        agg.sustained_move_threshold_emitted = true;
+        return;
+      }
+      const id = `sustained_move_${aid}_s${streakStart}`;
+      if (recordFirst(state, id, reachTick)) {
+        agg.sustained_move_threshold_emitted = true;
         pushImportant(state, {
-          tick: streakStart,
+          tick: reachTick,
           category: 'TRANSITION',
           kind: 'SUSTAINED_MOVE',
           title: `SUSTAINED MOVE (${aid})`,
           reason:
-            `${aid} reached a MOVE streak of 10 consecutive simulation ticks `
-            + `(tick-level occupancy t${streakStart}–t${tick}).`,
+            `${aid} reached ${SUSTAINED_MOVE_THRESHOLD} consecutive MOVE simulation ticks at t${reachTick} `
+            + `(streak threshold span t${streakStart}–t${reachTick}).`,
           evidence_class: 'DERIVED',
           agent_ids: [aid],
+          refs: { streak_start: streakStart, threshold_tick: reachTick, threshold: SUSTAINED_MOVE_THRESHOLD },
         });
       }
+    } else {
+      agg.sustained_move_threshold_emitted = true;
     }
-    state.last_processed_timeline_tick = Math.max(state.last_processed_timeline_tick, tick);
   }
 }
 

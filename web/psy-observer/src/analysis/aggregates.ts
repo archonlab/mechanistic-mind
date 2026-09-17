@@ -30,6 +30,14 @@ export type AgentAgg = {
   move_streak: number;
   longest_wait_streak: number;
   longest_move_streak: number;
+  /** Simulation tick where the current WAIT streak began (streak length 1). */
+  wait_streak_start_tick: number | null;
+  /** Simulation tick where the current MOVE streak began (streak length 1). */
+  move_streak_start_tick: number | null;
+  /** True after SUSTAINED WAIT threshold event emitted for the current streak. */
+  sustained_wait_threshold_emitted: boolean;
+  /** True after SUSTAINED MOVE threshold event emitted for the current streak. */
+  sustained_move_threshold_emitted: boolean;
   distance: number;
   unique_cells: Set<string>;
   last_xy: { x: number; y: number } | null;
@@ -144,6 +152,10 @@ export function makeAgentAgg(agent_id: string, body_id: string, seed: number | n
     move_streak: 0,
     longest_wait_streak: 0,
     longest_move_streak: 0,
+    wait_streak_start_tick: null,
+    move_streak_start_tick: null,
+    sustained_wait_threshold_emitted: false,
+    sustained_move_threshold_emitted: false,
     distance: 0,
     unique_cells: new Set(),
     last_xy: null,
@@ -284,6 +296,10 @@ export function updateResourceSeries(
   box.max = box.max == null ? v : Math.max(box.max, v);
 }
 
+/** Tick-level sustained-action thresholds (consecutive simulation ticks). */
+export const SUSTAINED_WAIT_THRESHOLD = 20;
+export const SUSTAINED_MOVE_THRESHOLD = 10;
+
 /**
  * Count one canonical action per (agent, simulation tick) — tick-level occupancy.
  * Returns false if this tick was already counted (repeated Observer sample).
@@ -296,8 +312,7 @@ export function ingestAction(agg: AgentAgg, action: string | null | undefined, t
   if (agg.last_action_tick != null && tick < agg.last_action_tick) return false;
   // Evidence gap: streak is consecutive-tick occupancy, not a count of any WAIT rows.
   if (agg.last_action_tick != null && tick > agg.last_action_tick + 1) {
-    agg.wait_streak = 0;
-    agg.move_streak = 0;
+    resetStreakState(agg);
   }
   const prevAction = agg.last_action;
   agg.last_action_tick = tick;
@@ -313,23 +328,43 @@ export function ingestAction(agg: AgentAgg, action: string | null | undefined, t
   const isWait = action === 'WAIT';
   const isMove = String(action).startsWith('MOVE');
   if (isWait) {
+    if (agg.wait_streak === 0) {
+      agg.wait_streak_start_tick = tick;
+      agg.sustained_wait_threshold_emitted = false;
+    }
     agg.wait_streak += 1;
     agg.move_streak = 0;
+    agg.move_streak_start_tick = null;
+    agg.sustained_move_threshold_emitted = false;
     agg.longest_wait_streak = Math.max(agg.longest_wait_streak, agg.wait_streak);
     if (agg.first_move_tick != null && agg.first_wait_after_move_tick == null && agg.wait_streak >= 5) {
       agg.first_wait_after_move_tick = tick - agg.wait_streak + 1;
     }
   } else if (isMove) {
+    if (agg.move_streak === 0) {
+      agg.move_streak_start_tick = tick;
+      agg.sustained_move_threshold_emitted = false;
+    }
     agg.move_streak += 1;
     agg.wait_streak = 0;
+    agg.wait_streak_start_tick = null;
+    agg.sustained_wait_threshold_emitted = false;
     agg.longest_move_streak = Math.max(agg.longest_move_streak, agg.move_streak);
     if (agg.first_move_tick == null) agg.first_move_tick = tick;
   } else {
-    agg.wait_streak = 0;
-    agg.move_streak = 0;
+    resetStreakState(agg);
   }
   agg.last_action = action;
   return true;
+}
+
+function resetStreakState(agg: AgentAgg) {
+  agg.wait_streak = 0;
+  agg.move_streak = 0;
+  agg.wait_streak_start_tick = null;
+  agg.move_streak_start_tick = null;
+  agg.sustained_wait_threshold_emitted = false;
+  agg.sustained_move_threshold_emitted = false;
 }
 
 /**
