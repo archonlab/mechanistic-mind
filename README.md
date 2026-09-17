@@ -156,16 +156,30 @@ Beta 2 candidates (not in this release): COMPARE RUNS, deeper Analyzer integrati
 
 ## License
 
-Mechanistic Mind is free software licensed under the
-GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later).
+Mechanistic Mind is available under a dual-licensing model.
 
-You may use, study, modify, and redistribute the software under the
-terms of the GNU AGPL. Modified versions distributed to others, and
-modified versions made available for users over a network, remain
-subject to the source-code requirements of the license.
+### Open-source use
 
-See [LICENSE](LICENSE) for the full license text.
+Mechanistic Mind is licensed under the GNU Affero General Public License
+v3.0 (AGPL-3.0).
 
+You are free to use, study, modify, and distribute the software under
+the terms of the AGPLv3.
+
+If you modify the software and provide access to that modified version
+over a network, the AGPLv3 requires that users be offered access to the
+corresponding source code.
+
+See [LICENSE](LICENSE) for the full license terms.
+
+### Commercial licensing
+
+If your organization wants to use or integrate Mechanistic Mind without
+the copyleft requirements of the AGPLv3, a separate commercial license
+may be available from the copyright holder.
+
+Commercial licensing does not replace or restrict the rights already
+granted under the AGPLv3.
 ---
 
 ## Version scheme
