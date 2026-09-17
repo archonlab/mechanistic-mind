@@ -1,0 +1,82 @@
+{
+  "experiment": "SINGLE_AGENT_LIFE_WORLD_V01",
+  "ticks": 220,
+  "world": {
+    "final_position": [
+      6,
+      3
+    ],
+    "unique_positions_visited": 59,
+    "movement_count": 148,
+    "total_progress": 12.0,
+    "object_use_counts": {
+      "OBJ-04": 37,
+      "OBJ-17": 1,
+      "OBJ-31": 12,
+      "OBJ-23": 3
+    }
+  },
+  "actions": {
+    "unique_action_tokens": 64,
+    "movement_actions": 148,
+    "interaction_actions": 53,
+    "wait_actions": 19
+  },
+  "psyche": {
+    "internal": {
+      "energy": 0.5799999999999987,
+      "hydration": 0.44899999999999807,
+      "fatigue": 0.018000000000000002,
+      "progress": 12.0
+    },
+    "known_positions": 59,
+    "known_objects": {
+      "OBJ-04": {
+        "position": [
+          4,
+          3
+        ],
+        "affordance": "USE",
+        "last_seen_tick": 219
+      },
+      "OBJ-17": {
+        "position": [
+          1,
+          1
+        ],
+        "affordance": "USE",
+        "last_seen_tick": 14
+      },
+      "OBJ-23": {
+        "position": [
+          7,
+          5
+        ],
+        "affordance": "USE",
+        "last_seen_tick": 199
+      },
+      "OBJ-31": {
+        "position": [
+          7,
+          1
+        ],
+        "affordance": "USE",
+        "last_seen_tick": 211
+      }
+    },
+    "learned_action_models": 64,
+    "memory_episodes": 64,
+    "prediction_error_magnitude": 0.0,
+    "self_model": {
+      "executed_actions": 219,
+      "consequence_observations": 219,
+      "agency_reliability": 1.0
+    }
+  },
+  "observer": {
+    "ticks": 220,
+    "archon_observations": 220,
+    "archon_events": 660
+  },
+  "interpretation": "One continuous psyche operates in a partially observed spatial world; hidden object outcomes must be discovered, remembered, and used under changing internal constraints."
+}

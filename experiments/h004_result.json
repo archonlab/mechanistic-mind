@@ -1,0 +1,57 @@
+{
+  "hypothesis_id": "H004-REOPEN-EXPLORATION",
+  "statement": "Reversal adaptation can be restored by reopening alternatives; a deterioration-triggered probe may do so with less unnecessary exploration than fixed random exploration.",
+  "random_exploration": {
+    "condition": "RANDOM_EXPLORATION",
+    "mechanism_id": "H004-RANDOM-EXPLORATION",
+    "ticks": 30,
+    "reversal_after": 6,
+    "pre_optimal_rate": 0.8333333333333334,
+    "post_optimal_rate": 0.6666666666666666,
+    "first_post_a_tick": 7,
+    "post_a": 16,
+    "post_b": 8,
+    "cumulative_outcome": 88.0,
+    "oracle_outcome": 114.0,
+    "regret": 26.0,
+    "exploration_events": 8,
+    "observer_ticks": 30,
+    "archon_observations": 30,
+    "archon_events": 68
+  },
+  "drop_triggered": {
+    "condition": "DROP_TRIGGERED_EXPLORATION",
+    "mechanism_id": "H004-DROP-TRIGGERED",
+    "ticks": 30,
+    "reversal_after": 6,
+    "pre_optimal_rate": 0.8333333333333334,
+    "post_optimal_rate": 0.9583333333333334,
+    "first_post_a_tick": 7,
+    "post_a": 23,
+    "post_b": 1,
+    "cumulative_outcome": 109.0,
+    "oracle_outcome": 114.0,
+    "regret": 5.0,
+    "exploration_events": 1,
+    "observer_ticks": 30,
+    "archon_observations": 30,
+    "archon_events": 72
+  },
+  "status": "BOTH_ADAPT_DROP_TRIGGER_MORE_EFFICIENT",
+  "interpretation": "Both reopening mechanisms recover after reversal, but the outcome-drop trigger produces lower regret in this run.",
+  "observed": {
+    "random_post_optimal_rate": 0.6666666666666666,
+    "drop_post_optimal_rate": 0.9583333333333334,
+    "random_regret": 26.0,
+    "drop_regret": 5.0,
+    "random_exploration_events": 8,
+    "drop_exploration_events": 1
+  },
+  "limits": [
+    "One deterministic reversal world.",
+    "Random-exploration result depends on deterministic seed and epsilon.",
+    "Drop threshold is hand-specified and not learned.",
+    "No noise or gradual regime drift is present.",
+    "Lower regret here does not establish biological plausibility."
+  ]
+}

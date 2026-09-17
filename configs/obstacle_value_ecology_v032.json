@@ -1,0 +1,50 @@
+{
+  "schema": "mechanistic-mind.obstacle-value-ecology/0.3.2",
+  "canonical_world": {
+    "width": 7,
+    "height": 5,
+    "start": [
+      0,
+      2
+    ],
+    "conditions": [
+      "HAZARD",
+      "SHAM_CUE",
+      "NO_OBSTACLE",
+      "REMOVAL"
+    ]
+  },
+  "obstacle": {
+    "position": [
+      3,
+      2
+    ],
+    "cue_signature": "CUE-ROUGH-RED",
+    "traversable": true,
+    "agent_knows_damage_table": false,
+    "hazard_body_effects": {
+      "energy_delta": -0.025,
+      "fatigue_delta": 0.055,
+      "damage_delta": 0.035
+    }
+  },
+  "value_ecology": {
+    "goal_train": {
+      "cue": "CUE-AMBER-VALUABLE",
+      "actual_progress": 0.55
+    },
+    "decoy_spawn_day": 30,
+    "decoy": {
+      "cue": "CUE-AMBER-VALUABLE",
+      "actual_progress": 0.0
+    },
+    "temporal_access": "object cooldowns"
+  },
+  "psychology_labels_not_preset": [
+    "fear",
+    "avoidance",
+    "trust",
+    "perseverance",
+    "personality"
+  ]
+}

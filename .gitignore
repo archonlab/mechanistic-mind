@@ -1,0 +1,65 @@
+# .gitignore — Mechanistic Mind / Psy Observer Web
+
+# Virtual environments / first-run bootstrap marker
+.venv/
+.venv_*/
+.venv*
+venv/
+env/
+.mm_observer_env_ok
+**/.mm_observer_env_ok
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node / frontend
+node_modules/
+web/psy-observer/dist/
+*.tsbuildinfo
+
+# Local Observer runtime state
+.psy_observer/
+*.log
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.cursor/
+
+# Secrets / local env
+.env
+.env.*
+!.env.example
+*.pem
+credentials.json
+
+# Generated run saves (keep pack documentation under results/mm_*)
+results/psychology_observer/psy_observer_web/psyweb-*/
+results/psychology_observer/**/session_*.json
+results/psychology_observer/**/session_*.jsonl
+
+# Large local dumps / archives
+*.tar.gz
+*.zip
+!docs/**/*.zip
+
+# Telemetry noise
+telemetry/*.bin
+**/profiling/
+**/debug_dumps/
+
+# Generated runtime results
+results/

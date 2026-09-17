@@ -1,0 +1,54 @@
+{
+  "experiment": "EXPERIENCE_COMPRESSION_V01",
+  "runtime_version": "0.3.7",
+  "world_seed": 17,
+  "agent_seed": 17,
+  "modes": ["RAW", "COMPRESSED", "FORGETFUL"],
+  "learning_ticks": 150,
+  "total_ticks": 360,
+  "checkpoint_interval": 250,
+  "perturbation": {
+    "kind": "UNANNOUNCED_CONTINGENCY_REVERSAL",
+    "effective_after_tick": 150
+  },
+  "memory": {
+    "episodic_capacity": 64,
+    "raw_episodic_capacity": 5000,
+    "pattern_capacity": 256,
+    "candidate_capacity": 256,
+    "min_pattern_observations": 3,
+    "low_error_threshold": 0.08,
+    "high_error_threshold": 0.35,
+    "surprise_retention_ticks": 40,
+    "invalidation_streak": 3,
+    "pattern_decay": 0.9995,
+    "confidence_scale": 4.0,
+    "exploration_gain": 2.0,
+    "retrieval_mode": "HIERARCHICAL_BOUNDED",
+    "cue_schema_version": "bounded-retrieval-cue-v1",
+    "outcome_directions": [
+      ["energy_signal", 1.0],
+      ["hydration_signal", 1.0],
+      ["fatigue_signal", -1.0],
+      ["discomfort_signal", -1.0],
+      ["effort_signal", -1.0],
+      ["energy_delta", 1.0],
+      ["hydration_delta", 1.0],
+      ["fatigue_delta", -1.0],
+      ["damage_delta", -1.0],
+      ["progress_delta", 1.0]
+    ],
+    "pattern_min_confidence": 0.45,
+    "pattern_min_samples": 3.0,
+    "representative_capacity": 2,
+    "exception_capacity": 3,
+    "episode_bucket_capacity": 16,
+    "cognitive_budget": {
+      "max_pattern_candidates": 4,
+      "max_exception_candidates": 4,
+      "max_episode_candidates": 8,
+      "max_total_memory_candidates": 12
+    }
+  },
+  "benchmark_ticks": [1000, 5000]
+}

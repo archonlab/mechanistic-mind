@@ -1,0 +1,451 @@
+{
+  "A_static_vs_dynamic": {
+    "DYNAMIC_WORLD": {
+      "action_counts": {
+        "MOVE:13,16": 40,
+        "MOVE:14,16": 40
+      },
+      "autonomous_event_kinds": {
+        "AUTONOMOUS_OBJECT_MOVED": 68,
+        "AUTONOMOUS_OBJECT_STATE_CYCLE": 40
+      },
+      "autonomous_events_logged": 108,
+      "causal_experience": {
+        "active_observation_transitions": 1,
+        "autonomous_event_count": 108,
+        "autonomous_object_movements": 68,
+        "autonomous_object_state_transitions": 40,
+        "body_state_deltas_during_wait": 0,
+        "interaction_frequency": 0.0,
+        "move_frequency": 1.0,
+        "observation_count": 80,
+        "passive_observation_transitions": 0,
+        "unique_observation_deltas": 3,
+        "unique_observations": 2,
+        "wait_frequency": 0.0
+      },
+      "condition": "DYNAMIC_WORLD",
+      "final_gate": {
+        "cognitive_depth": 1.421697,
+        "condition": "EXPERIENCE_GATED",
+        "config": {
+          "max_ticks": 200,
+          "min_ticks": 50,
+          "target_ticks": 100
+        },
+        "depth_delta": 0.0,
+        "depth_limitation_reason": "PARTIAL_LOCAL_EVIDENCE",
+        "developmental_maturity": 0.593333,
+        "developmental_stage": "LOCAL_PREDICTIVE_INTEGRATION",
+        "developmental_tick": 79,
+        "experience_metrics": {
+          "fragment_count": 56,
+          "interaction_diversity": 1,
+          "predictive_evidence": 2,
+          "repeated_consequences": 8,
+          "transition_diversity": 10
+        },
+        "gate_factor": 0.473899,
+        "global_ceiling": 0.62775,
+        "local_experience_maturity": 0.473899,
+        "local_metrics": {
+          "current_bucket": "(('CUE-MATTE-12', 'CUE-MATTE-29'), (('discomfort_signal', 'L'), ('effort_signal', 'L'), ('energy_signal', 'M'), ('fatigue_signal', 'L'), ('hydration_signal', 'M')))",
+          "effective_sample_size": 40.65,
+          "evidence_consistency": 1.0,
+          "inspected": 6,
+          "predictive_evidence": 0,
+          "related_consistency": 0.91044,
+          "related_fragments": 4,
+          "related_weighted_fragments": 1.4,
+          "relevant_diversity": 2,
+          "relevant_fragments": 2,
+          "repeated_consequences": 2
+        },
+        "matured": false,
+        "max_learned_proposals_cap": 5,
+        "retrieval_breadth": 16,
+        "retrieval_recent_limit": 16,
+        "time_progress": 0.79
+      },
+      "force_wait": false,
+      "mean_cognitive_depth": 1.058639,
+      "mean_local_maturity": 0.41495,
+      "repeated_action_concentration": 0.5,
+      "ticks": 80
+    },
+    "STATIC_WORLD": {
+      "action_counts": {
+        "MOVE:13,16": 40,
+        "MOVE:14,16": 40
+      },
+      "autonomous_event_kinds": {},
+      "autonomous_events_logged": 0,
+      "causal_experience": {
+        "active_observation_transitions": 0,
+        "autonomous_event_count": 0,
+        "autonomous_object_movements": 0,
+        "autonomous_object_state_transitions": 0,
+        "body_state_deltas_during_wait": 0,
+        "interaction_frequency": 0.0,
+        "move_frequency": 1.0,
+        "observation_count": 80,
+        "passive_observation_transitions": 0,
+        "unique_observation_deltas": 1,
+        "unique_observations": 1,
+        "wait_frequency": 0.0
+      },
+      "condition": "STATIC_WORLD",
+      "final_gate": {
+        "cognitive_depth": 1.42875,
+        "condition": "EXPERIENCE_GATED",
+        "config": {
+          "max_ticks": 200,
+          "min_ticks": 50,
+          "target_ticks": 100
+        },
+        "depth_delta": 0.0,
+        "depth_limitation_reason": "PARTIAL_LOCAL_EVIDENCE",
+        "developmental_maturity": 0.593333,
+        "developmental_stage": "LOCAL_PREDICTIVE_INTEGRATION",
+        "developmental_tick": 79,
+        "experience_metrics": {
+          "fragment_count": 56,
+          "interaction_diversity": 1,
+          "predictive_evidence": 2,
+          "repeated_consequences": 8,
+          "transition_diversity": 10
+        },
+        "gate_factor": 0.47625,
+        "global_ceiling": 0.62775,
+        "local_experience_maturity": 0.47625,
+        "local_metrics": {
+          "current_bucket": "(('CUE-MATTE-12', 'CUE-MATTE-29'), (('discomfort_signal', 'L'), ('effort_signal', 'L'), ('energy_signal', 'M'), ('fatigue_signal', 'L'), ('hydration_signal', 'M')))",
+          "effective_sample_size": 40.65,
+          "evidence_consistency": 1.0,
+          "inspected": 6,
+          "predictive_evidence": 0,
+          "related_consistency": 1.0,
+          "related_fragments": 4,
+          "related_weighted_fragments": 1.4,
+          "relevant_diversity": 2,
+          "relevant_fragments": 2,
+          "repeated_consequences": 2
+        },
+        "matured": false,
+        "max_learned_proposals_cap": 5,
+        "retrieval_breadth": 16,
+        "retrieval_recent_limit": 16,
+        "time_progress": 0.79
+      },
+      "force_wait": false,
+      "mean_cognitive_depth": 1.049559,
+      "mean_local_maturity": 0.416187,
+      "repeated_action_concentration": 0.5,
+      "ticks": 80
+    }
+  },
+  "B_passive_wait": {
+    "DYNAMIC_WORLD": {
+      "action_counts": {
+        "WAIT": 60
+      },
+      "autonomous_event_kinds": {
+        "AUTONOMOUS_OBJECT_MOVED": 68,
+        "AUTONOMOUS_OBJECT_STATE_CYCLE": 28
+      },
+      "autonomous_events_logged": 96,
+      "causal_experience": {
+        "active_observation_transitions": 0,
+        "autonomous_event_count": 96,
+        "autonomous_object_movements": 68,
+        "autonomous_object_state_transitions": 28,
+        "body_state_deltas_during_wait": 60,
+        "interaction_frequency": 0.0,
+        "move_frequency": 0.0,
+        "observation_count": 60,
+        "passive_observation_transitions": 14,
+        "unique_observation_deltas": 4,
+        "unique_observations": 2,
+        "wait_frequency": 1.0
+      },
+      "condition": "PASSIVE_DYNAMIC",
+      "final_gate": {
+        "cognitive_depth": 0.222254,
+        "condition": "EXPERIENCE_GATED",
+        "config": {
+          "max_ticks": 200,
+          "min_ticks": 50,
+          "target_ticks": 100
+        },
+        "depth_delta": -1.055746,
+        "depth_limitation_reason": "INSUFFICIENT_LOCAL_EVIDENCE",
+        "developmental_maturity": 0.393333,
+        "developmental_stage": "SENSORIMOTOR_ACQUISITION",
+        "developmental_tick": 59,
+        "experience_metrics": {
+          "fragment_count": 51,
+          "interaction_diversity": 1,
+          "predictive_evidence": 2,
+          "repeated_consequences": 2,
+          "transition_diversity": 4
+        },
+        "gate_factor": 0.074085,
+        "global_ceiling": 0.42775,
+        "local_experience_maturity": 0.074085,
+        "local_metrics": {
+          "current_bucket": "(('CUE-MATTE-12', 'CUE-MATTE-29'), (('discomfort_signal', 'L'), ('effort_signal', 'L'), ('energy_signal', 'M'), ('fatigue_signal', 'L'), ('hydration_signal', 'H')))",
+          "effective_sample_size": 20.65,
+          "evidence_consistency": 0.0,
+          "inspected": 2,
+          "predictive_evidence": 0,
+          "related_consistency": 0.889181,
+          "related_fragments": 2,
+          "related_weighted_fragments": 0.7,
+          "relevant_diversity": 0,
+          "relevant_fragments": 0,
+          "repeated_consequences": 0
+        },
+        "matured": false,
+        "max_learned_proposals_cap": 2,
+        "retrieval_breadth": 8,
+        "retrieval_recent_limit": 8,
+        "time_progress": 0.59
+      },
+      "force_wait": true,
+      "mean_cognitive_depth": 0.879451,
+      "mean_local_maturity": 0.383873,
+      "repeated_action_concentration": 1.0,
+      "ticks": 60
+    },
+    "STATIC_WORLD": {
+      "action_counts": {
+        "WAIT": 60
+      },
+      "autonomous_event_kinds": {},
+      "autonomous_events_logged": 0,
+      "causal_experience": {
+        "active_observation_transitions": 0,
+        "autonomous_event_count": 0,
+        "autonomous_object_movements": 0,
+        "autonomous_object_state_transitions": 0,
+        "body_state_deltas_during_wait": 60,
+        "interaction_frequency": 0.0,
+        "move_frequency": 0.0,
+        "observation_count": 60,
+        "passive_observation_transitions": 0,
+        "unique_observation_deltas": 1,
+        "unique_observations": 1,
+        "wait_frequency": 1.0
+      },
+      "condition": "PASSIVE_STATIC",
+      "final_gate": {
+        "cognitive_depth": 0.223781,
+        "condition": "EXPERIENCE_GATED",
+        "config": {
+          "max_ticks": 200,
+          "min_ticks": 50,
+          "target_ticks": 100
+        },
+        "depth_delta": -0.976219,
+        "depth_limitation_reason": "INSUFFICIENT_LOCAL_EVIDENCE",
+        "developmental_maturity": 0.368333,
+        "developmental_stage": "SENSORIMOTOR_ACQUISITION",
+        "developmental_tick": 59,
+        "experience_metrics": {
+          "fragment_count": 51,
+          "interaction_diversity": 1,
+          "predictive_evidence": 1,
+          "repeated_consequences": 2,
+          "transition_diversity": 4
+        },
+        "gate_factor": 0.074594,
+        "global_ceiling": 0.407125,
+        "local_experience_maturity": 0.074594,
+        "local_metrics": {
+          "current_bucket": "(('CUE-MATTE-12', 'CUE-MATTE-29'), (('discomfort_signal', 'L'), ('effort_signal', 'L'), ('energy_signal', 'M'), ('fatigue_signal', 'L'), ('hydration_signal', 'H')))",
+          "effective_sample_size": 20.65,
+          "evidence_consistency": 0.0,
+          "inspected": 2,
+          "predictive_evidence": 0,
+          "related_consistency": 1.0,
+          "related_fragments": 2,
+          "related_weighted_fragments": 0.7,
+          "relevant_diversity": 0,
+          "relevant_fragments": 0,
+          "repeated_consequences": 0
+        },
+        "matured": false,
+        "max_learned_proposals_cap": 2,
+        "retrieval_breadth": 8,
+        "retrieval_recent_limit": 8,
+        "time_progress": 0.59
+      },
+      "force_wait": true,
+      "mean_cognitive_depth": 0.838095,
+      "mean_local_maturity": 0.366163,
+      "repeated_action_concentration": 1.0,
+      "ticks": 60
+    }
+  },
+  "C_action_vs_wait_prepared": {
+    "note": "Phase A=forced WAIT, Phase B=free policy; compare transition structure. Full long-horizon version left for later runs.",
+    "phase_a_wait": {
+      "action_counts": {
+        "WAIT": 20
+      },
+      "autonomous_event_kinds": {
+        "AUTONOMOUS_OBJECT_MOVED": 22,
+        "AUTONOMOUS_OBJECT_STATE_CYCLE": 12
+      },
+      "autonomous_events_logged": 34,
+      "causal_experience": {
+        "active_observation_transitions": 0,
+        "autonomous_event_count": 34,
+        "autonomous_object_movements": 22,
+        "autonomous_object_state_transitions": 12,
+        "body_state_deltas_during_wait": 20,
+        "interaction_frequency": 0.0,
+        "move_frequency": 0.0,
+        "observation_count": 20,
+        "passive_observation_transitions": 4,
+        "unique_observation_deltas": 4,
+        "unique_observations": 2,
+        "wait_frequency": 1.0
+      },
+      "condition": "PHASE_A_WAIT",
+      "final_gate": {
+        "cognitive_depth": 0.781251,
+        "condition": "EXPERIENCE_GATED",
+        "config": {
+          "max_ticks": 200,
+          "min_ticks": 50,
+          "target_ticks": 100
+        },
+        "depth_delta": 0.02025,
+        "depth_limitation_reason": "EARLY_GLOBAL_CEILING",
+        "developmental_maturity": 0.298333,
+        "developmental_stage": "LOCAL_PREDICTIVE_INTEGRATION",
+        "developmental_tick": 19,
+        "experience_metrics": {
+          "fragment_count": 21,
+          "interaction_diversity": 1,
+          "predictive_evidence": 2,
+          "repeated_consequences": 2,
+          "transition_diversity": 4
+        },
+        "gate_factor": 0.260417,
+        "global_ceiling": 0.260417,
+        "local_experience_maturity": 0.41643,
+        "local_metrics": {
+          "current_bucket": "(('CUE-MATTE-12', 'CUE-MATTE-29'), (('discomfort_signal', 'L'), ('effort_signal', 'L'), ('energy_signal', 'H'), ('fatigue_signal', 'L'), ('hydration_signal', 'H')))",
+          "effective_sample_size": 19.0,
+          "evidence_consistency": 0.834386,
+          "inspected": 2,
+          "predictive_evidence": 1,
+          "related_consistency": 1.0,
+          "related_fragments": 0,
+          "related_weighted_fragments": 0.0,
+          "relevant_diversity": 2,
+          "relevant_fragments": 2,
+          "repeated_consequences": 1
+        },
+        "matured": false,
+        "max_learned_proposals_cap": 3,
+        "retrieval_breadth": 16,
+        "retrieval_recent_limit": 16,
+        "time_progress": 0.19
+      },
+      "force_wait": true,
+      "mean_cognitive_depth": 0.451075,
+      "mean_local_maturity": 0.319789,
+      "repeated_action_concentration": 1.0,
+      "ticks": 20
+    },
+    "phase_b_free": {
+      "action_counts": {
+        "MOVE:13,16": 10,
+        "MOVE:14,16": 10
+      },
+      "autonomous_event_kinds": {
+        "AUTONOMOUS_OBJECT_MOVED": 18,
+        "AUTONOMOUS_OBJECT_STATE_CYCLE": 12
+      },
+      "autonomous_events_logged": 30,
+      "causal_experience": {
+        "active_observation_transitions": 1,
+        "autonomous_event_count": 30,
+        "autonomous_object_movements": 18,
+        "autonomous_object_state_transitions": 12,
+        "body_state_deltas_during_wait": 0,
+        "interaction_frequency": 0.0,
+        "move_frequency": 1.0,
+        "observation_count": 20,
+        "passive_observation_transitions": 0,
+        "unique_observation_deltas": 3,
+        "unique_observations": 2,
+        "wait_frequency": 0.0
+      },
+      "condition": "PHASE_B_FREE",
+      "final_gate": {
+        "cognitive_depth": 0.969,
+        "condition": "EXPERIENCE_GATED",
+        "config": {
+          "max_ticks": 200,
+          "min_ticks": 50,
+          "target_ticks": 100
+        },
+        "depth_delta": 0.051,
+        "depth_limitation_reason": "EARLY_GLOBAL_CEILING",
+        "developmental_maturity": 0.395,
+        "developmental_stage": "LOCAL_PREDICTIVE_INTEGRATION",
+        "developmental_tick": 19,
+        "experience_metrics": {
+          "fragment_count": 22,
+          "interaction_diversity": 1,
+          "predictive_evidence": 3,
+          "repeated_consequences": 4,
+          "transition_diversity": 6
+        },
+        "gate_factor": 0.323,
+        "global_ceiling": 0.323,
+        "local_experience_maturity": 0.455675,
+        "local_metrics": {
+          "current_bucket": "(('CUE-MATTE-12', 'CUE-MATTE-29'), (('discomfort_signal', 'L'), ('effort_signal', 'L'), ('energy_signal', 'H'), ('fatigue_signal', 'L'), ('hydration_signal', 'H')))",
+          "effective_sample_size": 19.0,
+          "evidence_consistency": 0.818388,
+          "inspected": 2,
+          "predictive_evidence": 1,
+          "related_consistency": 1.0,
+          "related_fragments": 0,
+          "related_weighted_fragments": 0.0,
+          "relevant_diversity": 2,
+          "relevant_fragments": 2,
+          "repeated_consequences": 2
+        },
+        "matured": false,
+        "max_learned_proposals_cap": 4,
+        "retrieval_breadth": 16,
+        "retrieval_recent_limit": 16,
+        "time_progress": 0.19
+      },
+      "force_wait": false,
+      "mean_cognitive_depth": 0.4845,
+      "mean_local_maturity": 0.33222,
+      "repeated_action_concentration": 0.5,
+      "ticks": 20
+    }
+  },
+  "claim_boundary": "Separates (1) whether the experience stream changed from (2) whether agent behavior changed. No superiority claim.",
+  "experiment": "autonomous_world_dynamics_v03",
+  "observer_ui_integration": {
+    "fields": [
+      "world.autonomous_events",
+      "world.causal_provenance_tick",
+      "action_receipt.autonomous_update_kinds",
+      "action_receipt.causal_provenance_tick"
+    ],
+    "machine_readable": true,
+    "psychology_observer_ui": "Not fully wired into Observer panels in this update; ground-truth fields are emitted on world state / receipts."
+  },
+  "seed": 17
+}

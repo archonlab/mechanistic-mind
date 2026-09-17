@@ -1,0 +1,345 @@
+{
+  "behavior": {
+    "action_families": {
+      "MOVE": 102,
+      "USE": 17,
+      "WAIT": 1
+    },
+    "distinct_positions_visited": 97,
+    "obj_29_longest_consecutive_use": 1,
+    "object_uses": {
+      "OBJ-109": 13,
+      "OBJ-12": 3,
+      "OBJ-29": 1
+    }
+  },
+  "claim_boundary": "Autonomous seeded observation of the real runtime. It does not assert that every available manipulation will be selected in one run.",
+  "object_state_changes": {
+    "OBJ-109": {
+      "after": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "before": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "use_count": 13
+    },
+    "OBJ-12": {
+      "after": {
+        "durability": 1.0,
+        "quantity": 0.36000000000000004
+      },
+      "before": {
+        "durability": 1.0,
+        "quantity": 0.9
+      },
+      "use_count": 3
+    },
+    "OBJ-29": {
+      "after": {
+        "durability": 1.0,
+        "quantity": 0.88
+      },
+      "before": {
+        "durability": 1.0,
+        "quantity": 1.0
+      },
+      "use_count": 1
+    }
+  },
+  "release": "0.3.5",
+  "seed": 17,
+  "ticks": 120,
+  "use_receipts": [
+    {
+      "action": "USE:OBJ-29",
+      "effect_available": true,
+      "effect_scale": 1.0,
+      "object_id": "OBJ-29",
+      "object_state_after": {
+        "durability": 1.0,
+        "quantity": 0.88
+      },
+      "object_state_before": {
+        "durability": 1.0,
+        "quantity": 1.0
+      },
+      "object_state_deltas": {
+        "quantity": -0.12
+      },
+      "tick": 1
+    },
+    {
+      "action": "USE:OBJ-12",
+      "effect_available": true,
+      "effect_scale": 1.0,
+      "object_id": "OBJ-12",
+      "object_state_after": {
+        "durability": 1.0,
+        "quantity": 0.72
+      },
+      "object_state_before": {
+        "durability": 1.0,
+        "quantity": 0.9
+      },
+      "object_state_deltas": {
+        "quantity": -0.18000000000000005
+      },
+      "tick": 3
+    },
+    {
+      "action": "USE:OBJ-12",
+      "effect_available": true,
+      "effect_scale": 1.0,
+      "object_id": "OBJ-12",
+      "object_state_after": {
+        "durability": 1.0,
+        "quantity": 0.54
+      },
+      "object_state_before": {
+        "durability": 1.0,
+        "quantity": 0.72
+      },
+      "object_state_deltas": {
+        "quantity": -0.17999999999999994
+      },
+      "tick": 4
+    },
+    {
+      "action": "USE:OBJ-12",
+      "effect_available": true,
+      "effect_scale": 1.0,
+      "object_id": "OBJ-12",
+      "object_state_after": {
+        "durability": 1.0,
+        "quantity": 0.36000000000000004
+      },
+      "object_state_before": {
+        "durability": 1.0,
+        "quantity": 0.54
+      },
+      "object_state_deltas": {
+        "quantity": -0.18
+      },
+      "tick": 45
+    },
+    {
+      "action": "USE:OBJ-109",
+      "effect_available": true,
+      "effect_scale": 1.0,
+      "object_id": "OBJ-109",
+      "object_state_after": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_before": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_deltas": {},
+      "tick": 103
+    },
+    {
+      "action": "USE:OBJ-109",
+      "effect_available": true,
+      "effect_scale": 1.0,
+      "object_id": "OBJ-109",
+      "object_state_after": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_before": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_deltas": {},
+      "tick": 104
+    },
+    {
+      "action": "USE:OBJ-109",
+      "effect_available": true,
+      "effect_scale": 1.0,
+      "object_id": "OBJ-109",
+      "object_state_after": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_before": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_deltas": {},
+      "tick": 105
+    },
+    {
+      "action": "USE:OBJ-109",
+      "effect_available": true,
+      "effect_scale": 1.0,
+      "object_id": "OBJ-109",
+      "object_state_after": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_before": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_deltas": {},
+      "tick": 106
+    },
+    {
+      "action": "USE:OBJ-109",
+      "effect_available": true,
+      "effect_scale": 1.0,
+      "object_id": "OBJ-109",
+      "object_state_after": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_before": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_deltas": {},
+      "tick": 109
+    },
+    {
+      "action": "USE:OBJ-109",
+      "effect_available": true,
+      "effect_scale": 1.0,
+      "object_id": "OBJ-109",
+      "object_state_after": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_before": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_deltas": {},
+      "tick": 110
+    },
+    {
+      "action": "USE:OBJ-109",
+      "effect_available": true,
+      "effect_scale": 1.0,
+      "object_id": "OBJ-109",
+      "object_state_after": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_before": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_deltas": {},
+      "tick": 111
+    },
+    {
+      "action": "USE:OBJ-109",
+      "effect_available": true,
+      "effect_scale": 1.0,
+      "object_id": "OBJ-109",
+      "object_state_after": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_before": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_deltas": {},
+      "tick": 114
+    },
+    {
+      "action": "USE:OBJ-109",
+      "effect_available": true,
+      "effect_scale": 1.0,
+      "object_id": "OBJ-109",
+      "object_state_after": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_before": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_deltas": {},
+      "tick": 115
+    },
+    {
+      "action": "USE:OBJ-109",
+      "effect_available": true,
+      "effect_scale": 1.0,
+      "object_id": "OBJ-109",
+      "object_state_after": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_before": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_deltas": {},
+      "tick": 116
+    },
+    {
+      "action": "USE:OBJ-109",
+      "effect_available": true,
+      "effect_scale": 1.0,
+      "object_id": "OBJ-109",
+      "object_state_after": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_before": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_deltas": {},
+      "tick": 117
+    },
+    {
+      "action": "USE:OBJ-109",
+      "effect_available": true,
+      "effect_scale": 1.0,
+      "object_id": "OBJ-109",
+      "object_state_after": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_before": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_deltas": {},
+      "tick": 119
+    },
+    {
+      "action": "USE:OBJ-109",
+      "effect_available": true,
+      "effect_scale": 1.0,
+      "object_id": "OBJ-109",
+      "object_state_after": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_before": {
+        "durability": 0.59,
+        "quantity": 1.305
+      },
+      "object_state_deltas": {},
+      "tick": 120
+    }
+  ],
+  "world": {
+    "dimensions": [
+      32,
+      32
+    ],
+    "object_count": 30,
+    "unique_object_positions": 30
+  }
+}

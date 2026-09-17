@@ -1,0 +1,26 @@
+{
+  "experiment": "developmental_experience_v01",
+  "seed": 17,
+  "developmental_ticks": 80,
+  "common_life_ticks": 120,
+  "conditions": {
+    "DEVELOPMENTAL": {
+      "condition": "DEVELOPMENTAL",
+      "min_ticks": 20,
+      "target_ticks": 40,
+      "max_ticks": 80,
+      "target_fragments": 30,
+      "target_transition_diversity": 12,
+      "target_interaction_diversity": 4,
+      "target_repeated_consequences": 8,
+      "target_predictive_evidence": 6
+    },
+    "ADULT_FROM_TICK_0": {
+      "condition": "ADULT_FROM_TICK_0",
+      "min_ticks": 20,
+      "target_ticks": 40,
+      "max_ticks": 80
+    }
+  },
+  "note": "Short deterministic defaults for CI. Production windows remain 3k/5k/10k + 20k-50k common life."
+}

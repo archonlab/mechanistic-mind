@@ -1,0 +1,1349 @@
+# Claim registry
+
+Machine-readable canonical registry: `structured/claims.json`. Claims are deduplicated per surviving source claim ID; later changes must append revision links rather than erase history.
+
+- **CLAIM-4.39-001** [SUPPORTED] C10 body sensorimotor predictive learning — EXP-4.39
+- **CLAIM-4.39-002** [SUPPORTED] C11 precursor body prediction — EXP-4.39
+- **CLAIM-4.39-003** [SUPPORTED] C12 multistep acquired structure — EXP-4.39
+- **CLAIM-4.39-004** [NOT_SUPPORTED] C13 matched state anticipatory modulation — EXP-4.39
+- **CLAIM-4.39-005** [NOT_SUPPORTED] C14 anticipatory motor influence — EXP-4.39
+- **CLAIM-4.39-006** [NOT_SUPPORTED] C15 predictive path necessity — EXP-4.39
+- **CLAIM-4.39-007** [NOT_SUPPORTED] C16 valuation independence — EXP-4.39
+- **CLAIM-4.39-008** [NOT_SUPPORTED] C17 false prediction following — EXP-4.39
+- **CLAIM-4.39-009** [SUPPORTED] C18 online prediction revision — EXP-4.39
+- **CLAIM-4.39-010** [NOT_SUPPORTED] C19 online sensorimotor revision — EXP-4.39
+- **CLAIM-4.39-011** [SUPPORTED] C1 intrinsic sensorimotor evolution — EXP-4.39
+- **CLAIM-4.39-012** [SUPPORTED] C20 passive development compatibility — EXP-4.39
+- **CLAIM-4.39-013** [SUPPORTED] C21 boundedness — EXP-4.39
+- **CLAIM-4.39-014** [SUPPORTED] C2 spontaneous motor generation — EXP-4.39
+- **CLAIM-4.39-015** [SUPPORTED] C3 body state coupling — EXP-4.39
+- **CLAIM-4.39-016** [SUPPORTED] C4 body dependent motor consequence — EXP-4.39
+- **CLAIM-4.39-017** [SUPPORTED] C5 body coupling necessity — EXP-4.39
+- **CLAIM-4.39-018** [SUPPORTED] C6 signal physics separation — EXP-4.39
+- **CLAIM-4.39-019** [SUPPORTED] C7 non valuational reactive modulation — EXP-4.39
+- **CLAIM-4.39-020** [SUPPORTED] C8 physical dose response — EXP-4.39
+- **CLAIM-4.39-021** [SUPPORTED] C9 action body consequence learning — EXP-4.39
+- **CLAIM-4.40-001** [NOT_SUPPORTED] C10 endogenous signal necessity — EXP-4.40
+- **CLAIM-4.40-002** [NOT_SUPPORTED] C11 actual body independence — EXP-4.40
+- **CLAIM-4.40-003** [NOT_SUPPORTED] C12 direct cue independence — EXP-4.40
+- **CLAIM-4.40-004** [NOT_SUPPORTED] C13 history dependent present dynamics — EXP-4.40
+- **CLAIM-4.40-005** [NOT_SUPPORTED] C14 structural correspondence — EXP-4.40
+- **CLAIM-4.40-006** [NOT_SUPPORTED] C15 cross mapping causality — EXP-4.40
+- **CLAIM-4.40-007** [NOT_SUPPORTED] C16 passive acquisition — EXP-4.40
+- **CLAIM-4.40-008** [NOT_SUPPORTED] C17 raw history independence — EXP-4.40
+- **CLAIM-4.40-009** [NOT_SUPPORTED] C18 valuation independence — EXP-4.40
+- **CLAIM-4.40-010** [SUPPORTED] C19 prediction revision — EXP-4.40
+- **CLAIM-4.40-011** [SUPPORTED] C1 generic endogenous signal dynamics — EXP-4.40
+- **CLAIM-4.40-012** [NOT_SUPPORTED] C20 endogenous signal revision — EXP-4.40
+- **CLAIM-4.40-013** [NOT_SUPPORTED] C21 present N revision — EXP-4.40
+- **CLAIM-4.40-014** [NOT_SUPPORTED] C22 false prediction following — EXP-4.40
+- **CLAIM-4.40-015** [NOT_SUPPORTED] C23 motor consequence — EXP-4.40
+- **CLAIM-4.40-016** [NOT_SUPPORTED] C24 motor path necessity — EXP-4.40
+- **CLAIM-4.40-017** [SUPPORTED] C25 boundedness — EXP-4.40
+- **CLAIM-4.40-018** [SUPPORTED] C2 generic I N coupling — EXP-4.40
+- **CLAIM-4.40-019** [SUPPORTED] C3 I N necessity — EXP-4.40
+- **CLAIM-4.40-020** [SUPPORTED] C4 precursor body N learning — EXP-4.40
+- **CLAIM-4.40-021** [SUPPORTED] C5 multiple future structures — EXP-4.40
+- **CLAIM-4.40-022** [NOT_SUPPORTED] C6 acquired endogenous signal generation — EXP-4.40
+- **CLAIM-4.40-023** [NOT_SUPPORTED] C7 temporal structure dependence — EXP-4.40
+- **CLAIM-4.40-024** [NOT_SUPPORTED] C8 prediction dependence — EXP-4.40
+- **CLAIM-4.40-025** [NOT_SUPPORTED] C9 pre event sensorimotor modulation — EXP-4.40
+- **CLAIM-4.41-001** [SUPPORTED] C10 destination exposure independence — EXP-4.41
+- **CLAIM-4.41-002** [SUPPORTED] C11 mapping specificity — EXP-4.41
+- **CLAIM-4.41-003** [SUPPORTED] C12 multiple acquired relations — EXP-4.41
+- **CLAIM-4.41-004** [SUPPORTED] C13 prediction runtime independence — EXP-4.41
+- **CLAIM-4.41-005** [SUPPORTED] C14 stored prediction dynamics dissociation — EXP-4.41
+- **CLAIM-4.41-006** [SUPPORTED] C15 endogenous signal generation — EXP-4.41
+- **CLAIM-4.41-007** [SUPPORTED] C16 I N propagation — EXP-4.41
+- **CLAIM-4.41-008** [SUPPORTED] C17 I N necessity — EXP-4.41
+- **CLAIM-4.41-009** [SUPPORTED] C18 pre event effect — EXP-4.41
+- **CLAIM-4.41-010** [SUPPORTED] C19 event omission survival — EXP-4.41
+- **CLAIM-4.41-011** [SUPPORTED] C1 bounded internal dynamics — EXP-4.41
+- **CLAIM-4.41-012** [SUPPORTED] C20 same present different history effect — EXP-4.41
+- **CLAIM-4.41-013** [SUPPORTED] C21 body future specificity — EXP-4.41
+- **CLAIM-4.41-014** [SUPPORTED] C22 reversal revision — EXP-4.41
+- **CLAIM-4.41-015** [SUPPORTED] C23 activation revision — EXP-4.41
+- **CLAIM-4.41-016** [SUPPORTED] C24 N revision — EXP-4.41
+- **CLAIM-4.41-017** [SUPPORTED] C25 relation removal adaptation — EXP-4.41
+- **CLAIM-4.41-018** [SUPPORTED] C26 reacquisition — EXP-4.41
+- **CLAIM-4.41-019** [SUPPORTED] C27 raw history independence — EXP-4.41
+- **CLAIM-4.41-020** [SUPPORTED] C28 long run boundedness — EXP-4.41
+- **CLAIM-4.41-021** [SUPPORTED] C29 motor consequence — EXP-4.41
+- **CLAIM-4.41-022** [SUPPORTED] C2 local adaptive coupling — EXP-4.41
+- **CLAIM-4.41-023** [SUPPORTED] C30 valuation independence — EXP-4.41
+- **CLAIM-4.41-024** [SUPPORTED] C3 structured experience changes coupling — EXP-4.41
+- **CLAIM-4.41-025** [SUPPORTED] C4 temporal structure dependence — EXP-4.41
+- **CLAIM-4.41-026** [SUPPORTED] C5 noise control — EXP-4.41
+- **CLAIM-4.41-027** [SUPPORTED] C6 history dependent internal activation — EXP-4.41
+- **CLAIM-4.41-028** [SUPPORTED] C7 plasticity necessity — EXP-4.41
+- **CLAIM-4.41-029** [SUPPORTED] C8 acquired coupling necessity — EXP-4.41
+- **CLAIM-4.41-030** [SUPPORTED] C9 repetition independence — EXP-4.41
+- **CLAIM-4.42-001** [SUPPORTED] C10 pre event internal activation — EXP-4.42
+- **CLAIM-4.42-002** [SUPPORTED] C11 W necessity — EXP-4.42
+- **CLAIM-4.42-003** [SUPPORTED] C12 event omission survival — EXP-4.42
+- **CLAIM-4.42-004** [SUPPORTED] C13 explicit prediction independence — EXP-4.42
+- **CLAIM-4.42-005** [SUPPORTED] C14 valuation independence — EXP-4.42
+- **CLAIM-4.42-006** [SUPPORTED] C15 pre event N modulation — EXP-4.42
+- **CLAIM-4.42-007** [SUPPORTED] C16 I to N necessity — EXP-4.42
+- **CLAIM-4.42-008** [SUPPORTED] C17 autonomous motor modulation — EXP-4.42
+- **CLAIM-4.42-009** [SUPPORTED] C18 motor path necessity — EXP-4.42
+- **CLAIM-4.42-010** [SUPPORTED] C19 autonomous physical intervention — EXP-4.42
+- **CLAIM-4.42-011** [SUPPORTED] C1 autonomous body evolution — EXP-4.42
+- **CLAIM-4.42-012** [SUPPORTED] C20 stochastic baseline separation — EXP-4.42
+- **CLAIM-4.42-013** [SUPPORTED] C21 same present different history action — EXP-4.42
+- **CLAIM-4.42-014** [NOT_SUPPORTED] C22 future body divergence — EXP-4.42
+- **CLAIM-4.42-015** [NOT_SUPPORTED] C23 intervention necessity for future — EXP-4.42
+- **CLAIM-4.42-016** [NOT_SUPPORTED] C24 closed body coupled loop — EXP-4.42
+- **CLAIM-4.42-017** [SUPPORTED] C25 passive development compatibility — EXP-4.42
+- **CLAIM-4.42-018** [SUPPORTED] C26 reversal of acquired coupling — EXP-4.42
+- **CLAIM-4.42-019** [SUPPORTED] C27 reversal of pre event internal — EXP-4.42
+- **CLAIM-4.42-020** [SUPPORTED] C28 reversal of autonomous intervention — EXP-4.42
+- **CLAIM-4.42-021** [SUPPORTED] C29 reversal of future body — EXP-4.42
+- **CLAIM-4.42-022** [SUPPORTED] C2 physical interaction consequence — EXP-4.42
+- **CLAIM-4.42-023** [SUPPORTED] C30 relation removal adaptation — EXP-4.42
+- **CLAIM-4.42-024** [SUPPORTED] C31 reacquisition — EXP-4.42
+- **CLAIM-4.42-025** [SUPPORTED] C32 raw history independence — EXP-4.42
+- **CLAIM-4.42-026** [SUPPORTED] C33 long run boundedness — EXP-4.42
+- **CLAIM-4.42-027** [SUPPORTED] C34 second order development — EXP-4.42
+- **CLAIM-4.42-028** [SUPPORTED] C3 immediate consequence match — EXP-4.42
+- **CLAIM-4.42-029** [SUPPORTED] C4 body coupled developmental experience — EXP-4.42
+- **CLAIM-4.42-030** [SUPPORTED] C5 local coupling acquisition — EXP-4.42
+- **CLAIM-4.42-031** [SUPPORTED] C6 temporal structure dependence — EXP-4.42
+- **CLAIM-4.42-032** [NOT_SUPPORTED] C7 action repetition independence — EXP-4.42
+- **CLAIM-4.42-033** [SUPPORTED] C8 body exposure independence — EXP-4.42
+- **CLAIM-4.42-034** [SUPPORTED] C9 precursor dependence — EXP-4.42
+- **CLAIM-4.43-001** [SUPPORTED] C10 B exposure independence — EXP-4.43
+- **CLAIM-4.43-002** [SUPPORTED] C11 proximal repetition independence — EXP-4.43
+- **CLAIM-4.43-003** [SUPPORTED] C12 delay dependence — EXP-4.43
+- **CLAIM-4.43-004** [SUPPORTED] C13 out of window loss — EXP-4.43
+- **CLAIM-4.43-005** [SUPPORTED] C14 same present internal difference — EXP-4.43
+- **CLAIM-4.43-006** [SUPPORTED] C15 W necessity — EXP-4.43
+- **CLAIM-4.43-007** [SUPPORTED] C16 pre event N difference — EXP-4.43
+- **CLAIM-4.43-008** [SUPPORTED] C17 motor distribution difference — EXP-4.43
+- **CLAIM-4.43-009** [NOT_SUPPORTED] C18 autonomous pA difference — EXP-4.43
+- **CLAIM-4.43-010** [NOT_SUPPORTED] C19 stochastic separation — EXP-4.43
+- **CLAIM-4.43-011** [SUPPORTED] C1 distinct X and A — EXP-4.43
+- **CLAIM-4.43-012** [SUPPORTED] C20 explicit prediction independence — EXP-4.43
+- **CLAIM-4.43-013** [SUPPORTED] C21 valuation independence — EXP-4.43
+- **CLAIM-4.43-014** [SUPPORTED] C22 raw history independence — EXP-4.43
+- **CLAIM-4.43-015** [SUPPORTED] C23 B removal causality — EXP-4.43
+- **CLAIM-4.43-016** [SUPPORTED] C24 temporal shift causality — EXP-4.43
+- **CLAIM-4.43-017** [SUPPORTED] C25 physical consequence specificity — EXP-4.43
+- **CLAIM-4.43-018** [SUPPORTED] C26 representational coexistence — EXP-4.43
+- **CLAIM-4.43-019** [SUPPORTED] C27 boundedness — EXP-4.43
+- **CLAIM-4.43-020** [SUPPORTED] C28 acquisition horizon — EXP-4.43
+- **CLAIM-4.43-021** [NOT_SUPPORTED] C29 442 C7 resolution — EXP-4.43
+- **CLAIM-4.43-022** [SUPPORTED] C2 proximal history match — EXP-4.43
+- **CLAIM-4.43-023** [NOT_SUPPORTED] C30 distal consequence to motor — EXP-4.43
+- **CLAIM-4.43-024** [NOT_SUPPORTED] C31 future body secondary — EXP-4.43
+- **CLAIM-4.43-025** [SUPPORTED] C32 historical null preservation — EXP-4.43
+- **CLAIM-4.43-026** [SUPPORTED] C3 distal exposure match — EXP-4.43
+- **CLAIM-4.43-027** [SUPPORTED] C4 distal temporal difference — EXP-4.43
+- **CLAIM-4.43-028** [SUPPORTED] C5 B reaches ordinary physics — EXP-4.43
+- **CLAIM-4.43-029** [SUPPORTED] C6 eligibility present at B — EXP-4.43
+- **CLAIM-4.43-030** [SUPPORTED] C7 B participates in local update — EXP-4.43
+- **CLAIM-4.43-031** [SUPPORTED] C8 distal W difference — EXP-4.43
+- **CLAIM-4.43-032** [SUPPORTED] C9 temporal specificity — EXP-4.43
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-001** [SUPPORTED] C10 self generated further W change — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-002** [SUPPORTED] C11 recursive probe shift — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-003** [SUPPORTED] C12 plasticity mediates probe shift — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-004** [SUPPORTED] C13 not researcher forced in auto — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-005** [SUPPORTED] C14 yoked matched actions — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-006** [SUPPORTED] C15 yoked W path distinct or matched — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-007** [SUPPORTED] C16 force vs endogenous distinguishable — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-008** [SUPPORTED] C17 naive spontaneous also learns — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-009** [SUPPORTED] C18 bootstrap plus auto exceeds naive auto — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-010** [SUPPORTED] C19 consequence specificity — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-011** [SUPPORTED] C1 endogenous action occurs — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-012** [SUPPORTED] C20 reversal revises W — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-013** [SUPPORTED] C21 prediction independence — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-014** [SUPPORTED] C22 valuation independence — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-015** [SUPPORTED] C23 raw history independence — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-016** [SUPPORTED] C24 boundedness — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-017** [SUPPORTED] C25 recursive closed loop — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-018** [SUPPORTED] C2 endogenous A physical success — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-019** [SUPPORTED] C3 endogenous experience logged — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-020** [SUPPORTED] C4 autonomous W change — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-021** [SUPPORTED] C5 plasticity necessity — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-022** [SUPPORTED] C6 beyond decay baseline — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-023** [SUPPORTED] C7 motor path necessity — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-024** [SUPPORTED] C8 physical A necessity — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.43-SELF-GENERATED-DEVELOPMENT-025** [SUPPORTED] C9 bootstrap alters baseline — EXP-4.43-SELF-GENERATED-DEVELOPMENT
+- **CLAIM-4.44-001** [NOT_SUPPORTED] C10 N interaction — EXP-4.44
+- **CLAIM-4.44-002** [NOT_SUPPORTED] C11 motor interaction — EXP-4.44
+- **CLAIM-4.44-003** [NOT_SUPPORTED] C12 pA interaction — EXP-4.44
+- **CLAIM-4.44-004** [SUPPORTED] C13 stochastic separation — EXP-4.44
+- **CLAIM-4.44-005** [SUPPORTED] C14 seed consistency — EXP-4.44
+- **CLAIM-4.44-006** [NOT_SUPPORTED] C15 W necessity — EXP-4.44
+- **CLAIM-4.44-007** [SUPPORTED] C16 I to N necessity — EXP-4.44
+- **CLAIM-4.44-008** [SUPPORTED] C17 body to N necessity — EXP-4.44
+- **CLAIM-4.44-009** [SUPPORTED] C18 explicit prediction independence — EXP-4.44
+- **CLAIM-4.44-010** [SUPPORTED] C19 valuation independence — EXP-4.44
+- **CLAIM-4.44-011** [SUPPORTED] C1 443 reproduction — EXP-4.44
+- **CLAIM-4.44-012** [SUPPORTED] C20 no action feasibility confound — EXP-4.44
+- **CLAIM-4.44-013** [SUPPORTED] C21 no clipping saturation — EXP-4.44
+- **CLAIM-4.44-014** [SUPPORTED] C22 trajectory probe feasible — EXP-4.44
+- **CLAIM-4.44-015** [NOT_SUPPORTED] C23 same body diff traj internal — EXP-4.44
+- **CLAIM-4.44-016** [NOT_SUPPORTED] C24 same body diff traj motor — EXP-4.44
+- **CLAIM-4.44-017** [NOT_SUPPORTED] C25 traj x history — EXP-4.44
+- **CLAIM-4.44-018** [SUPPORTED] C26 complete state match — EXP-4.44
+- **CLAIM-4.44-019** [SUPPORTED] C27 raw history independence — EXP-4.44
+- **CLAIM-4.44-020** [SUPPORTED] C28 boundedness — EXP-4.44
+- **CLAIM-4.44-021** [NOT_SUPPORTED] C29 443 readout resolution — EXP-4.44
+- **CLAIM-4.44-022** [SUPPORTED] C2 valid body probe states — EXP-4.44
+- **CLAIM-4.44-023** [NOT_SUPPORTED] C30 future body secondary — EXP-4.44
+- **CLAIM-4.44-024** [SUPPORTED] C31 historical null preservation — EXP-4.44
+- **CLAIM-4.44-025** [SUPPORTED] C3 body main effect on N — EXP-4.44
+- **CLAIM-4.44-026** [SUPPORTED] C4 body main effect on motor — EXP-4.44
+- **CLAIM-4.44-027** [SUPPORTED] C5 distal history W — EXP-4.44
+- **CLAIM-4.44-028** [SUPPORTED] C6 distal history qIN — EXP-4.44
+- **CLAIM-4.44-029** [SUPPORTED] C7 factorial matching — EXP-4.44
+- **CLAIM-4.44-030** [NOT_SUPPORTED] C8 q interaction — EXP-4.44
+- **CLAIM-4.44-031** [NOT_SUPPORTED] C9 I interaction — EXP-4.44
+- **CLAIM-4.45-001** [SUPPORTED] C10 survives matched external — EXP-4.45
+- **CLAIM-4.45-002** [SUPPORTED] C11 survives matched body — EXP-4.45
+- **CLAIM-4.45-003** [SUPPORTED] C12 PRESENT1 — EXP-4.45
+- **CLAIM-4.45-004** [SUPPORTED] C13 PRESENT2 q — EXP-4.45
+- **CLAIM-4.45-005** [SUPPORTED] C14 PRESENT2 I — EXP-4.45
+- **CLAIM-4.45-006** [SUPPORTED] C15 PRESENT2 N — EXP-4.45
+- **CLAIM-4.45-007** [SUPPORTED] C16 plasticity off — EXP-4.45
+- **CLAIM-4.45-008** [SUPPORTED] C17 W reset — EXP-4.45
+- **CLAIM-4.45-009** [SUPPORTED] C18 world only not full — EXP-4.45
+- **CLAIM-4.45-010** [SUPPORTED] C19 body only not full — EXP-4.45
+- **CLAIM-4.45-011** [SUPPORTED] C1 external varies — EXP-4.45
+- **CLAIM-4.45-012** [NOT_SUPPORTED] C20 shuffled not full — EXP-4.45
+- **CLAIM-4.45-013** [SUPPORTED] C21 matched marginals distinguishable — EXP-4.45
+- **CLAIM-4.45-014** [SUPPORTED] C22 familiar vs unpaired — EXP-4.45
+- **CLAIM-4.45-015** [SUPPORTED] C23 reversal revises — EXP-4.45
+- **CLAIM-4.45-016** [SUPPORTED] C24 reacquisition — EXP-4.45
+- **CLAIM-4.45-017** [NOT_SUPPORTED] C25 body traj alone 444 null — EXP-4.45
+- **CLAIM-4.45-018** [SUPPORTED] C26 body rel to external — EXP-4.45
+- **CLAIM-4.45-019** [NOT_SUPPORTED] C27 motor — EXP-4.45
+- **CLAIM-4.45-020** [SUPPORTED] C28 motor valuation — EXP-4.45
+- **CLAIM-4.45-021** [SUPPORTED] C29 motor prediction — EXP-4.45
+- **CLAIM-4.45-022** [SUPPORTED] C2 body varies — EXP-4.45
+- **CLAIM-4.45-023** [SUPPORTED] C30 no semantic leak — EXP-4.45
+- **CLAIM-4.45-024** [SUPPORTED] C31 bounded — EXP-4.45
+- **CLAIM-4.45-025** [SUPPORTED] C32 joint not exposure — EXP-4.45
+- **CLAIM-4.45-026** [SUPPORTED] C3 no condition labels — EXP-4.45
+- **CLAIM-4.45-027** [SUPPORTED] C4 matched x marginals — EXP-4.45
+- **CLAIM-4.45-028** [SUPPORTED] C5 matched b marginals — EXP-4.45
+- **CLAIM-4.45-029** [SUPPORTED] C6 temporal relation differs — EXP-4.45
+- **CLAIM-4.45-030** [SUPPORTED] C7 W modified — EXP-4.45
+- **CLAIM-4.45-031** [SUPPORTED] C8 coupled histories differ in W — EXP-4.45
+- **CLAIM-4.45-032** [SUPPORTED] C9 survives raw purge — EXP-4.45
+- **CLAIM-4.46-001** [SUPPORTED] C10 shuffled not full — EXP-4.46
+- **CLAIM-4.46-002** [SUPPORTED] C11 N only not full — EXP-4.46
+- **CLAIM-4.46-003** [SUPPORTED] C12 M only not full — EXP-4.46
+- **CLAIM-4.46-004** [SUPPORTED] C13 same N1 preactivation — EXP-4.46
+- **CLAIM-4.46-005** [SUPPORTED] C14 same N1 distribution — EXP-4.46
+- **CLAIM-4.46-006** [SUPPORTED] C15 relation specific — EXP-4.46
+- **CLAIM-4.46-007** [SUPPORTED] C16 R reset removes — EXP-4.46
+- **CLAIM-4.46-008** [SUPPORTED] C17 plasticity off — EXP-4.46
+- **CLAIM-4.46-009** [SUPPORTED] C18 eligibility ablation — EXP-4.46
+- **CLAIM-4.46-010** [SUPPORTED] C19 survives prediction ablation — EXP-4.46
+- **CLAIM-4.46-011** [SUPPORTED] C1 generic N channels — EXP-4.46
+- **CLAIM-4.46-012** [SUPPORTED] C20 survives OSV — EXP-4.46
+- **CLAIM-4.46-013** [SUPPORTED] C21 W not required — EXP-4.46
+- **CLAIM-4.46-014** [SUPPORTED] C22 probe geometry — EXP-4.46
+- **CLAIM-4.46-015** [SUPPORTED] C23 unpaired comparatively unchanged — EXP-4.46
+- **CLAIM-4.46-016** [SUPPORTED] C24 reversal revises — EXP-4.46
+- **CLAIM-4.46-017** [SUPPORTED] C25 relation removal updates — EXP-4.46
+- **CLAIM-4.46-018** [SUPPORTED] C26 R bounded — EXP-4.46
+- **CLAIM-4.46-019** [SUPPORTED] C27 constant storage — EXP-4.46
+- **CLAIM-4.46-020** [NOT_SUPPORTED] C28 endogenous N uses R — EXP-4.46
+- **CLAIM-4.46-021** [SUPPORTED] C29 no condition label — EXP-4.46
+- **CLAIM-4.46-022** [SUPPORTED] C2 generic M channels — EXP-4.46
+- **CLAIM-4.46-023** [SUPPORTED] C30 no semantic leak — EXP-4.46
+- **CLAIM-4.46-024** [SUPPORTED] C31 regressions — EXP-4.46
+- **CLAIM-4.46-025** [SUPPORTED] C32 not fixed readout alone — EXP-4.46
+- **CLAIM-4.46-026** [SUPPORTED] C33 not global gain — EXP-4.46
+- **CLAIM-4.46-027** [SUPPORTED] C34 reflects temporal relation — EXP-4.46
+- **CLAIM-4.46-028** [SUPPORTED] C3 R init neutral — EXP-4.46
+- **CLAIM-4.46-029** [SUPPORTED] C4 local NM only — EXP-4.46
+- **CLAIM-4.46-030** [SUPPORTED] C5 matched N marginals — EXP-4.46
+- **CLAIM-4.46-031** [SUPPORTED] C6 matched M marginals — EXP-4.46
+- **CLAIM-4.46-032** [SUPPORTED] C7 temporal relation differs — EXP-4.46
+- **CLAIM-4.46-033** [SUPPORTED] C8 R modified — EXP-4.46
+- **CLAIM-4.46-034** [SUPPORTED] C9 HA HB distinct R — EXP-4.46
+- **CLAIM-4.47-001** [SUPPORTED] C10 endo projects — EXP-4.47
+- **CLAIM-4.47-002** [SUPPORTED] C11 projection predicts — EXP-4.47
+- **CLAIM-4.47-003** [SUPPORTED] C12 amplitude match reproduces probe — EXP-4.47
+- **CLAIM-4.47-004** [NOT_SUPPORTED] C13 direction match reproduces probe — EXP-4.47
+- **CLAIM-4.47-005** [SUPPORTED] C14 sweep smooth — EXP-4.47
+- **CLAIM-4.47-006** [SUPPORTED] C15 endo replay matches ordinary — EXP-4.47
+- **CLAIM-4.47-007** [NOT_SUPPORTED] C16 endo replay differs — EXP-4.47
+- **CLAIM-4.47-008** [SUPPORTED] C17 probe at endo boundary — EXP-4.47
+- **CLAIM-4.47-009** [SUPPORTED] C18 matched vector deterministic — EXP-4.47
+- **CLAIM-4.47-010** [SUPPORTED] C19 pathway diff attributed — EXP-4.47
+- **CLAIM-4.47-011** [SUPPORTED] C1 446 reproduces D — EXP-4.47
+- **CLAIM-4.47-012** [NOT_SUPPORTED] C20 temporal vs snapshot — EXP-4.47
+- **CLAIM-4.47-013** [NOT_SUPPORTED] C21 shuffle changes — EXP-4.47
+- **CLAIM-4.47-014** [NOT_SUPPORTED] C22 operating point — EXP-4.47
+- **CLAIM-4.47-015** [NOT_SUPPORTED] C23 fixed readout nonlinear — EXP-4.47
+- **CLAIM-4.47-016** [NOT_SUPPORTED] C24 stochastic explains — EXP-4.47
+- **CLAIM-4.47-017** [SUPPORTED] C25 prestochastic endo present — EXP-4.47
+- **CLAIM-4.47-018** [NOT_SUPPORTED] C26 endo weak subspace — EXP-4.47
+- **CLAIM-4.47-019** [SUPPORTED] C27 no gain change — EXP-4.47
+- **CLAIM-4.47-020** [SUPPORTED] C28 no R change — EXP-4.47
+- **CLAIM-4.47-021** [SUPPORTED] C29 no qIN change — EXP-4.47
+- **CLAIM-4.47-022** [SUPPORTED] C2 probe reproduces — EXP-4.47
+- **CLAIM-4.47-023** [SUPPORTED] C30 no reward — EXP-4.47
+- **CLAIM-4.47-024** [SUPPORTED] C31 no condition label — EXP-4.47
+- **CLAIM-4.47-025** [SUPPORTED] C32 no semantic leak — EXP-4.47
+- **CLAIM-4.47-026** [SUPPORTED] C33 regressions — EXP-4.47
+- **CLAIM-4.47-027** [SUPPORTED] C34 first attenuation identified — EXP-4.47
+- **CLAIM-4.47-028** [SUPPORTED] C35 quantitative — EXP-4.47
+- **CLAIM-4.47-029** [SUPPORTED] C3 endo below historical — EXP-4.47
+- **CLAIM-4.47-030** [SUPPORTED] C4 endo N captured — EXP-4.47
+- **CLAIM-4.47-031** [SUPPORTED] C5 probe N captured — EXP-4.47
+- **CLAIM-4.47-032** [SUPPORTED] C6 magnitude differs — EXP-4.47
+- **CLAIM-4.47-033** [SUPPORTED] C7 direction differs — EXP-4.47
+- **CLAIM-4.47-034** [SUPPORTED] C8 dR subspace — EXP-4.47
+- **CLAIM-4.47-035** [SUPPORTED] C9 probe projects — EXP-4.47
+- **CLAIM-4.48-001** [SUPPORTED] C10 effective drive — EXP-4.48
+- **CLAIM-4.48-002** [SUPPORTED] C11 447 predicts — EXP-4.48
+- **CLAIM-4.48-003** [SUPPORTED] C12 obs follows pred — EXP-4.48
+- **CLAIM-4.48-004** [NOT_SUPPORTED] C13 q contributes — EXP-4.48
+- **CLAIM-4.48-005** [SUPPORTED] C14 I contributes — EXP-4.48
+- **CLAIM-4.48-006** [SUPPORTED] C15 body contributes — EXP-4.48
+- **CLAIM-4.48-007** [SUPPORTED] C16 sources cooccur — EXP-4.48
+- **CLAIM-4.48-008** [NOT_SUPPORTED] C17 nat amp above 447 — EXP-4.48
+- **CLAIM-4.48-009** [NOT_SUPPORTED] C18 nat drive above 447 — EXP-4.48
+- **CLAIM-4.48-010** [NOT_SUPPORTED] C19 nat reaches 0.02 — EXP-4.48
+- **CLAIM-4.48-011** [SUPPORTED] C1 446 D — EXP-4.48
+- **CLAIM-4.48-012** [NOT_SUPPORTED] C20 threshold all seeds — EXP-4.48
+- **CLAIM-4.48-013** [SUPPORTED] C21 not probe — EXP-4.48
+- **CLAIM-4.48-014** [SUPPORTED] C22 not instrumentation — EXP-4.48
+- **CLAIM-4.48-015** [SUPPORTED] C23 not changed R — EXP-4.48
+- **CLAIM-4.48-016** [SUPPORTED] C24 not changed readout — EXP-4.48
+- **CLAIM-4.48-017** [SUPPORTED] C25 not changed gain — EXP-4.48
+- **CLAIM-4.48-018** [SUPPORTED] C26 geometry compatible — EXP-4.48
+- **CLAIM-4.48-019** [SUPPORTED] C27 attenuation is amp — EXP-4.48
+- **CLAIM-4.48-020** [SUPPORTED] C28 duration measured — EXP-4.48
+- **CLAIM-4.48-021** [SUPPORTED] C29 not single seed — EXP-4.48
+- **CLAIM-4.48-022** [SUPPORTED] C2 447 B — EXP-4.48
+- **CLAIM-4.48-023** [SUPPORTED] C30 bounded storage — EXP-4.48
+- **CLAIM-4.48-024** [SUPPORTED] C31 no reward — EXP-4.48
+- **CLAIM-4.48-025** [SUPPORTED] C32 no condition label — EXP-4.48
+- **CLAIM-4.48-026** [SUPPORTED] C33 no semantic leak — EXP-4.48
+- **CLAIM-4.48-027** [SUPPORTED] C34 regressions — EXP-4.48
+- **CLAIM-4.48-028** [SUPPORTED] C35 boundary characterized — EXP-4.48
+- **CLAIM-4.48-029** [SUPPORTED] C3 N unchanged — EXP-4.48
+- **CLAIM-4.48-030** [SUPPORTED] C4 R unchanged — EXP-4.48
+- **CLAIM-4.48-031** [SUPPORTED] C5 no gain change — EXP-4.48
+- **CLAIM-4.48-032** [SUPPORTED] C6 no feedback — EXP-4.48
+- **CLAIM-4.48-033** [SUPPORTED] C7 nat amp dist — EXP-4.48
+- **CLAIM-4.48-034** [SUPPORTED] C8 nat occupancy — EXP-4.48
+- **CLAIM-4.48-035** [SUPPORTED] C9 nat subspace — EXP-4.48
+- **CLAIM-4.49-001** [NOT_SUPPORTED] C10 u from physics — EXP-4.49
+- **CLAIM-4.49-002** [NOT_SUPPORTED] C11 u changes q — EXP-4.49
+- **CLAIM-4.49-003** [NOT_SUPPORTED] C12 qI respond — EXP-4.49
+- **CLAIM-4.49-004** [SUPPORTED] C13 N via unchanged — EXP-4.49
+- **CLAIM-4.49-005** [SUPPORTED] C14 N above 448 median — EXP-4.49
+- **CLAIM-4.49-006** [NOT_SUPPORTED] C15 N above 448 p95 — EXP-4.49
+- **CLAIM-4.49-007** [NOT_SUPPORTED] C16 N above 448 max — EXP-4.49
+- **CLAIM-4.49-008** [SUPPORTED] C17 dR projection — EXP-4.49
+- **CLAIM-4.49-009** [NOT_SUPPORTED] C18 drive above 448 — EXP-4.49
+- **CLAIM-4.49-010** [SUPPORTED] C19 447 predicts — EXP-4.49
+- **CLAIM-4.49-011** [SUPPORTED] C1 448 A — EXP-4.49
+- **CLAIM-4.49-012** [SUPPORTED] C20 obs matches pred — EXP-4.49
+- **CLAIM-4.49-013** [NOT_SUPPORTED] C21 RA vs RB history — EXP-4.49
+- **CLAIM-4.49-014** [SUPPORTED] C22 not fixed alone — EXP-4.49
+- **CLAIM-4.49-015** [SUPPORTED] C23 R reset removes — EXP-4.49
+- **CLAIM-4.49-016** [SUPPORTED] C24 absent reduces u — EXP-4.49
+- **CLAIM-4.49-017** [SUPPORTED] C25 decouple reduces field — EXP-4.49
+- **CLAIM-4.49-018** [SUPPORTED] C26 u ablation — EXP-4.49
+- **CLAIM-4.49-019** [SUPPORTED] C27 no qIN injection — EXP-4.49
+- **CLAIM-4.49-020** [SUPPORTED] C28 no reward — EXP-4.49
+- **CLAIM-4.49-021** [SUPPORTED] C29 no source id — EXP-4.49
+- **CLAIM-4.49-022** [SUPPORTED] C2 qIN unchanged — EXP-4.49
+- **CLAIM-4.49-023** [SUPPORTED] C30 reproduces — EXP-4.49
+- **CLAIM-4.49-024** [SUPPORTED] C31 intensity scales field — EXP-4.49
+- **CLAIM-4.49-025** [SUPPORTED] C32 spontaneous event class — EXP-4.49
+- **CLAIM-4.49-026** [NOT_SUPPORTED] C33 spontaneous elevated N — EXP-4.49
+- **CLAIM-4.49-027** [NOT_SUPPORTED] C34 spontaneous R motor — EXP-4.49
+- **CLAIM-4.49-028** [SUPPORTED] C35 no semantic leak — EXP-4.49
+- **CLAIM-4.49-029** [SUPPORTED] C36 bounded storage — EXP-4.49
+- **CLAIM-4.49-030** [SUPPORTED] C37 regressions — EXP-4.49
+- **CLAIM-4.49-031** [NOT_SUPPORTED] C38 full physical chain — EXP-4.49
+- **CLAIM-4.49-032** [SUPPORTED] C3 R unchanged — EXP-4.49
+- **CLAIM-4.49-033** [SUPPORTED] C4 no gain — EXP-4.49
+- **CLAIM-4.49-034** [SUPPORTED] C5 candidate exists — EXP-4.49
+- **CLAIM-4.49-035** [SUPPORTED] C6 no semantic label — EXP-4.49
+- **CLAIM-4.49-036** [SUPPORTED] C7 local physical — EXP-4.49
+- **CLAIM-4.49-037** [SUPPORTED] C8 accessible sample — EXP-4.49
+- **CLAIM-4.49-038** [NOT_SUPPORTED] C9 reaches u — EXP-4.49
+- **CLAIM-4.50-001** [SUPPORTED] C1 449 A — EXP-4.50
+- **CLAIM-4.50-002** [SUPPORTED] C2 no world u — EXP-4.50
+- **CLAIM-4.50-003** [SUPPORTED] C3 no new u — EXP-4.50
+- **CLAIM-4.50-004** [SUPPORTED] C4 439 unchanged — EXP-4.50
+- **CLAIM-4.50-005** [SUPPORTED] C5 446 unchanged — EXP-4.50
+- **CLAIM-4.50-006** [SUPPORTED] C6 no gain — EXP-4.50
+- **CLAIM-4.50-007** [SUPPORTED] C7 world alters body — EXP-4.50
+- **CLAIM-4.50-008** [SUPPORTED] C8 var is 439 — EXP-4.50
+- **CLAIM-4.50-009** [SUPPORTED] C9 ordinary physics — EXP-4.50
+- **CLAIM-4.50-010** [SUPPORTED] C10 WAIT — EXP-4.50
+- **CLAIM-4.50-011** [SUPPORTED] C11 body changes N — EXP-4.50
+- **CLAIM-4.50-012** [SUPPORTED] C12 no u — EXP-4.50
+- **CLAIM-4.50-013** [SUPPORTED] C13 no q — EXP-4.50
+- **CLAIM-4.50-014** [SUPPORTED] C14 no I — EXP-4.50
+- **CLAIM-4.50-015** [SUPPORTED] C15 N gt median — EXP-4.50
+- **CLAIM-4.50-016** [SUPPORTED] C16 N gt p95 — EXP-4.50
+- **CLAIM-4.50-017** [SUPPORTED] C17 N gt max — EXP-4.50
+- **CLAIM-4.50-018** [SUPPORTED] C18 dR proj — EXP-4.50
+- **CLAIM-4.50-019** [SUPPORTED] C19 rel drive — EXP-4.50
+- **CLAIM-4.50-020** [SUPPORTED] C20 pred rule — EXP-4.50
+- **CLAIM-4.50-021** [SUPPORTED] C21 pred match — EXP-4.50
+- **CLAIM-4.50-022** [SUPPORTED] C22 RA vs RB — EXP-4.50
+- **CLAIM-4.50-023** [SUPPORTED] C23 R reset — EXP-4.50
+- **CLAIM-4.50-024** [SUPPORTED] C24 body N ablation — EXP-4.50
+- **CLAIM-4.50-025** [SUPPORTED] C25 body blocked — EXP-4.50
+- **CLAIM-4.50-026** [SUPPORTED] C26 matched N — EXP-4.50
+- **CLAIM-4.50-027** [SUPPORTED] C27 matched motor — EXP-4.50
+- **CLAIM-4.50-028** [SUPPORTED] C28 source blind — EXP-4.50
+- **CLAIM-4.50-029** [SUPPORTED] C29 sample not enough — EXP-4.50
+- **CLAIM-4.50-030** [SUPPORTED] C30 seeds — EXP-4.50
+- **CLAIM-4.50-031** [SUPPORTED] C31 R frozen — EXP-4.50
+- **CLAIM-4.50-032** [SUPPORTED] C32 W frozen — EXP-4.50
+- **CLAIM-4.50-033** [SUPPORTED] C33 no prediction — EXP-4.50
+- **CLAIM-4.50-034** [SUPPORTED] C34 no osv — EXP-4.50
+- **CLAIM-4.50-035** [SUPPORTED] C35 no reward — EXP-4.50
+- **CLAIM-4.50-036** [SUPPORTED] C36 no source label — EXP-4.50
+- **CLAIM-4.50-037** [NOT_SUPPORTED] C37 spontaneous event — EXP-4.50
+- **CLAIM-4.50-038** [NOT_SUPPORTED] C38 spontaneous body N — EXP-4.50
+- **CLAIM-4.50-039** [NOT_SUPPORTED] C39 spontaneous R motor — EXP-4.50
+- **CLAIM-4.50-040** [SUPPORTED] C40 bounded — EXP-4.50
+- **CLAIM-4.50-041** [SUPPORTED] C41 regressions — EXP-4.50
+- **CLAIM-4.50-042** [SUPPORTED] C42 full chain — EXP-4.50
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-001** [SUPPORTED] C1 450 D — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-002** [SUPPORTED] C2 449 A — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-003** [SUPPORTED] C3 no world u — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-004** [SUPPORTED] C4 no new world body — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-005** [SUPPORTED] C5 439 unchanged — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-006** [SUPPORTED] C6 446 unchanged — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-007** [SUPPORTED] C7 no gain — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-008** [SUPPORTED] C8 default identified — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-009** [SUPPORTED] C9 439 inputs identified — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-010** [SUPPORTED] C10 writers inventoried — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-011** [SUPPORTED] C11 writers classified — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-012** [SUPPORTED] C12 config default none — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-013** [SUPPORTED] C13 runtime confirms none — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-014** [SUPPORTED] C14 default body dynamics — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-015** [SUPPORTED] C15 passive physiology — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-016** [NOT_SUPPORTED] C16 passive alters 439 N — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-017** [NOT_SUPPORTED] C17 default world writer — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-018** [NOT_SUPPORTED] C18 world writer executes — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-019** [NOT_SUPPORTED] C19 writer hits 439 var — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-020** [NOT_SUPPORTED] C20 no staging needed — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-021** [NOT_SUPPORTED] C21 WAIT world body — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-022** [NOT_SUPPORTED] C22 FREE world body — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-023** [NOT_SUPPORTED] C23 counterfactual — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-024** [NOT_SUPPORTED] C24 not init only — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-025** [NOT_SUPPORTED] C25 not passive drift — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-026** [NOT_SUPPORTED] C26 world body alters N — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-027** [SUPPORTED] C27 u zero — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-028** [SUPPORTED] C28 q zero — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-029** [SUPPORTED] C29 I zero — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-030** [NOT_SUPPORTED] C30 dR proj — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-031** [NOT_SUPPORTED] C31 R drive — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-032** [NOT_SUPPORTED] C32 history motor — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-033** [NOT_SUPPORTED] C33 R reset — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-034** [NOT_SUPPORTED] C34 full default chain — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-035** [SUPPORTED] C35 no writer in cognition — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-036** [SUPPORTED] C36 no reward — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-037** [SUPPORTED] C37 no preset required — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-038** [SUPPORTED] C38 no optional enabled — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-039** [SUPPORTED] C39 seeds — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-040** [SUPPORTED] C40 bounded — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-041** [SUPPORTED] C41 regressions — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.51-DEFAULT-RUNTIME-BODY-ACCESS-042** [SUPPORTED] C42 static runtime agree — EXP-4.51-DEFAULT-RUNTIME-BODY-ACCESS
+- **CLAIM-4.52-001** [SUPPORTED] C1 450 D — EXP-4.52
+- **CLAIM-4.52-002** [SUPPORTED] C2 451 A — EXP-4.52
+- **CLAIM-4.52-003** [SUPPORTED] C3 default unchanged — EXP-4.52
+- **CLAIM-4.52-004** [SUPPORTED] C4 config default none — EXP-4.52
+- **CLAIM-4.52-005** [SUPPORTED] C5 existing physics — EXP-4.52
+- **CLAIM-4.52-006** [SUPPORTED] C6 no new world body — EXP-4.52
+- **CLAIM-4.52-007** [SUPPORTED] C7 no world u — EXP-4.52
+- **CLAIM-4.52-008** [SUPPORTED] C8 no new body N — EXP-4.52
+- **CLAIM-4.52-009** [SUPPORTED] C9 no new plasticity — EXP-4.52
+- **CLAIM-4.52-010** [SUPPORTED] C10 matched init — EXP-4.52
+- **CLAIM-4.52-011** [SUPPORTED] C11 D1 changes body — EXP-4.52
+- **CLAIM-4.52-012** [SUPPORTED] C12 D2 different body — EXP-4.52
+- **CLAIM-4.52-013** [SUPPORTED] C13 no injection — EXP-4.52
+- **CLAIM-4.52-014** [SUPPORTED] C14 motor available — EXP-4.52
+- **CLAIM-4.52-015** [NOT_SUPPORTED] C15 delta W — EXP-4.52
+- **CLAIM-4.52-016** [NOT_SUPPORTED] C16 delta R — EXP-4.52
+- **CLAIM-4.52-017** [NOT_SUPPORTED] C17 any acquired — EXP-4.52
+- **CLAIM-4.52-018** [NOT_SUPPORTED] C18 exceeds seed — EXP-4.52
+- **CLAIM-4.52-019** [SUPPORTED] C19 ecology removed — EXP-4.52
+- **CLAIM-4.52-020** [SUPPORTED] C20 world matched — EXP-4.52
+- **CLAIM-4.52-021** [SUPPORTED] C21 body matched — EXP-4.52
+- **CLAIM-4.52-022** [SUPPORTED] C22 transients reset — EXP-4.52
+- **CLAIM-4.52-023** [NOT_SUPPORTED] C23 hist q — EXP-4.52
+- **CLAIM-4.52-024** [NOT_SUPPORTED] C24 hist I — EXP-4.52
+- **CLAIM-4.52-025** [NOT_SUPPORTED] C25 hist N — EXP-4.52
+- **CLAIM-4.52-026** [NOT_SUPPORTED] C26 hist motor — EXP-4.52
+- **CLAIM-4.52-027** [NOT_SUPPORTED] C27 survives reset — EXP-4.52
+- **CLAIM-4.52-028** [NOT_SUPPORTED] C28 raw purge — EXP-4.52
+- **CLAIM-4.52-029** [SUPPORTED] C29 R reset — EXP-4.52
+- **CLAIM-4.52-030** [SUPPORTED] C30 W reset — EXP-4.52
+- **CLAIM-4.52-031** [SUPPORTED] C31 factorial — EXP-4.52
+- **CLAIM-4.52-032** [SUPPORTED] C32 body matched repro — EXP-4.52
+- **CLAIM-4.52-033** [NOT_SUPPORTED] C33 body mediation — EXP-4.52
+- **CLAIM-4.52-034** [SUPPORTED] C34 no dev field — EXP-4.52
+- **CLAIM-4.52-035** [SUPPORTED] C35 not current body — EXP-4.52
+- **CLAIM-4.52-036** [SUPPORTED] C36 not current world — EXP-4.52
+- **CLAIM-4.52-037** [SUPPORTED] C37 no raw replay — EXP-4.52
+- **CLAIM-4.52-038** [NOT_SUPPORTED] C38 shuffle differs — EXP-4.52
+- **CLAIM-4.52-039** [NOT_SUPPORTED] C39 order — EXP-4.52
+- **CLAIM-4.52-040** [NOT_SUPPORTED] C40 seeds — EXP-4.52
+- **CLAIM-4.52-041** [SUPPORTED] C41 leak — EXP-4.52
+- **CLAIM-4.52-042** [SUPPORTED] C42 regressions — EXP-4.52
+- **CLAIM-4.52-043** [SUPPORTED] C43 default untouched — EXP-4.52
+- **CLAIM-4.52-044** [SUPPORTED] C44 no reward — EXP-4.52
+- **CLAIM-4.52-045** [SUPPORTED] C45 separable — EXP-4.52
+- **CLAIM-4.52-046** [NOT_SUPPORTED] C46 persistent trace — EXP-4.52
+- **CLAIM-4.53-001** [SUPPORTED] C1 452 H — EXP-4.53
+- **CLAIM-4.53-002** [SUPPORTED] C2 default runtime — EXP-4.53
+- **CLAIM-4.53-003** [SUPPORTED] C3 config None — EXP-4.53
+- **CLAIM-4.53-004** [SUPPORTED] C4 no new world body — EXP-4.53
+- **CLAIM-4.53-005** [SUPPORTED] C5 no new body N — EXP-4.53
+- **CLAIM-4.53-006** [SUPPORTED] C6 R rule unchanged — EXP-4.53
+- **CLAIM-4.53-007** [SUPPORTED] C7 motor rule unchanged — EXP-4.53
+- **CLAIM-4.53-008** [SUPPORTED] C8 char before R — EXP-4.53
+- **CLAIM-4.53-009** [SUPPORTED] C9 prereg select — EXP-4.53
+- **CLAIM-4.53-010** [SUPPORTED] C10 sat reduced — EXP-4.53
+- **CLAIM-4.53-011** [SUPPORTED] C11 same duration — EXP-4.53
+- **CLAIM-4.53-012** [SUPPORTED] C12 exposure matched — EXP-4.53
+- **CLAIM-4.53-013** [SUPPORTED] C13 body temporal diff — EXP-4.53
+- **CLAIM-4.53-014** [SUPPORTED] C14 marginals quantified — EXP-4.53
+- **CLAIM-4.53-015** [SUPPORTED] C15 identical M — EXP-4.53
+- **CLAIM-4.53-016** [SUPPORTED] C16 mismatch zero — EXP-4.53
+- **CLAIM-4.53-017** [SUPPORTED] C17 rng inventoried — EXP-4.53
+- **CLAIM-4.53-018** [SUPPORTED] C18 matchable rng paired — EXP-4.53
+- **CLAIM-4.53-019** [SUPPORTED] C19 same condition floor — EXP-4.53
+- **CLAIM-4.53-020** [SUPPORTED] C20 diff body same M R — EXP-4.53
+- **CLAIM-4.53-021** [SUPPORTED] C21 above floor — EXP-4.53
+- **CLAIM-4.53-022** [SUPPORTED] C22 repro across streams — EXP-4.53
+- **CLAIM-4.53-023** [NOT_SUPPORTED] C23 consistent geometry — EXP-4.53
+- **CLAIM-4.53-024** [SUPPORTED] C24 body replay — EXP-4.53
+- **CLAIM-4.53-025** [SUPPORTED] C25 body mediation — EXP-4.53
+- **CLAIM-4.53-026** [SUPPORTED] C26 shift changes R — EXP-4.53
+- **CLAIM-4.53-027** [SUPPORTED] C27 pairing contributes — EXP-4.53
+- **CLAIM-4.53-028** [SUPPORTED] C28 W unchanged — EXP-4.53
+- **CLAIM-4.53-029** [SUPPORTED] C29 survives removal — EXP-4.53
+- **CLAIM-4.53-030** [SUPPORTED] C30 survives present match — EXP-4.53
+- **CLAIM-4.53-031** [SUPPORTED] C31 survives qIN reset — EXP-4.53
+- **CLAIM-4.53-032** [NOT_SUPPORTED] C32 same present q — EXP-4.53
+- **CLAIM-4.53-033** [NOT_SUPPORTED] C33 same present I — EXP-4.53
+- **CLAIM-4.53-034** [NOT_SUPPORTED] C34 same present N — EXP-4.53
+- **CLAIM-4.53-035** [NOT_SUPPORTED] C35 probe motor — EXP-4.53
+- **CLAIM-4.53-036** [NOT_SUPPORTED] C36 probe repro — EXP-4.53
+- **CLAIM-4.53-037** [NOT_SUPPORTED] C37 R reset clears — EXP-4.53
+- **CLAIM-4.53-038** [NOT_SUPPORTED] C38 natural expression — EXP-4.53
+- **CLAIM-4.53-039** [NOT_SUPPORTED] C39 autonomous — EXP-4.53
+- **CLAIM-4.53-040** [SUPPORTED] C40 sat explains 452 — EXP-4.53
+- **CLAIM-4.53-041** [SUPPORTED] C41 no u — EXP-4.53
+- **CLAIM-4.53-042** [SUPPORTED] C42 no reward — EXP-4.53
+- **CLAIM-4.53-043** [SUPPORTED] C43 no id in cognition — EXP-4.53
+- **CLAIM-4.53-044** [SUPPORTED] C44 leak empty — EXP-4.53
+- **CLAIM-4.53-045** [SUPPORTED] C45 regressions — EXP-4.53
+- **CLAIM-4.53-046** [SUPPORTED] C46 new tests — EXP-4.53
+- **CLAIM-4.53-047** [SUPPORTED] C47 default unchanged — EXP-4.53
+- **CLAIM-4.53-048** [SUPPORTED] C48 no unlimited history — EXP-4.53
+- **CLAIM-4.54-001** [SUPPORTED] C1 453 E — EXP-4.54
+- **CLAIM-4.54-002** [SUPPORTED] C2 config None — EXP-4.54
+- **CLAIM-4.54-003** [SUPPORTED] C3 launch traced — EXP-4.54
+- **CLAIM-4.54-004** [SUPPORTED] C4 no new world — EXP-4.54
+- **CLAIM-4.54-005** [SUPPORTED] C5 no new body — EXP-4.54
+- **CLAIM-4.54-006** [SUPPORTED] C6 no new world body — EXP-4.54
+- **CLAIM-4.54-007** [SUPPORTED] C7 no new body N — EXP-4.54
+- **CLAIM-4.54-008** [SUPPORTED] C8 no RW change — EXP-4.54
+- **CLAIM-4.54-009** [SUPPORTED] C9 no motor change — EXP-4.54
+- **CLAIM-4.54-010** [SUPPORTED] C10 wait no preset — EXP-4.54
+- **CLAIM-4.54-011** [SUPPORTED] C11 free no preset — EXP-4.54
+- **CLAIM-4.54-012** [SUPPORTED] C12 no 420 enabled — EXP-4.54
+- **CLAIM-4.54-013** [SUPPORTED] C13 439 inputs reconfirmed — EXP-4.54
+- **CLAIM-4.54-014** [SUPPORTED] C14 writers inventoried — EXP-4.54
+- **CLAIM-4.54-015** [SUPPORTED] C15 impl en occ separate — EXP-4.54
+- **CLAIM-4.54-016** [NOT_SUPPORTED] C16 wait 439 changes — EXP-4.54
+- **CLAIM-4.54-017** [NOT_SUPPORTED] C17 free 439 changes — EXP-4.54
+- **CLAIM-4.54-018** [NOT_SUPPORTED] C18 world dependent 439 — EXP-4.54
+- **CLAIM-4.54-019** [NOT_SUPPORTED] C19 world audit — EXP-4.54
+- **CLAIM-4.54-020** [NOT_SUPPORTED] C20 above noise body — EXP-4.54
+- **CLAIM-4.54-021** [NOT_SUPPORTED] C21 nonsaturated world body — EXP-4.54
+- **CLAIM-4.54-022** [NOT_SUPPORTED] C22 temporally variable — EXP-4.54
+- **CLAIM-4.54-023** [NOT_SUPPORTED] C23 structure vs shuffle — EXP-4.54
+- **CLAIM-4.54-024** [NOT_SUPPORTED] C24 recurrence — EXP-4.54
+- **CLAIM-4.54-025** [NOT_SUPPORTED] C25 body to N — EXP-4.54
+- **CLAIM-4.54-026** [NOT_SUPPORTED] C26 N above noise — EXP-4.54
+- **CLAIM-4.54-027** [NOT_SUPPORTED] C27 movement mediation — EXP-4.54
+- **CLAIM-4.54-028** [NOT_SUPPORTED] C28 contact mediation — EXP-4.54
+- **CLAIM-4.54-029** [NOT_SUPPORTED] C29 action cost to N — EXP-4.54
+- **CLAIM-4.54-030** [NOT_SUPPORTED] C30 dynamic sources — EXP-4.54
+- **CLAIM-4.54-031** [NOT_SUPPORTED] C31 complete route — EXP-4.54
+- **CLAIM-4.54-032** [NOT_SUPPORTED] C32 occurs unscheduled — EXP-4.54
+- **CLAIM-4.54-033** [NOT_SUPPORTED] C33 not init offset — EXP-4.54
+- **CLAIM-4.54-034** [NOT_SUPPORTED] C34 not passive phys — EXP-4.54
+- **CLAIM-4.54-035** [NOT_SUPPORTED] C35 not N noise — EXP-4.54
+- **CLAIM-4.54-036** [NOT_SUPPORTED] C36 not saturation — EXP-4.54
+- **CLAIM-4.54-037** [NOT_SUPPORTED] C37 across seeds — EXP-4.54
+- **CLAIM-4.54-038** [SUPPORTED] C38 bounded log — EXP-4.54
+- **CLAIM-4.54-039** [NOT_SUPPORTED] C39 section24 R — EXP-4.54
+- **CLAIM-4.54-040** [NOT_SUPPORTED] C40 section24 floor — EXP-4.54
+- **CLAIM-4.54-041** [NOT_SUPPORTED] C41 section24 reset — EXP-4.54
+- **CLAIM-4.54-042** [SUPPORTED] C42 no autonomous R claim — EXP-4.54
+- **CLAIM-4.54-043** [SUPPORTED] C43 no reward — EXP-4.54
+- **CLAIM-4.54-044** [SUPPORTED] C44 no schedule in cognition — EXP-4.54
+- **CLAIM-4.54-045** [SUPPORTED] C45 leak empty — EXP-4.54
+- **CLAIM-4.54-046** [SUPPORTED] C46 regressions — EXP-4.54
+- **CLAIM-4.54-047** [SUPPORTED] C47 new tests — EXP-4.54
+- **CLAIM-4.54-048** [SUPPORTED] C48 default unchanged — EXP-4.54
+- **CLAIM-4.55-001** [SUPPORTED] C1 454 A — EXP-4.55
+- **CLAIM-4.55-002** [SUPPORTED] C2 config None — EXP-4.55
+- **CLAIM-4.55-003** [SUPPORTED] C3 439 inputs — EXP-4.55
+- **CLAIM-4.55-004** [SUPPORTED] C4 no runtime wire — EXP-4.55
+- **CLAIM-4.55-005** [SUPPORTED] C5 inventory — EXP-4.55
+- **CLAIM-4.55-006** [SUPPORTED] C6 writers traced — EXP-4.55
+- **CLAIM-4.55-007** [SUPPORTED] C7 wait phys — EXP-4.55
+- **CLAIM-4.55-008** [SUPPORTED] C8 free phys — EXP-4.55
+- **CLAIM-4.55-009** [SUPPORTED] C9 action dependent — EXP-4.55
+- **CLAIM-4.55-010** [SUPPORTED] C10 world dependent — EXP-4.55
+- **CLAIM-4.55-011** [SUPPORTED] C11 object dependent — EXP-4.55
+- **CLAIM-4.55-012** [SUPPORTED] C12 bounded — EXP-4.55
+- **CLAIM-4.55-013** [SUPPORTED] C13 phys variation — EXP-4.55
+- **CLAIM-4.55-014** [SUPPORTED] C14 free differs wait — EXP-4.55
+- **CLAIM-4.55-015** [SUPPORTED] C15 prereg proj — EXP-4.55
+- **CLAIM-4.55-016** [SUPPORTED] C16 no R selected — EXP-4.55
+- **CLAIM-4.55-017** [SUPPORTED] C17 no learned proj — EXP-4.55
+- **CLAIM-4.55-018** [SUPPORTED] C18 N above noise — EXP-4.55
+- **CLAIM-4.55-019** [SUPPORTED] C19 bounded N — EXP-4.55
+- **CLAIM-4.55-020** [SUPPORTED] C20 temporal N — EXP-4.55
+- **CLAIM-4.55-021** [SUPPORTED] C21 vs const — EXP-4.55
+- **CLAIM-4.55-022** [SUPPORTED] C22 vs shuffle — EXP-4.55
+- **CLAIM-4.55-023** [SUPPORTED] C23 temp survives — EXP-4.55
+- **CLAIM-4.55-024** [SUPPORTED] C24 across seeds — EXP-4.55
+- **CLAIM-4.55-025** [SUPPORTED] C25 multi proj — EXP-4.55
+- **CLAIM-4.55-026** [SUPPORTED] C26 420 not required — EXP-4.55
+- **CLAIM-4.55-027** [SUPPORTED] C27 mismatch zero — EXP-4.55
+- **CLAIM-4.55-028** [SUPPORTED] C28 R floor — EXP-4.55
+- **CLAIM-4.55-029** [SUPPORTED] C29 shift R — EXP-4.55
+- **CLAIM-4.55-030** [SUPPORTED] C30 shuffle R — EXP-4.55
+- **CLAIM-4.55-031** [SUPPORTED] C31 above floor — EXP-4.55
+- **CLAIM-4.55-032** [SUPPORTED] C32 pairing — EXP-4.55
+- **CLAIM-4.55-033** [SUPPORTED] C33 robust proj — EXP-4.55
+- **CLAIM-4.55-034** [SUPPORTED] C34 probe — EXP-4.55
+- **CLAIM-4.55-035** [SUPPORTED] C35 reset — EXP-4.55
+- **CLAIM-4.55-036** [SUPPORTED] C36 wait R — EXP-4.55
+- **CLAIM-4.55-037** [SUPPORTED] C37 free R — EXP-4.55
+- **CLAIM-4.55-038** [SUPPORTED] C38 action substrate — EXP-4.55
+- **CLAIM-4.55-039** [SUPPORTED] C39 world substrate — EXP-4.55
+- **CLAIM-4.55-040** [SUPPORTED] C40 object substrate — EXP-4.55
+- **CLAIM-4.55-041** [SUPPORTED] C41 no wire added — EXP-4.55
+- **CLAIM-4.55-042** [SUPPORTED] C42 no 420 — EXP-4.55
+- **CLAIM-4.55-043** [SUPPORTED] C43 no reward — EXP-4.55
+- **CLAIM-4.55-044** [SUPPORTED] C44 no semantic map — EXP-4.55
+- **CLAIM-4.55-045** [SUPPORTED] C45 leak empty — EXP-4.55
+- **CLAIM-4.55-046** [SUPPORTED] C46 regressions — EXP-4.55
+- **CLAIM-4.55-047** [SUPPORTED] C47 new tests — EXP-4.55
+- **CLAIM-4.55-048** [SUPPORTED] C48 default unchanged — EXP-4.55
+- **CLAIM-4.56-001** [SUPPORTED] C1 — EXP-4.56
+- **CLAIM-4.56-002** [SUPPORTED] C2 — EXP-4.56
+- **CLAIM-4.56-003** [SUPPORTED] C3 — EXP-4.56
+- **CLAIM-4.56-004** [SUPPORTED] C4 — EXP-4.56
+- **CLAIM-4.56-005** [SUPPORTED] C5 — EXP-4.56
+- **CLAIM-4.56-006** [SUPPORTED] C6 — EXP-4.56
+- **CLAIM-4.56-007** [SUPPORTED] C7 — EXP-4.56
+- **CLAIM-4.56-008** [SUPPORTED] C8 — EXP-4.56
+- **CLAIM-4.56-009** [SUPPORTED] C9 — EXP-4.56
+- **CLAIM-4.56-010** [SUPPORTED] C10 — EXP-4.56
+- **CLAIM-4.56-011** [SUPPORTED] C11 — EXP-4.56
+- **CLAIM-4.56-012** [SUPPORTED] C12 — EXP-4.56
+- **CLAIM-4.56-013** [SUPPORTED] C13 — EXP-4.56
+- **CLAIM-4.56-014** [SUPPORTED] C14 — EXP-4.56
+- **CLAIM-4.56-015** [SUPPORTED] C15 — EXP-4.56
+- **CLAIM-4.56-016** [SUPPORTED] C16 — EXP-4.56
+- **CLAIM-4.56-017** [SUPPORTED] C17 — EXP-4.56
+- **CLAIM-4.56-018** [SUPPORTED] C18 — EXP-4.56
+- **CLAIM-4.56-019** [SUPPORTED] C19 — EXP-4.56
+- **CLAIM-4.56-020** [SUPPORTED] C20 — EXP-4.56
+- **CLAIM-4.56-021** [SUPPORTED] C21 — EXP-4.56
+- **CLAIM-4.56-022** [SUPPORTED] C22 — EXP-4.56
+- **CLAIM-4.56-023** [SUPPORTED] C23 — EXP-4.56
+- **CLAIM-4.56-024** [SUPPORTED] C24 — EXP-4.56
+- **CLAIM-4.56-025** [SUPPORTED] C25 — EXP-4.56
+- **CLAIM-4.56-026** [SUPPORTED] C26 — EXP-4.56
+- **CLAIM-4.56-027** [SUPPORTED] C27 — EXP-4.56
+- **CLAIM-4.56-028** [SUPPORTED] C28 — EXP-4.56
+- **CLAIM-4.56-029** [SUPPORTED] C29 — EXP-4.56
+- **CLAIM-4.56-030** [SUPPORTED] C30 — EXP-4.56
+- **CLAIM-4.56-031** [SUPPORTED] C31 — EXP-4.56
+- **CLAIM-4.56-032** [SUPPORTED] C32 — EXP-4.56
+- **CLAIM-4.56-033** [SUPPORTED] C33 — EXP-4.56
+- **CLAIM-4.56-034** [SUPPORTED] C34 — EXP-4.56
+- **CLAIM-4.56-035** [SUPPORTED] C35 — EXP-4.56
+- **CLAIM-4.56-036** [SUPPORTED] C36 — EXP-4.56
+- **CLAIM-4.56-037** [SUPPORTED] C37 — EXP-4.56
+- **CLAIM-4.56-038** [SUPPORTED] C38 — EXP-4.56
+- **CLAIM-4.56-039** [SUPPORTED] C39 — EXP-4.56
+- **CLAIM-4.56-040** [SUPPORTED] C40 — EXP-4.56
+- **CLAIM-4.56-041** [SUPPORTED] C41 — EXP-4.56
+- **CLAIM-4.56-042** [SUPPORTED] C42 — EXP-4.56
+- **CLAIM-4.56-043** [NOT_SUPPORTED] C43 — EXP-4.56
+- **CLAIM-4.56-044** [NOT_SUPPORTED] C44 — EXP-4.56
+- **CLAIM-4.56-045** [SUPPORTED] C45 — EXP-4.56
+- **CLAIM-4.56-046** [SUPPORTED] C46 — EXP-4.56
+- **CLAIM-4.56-047** [SUPPORTED] C47 — EXP-4.56
+- **CLAIM-4.56-048** [SUPPORTED] C48 — EXP-4.56
+- **CLAIM-4.56-049** [SUPPORTED] C49 — EXP-4.56
+- **CLAIM-4.56-050** [SUPPORTED] C50 — EXP-4.56
+- **CLAIM-4.56-051** [SUPPORTED] C51 — EXP-4.56
+- **CLAIM-4.56-052** [SUPPORTED] C52 — EXP-4.56
+- **CLAIM-4.56-053** [SUPPORTED] C53 — EXP-4.56
+- **CLAIM-4.56-054** [SUPPORTED] C54 — EXP-4.56
+- **CLAIM-4.56-055** [SUPPORTED] C55 — EXP-4.56
+- **CLAIM-4.56-056** [SUPPORTED] C56 — EXP-4.56
+- **CLAIM-4.56-057** [SUPPORTED] C57 — EXP-4.56
+- **CLAIM-4.56-058** [NOT_SUPPORTED] C58 — EXP-4.56
+- **CLAIM-4.56-059** [NOT_SUPPORTED] C59 — EXP-4.56
+- **CLAIM-4.56-060** [SUPPORTED] C60 — EXP-4.56
+- **CLAIM-4.56-061** [SUPPORTED] C61 — EXP-4.56
+- **CLAIM-4.56-062** [NOT_SUPPORTED] C62 — EXP-4.56
+- **CLAIM-4.56-063** [SUPPORTED] C63 — EXP-4.56
+- **CLAIM-4.56-064** [SUPPORTED] C64 — EXP-4.56
+- **CLAIM-4.56-065** [SUPPORTED] C65 — EXP-4.56
+- **CLAIM-4.56-066** [SUPPORTED] C66 — EXP-4.56
+- **CLAIM-4.56-067** [SUPPORTED] C67 — EXP-4.56
+- **CLAIM-4.56-068** [SUPPORTED] C68 — EXP-4.56
+- **CLAIM-4.56-069** [SUPPORTED] C69 — EXP-4.56
+- **CLAIM-4.56-070** [SUPPORTED] C70 — EXP-4.56
+- **CLAIM-4.57-001** [SUPPORTED] C1 — EXP-4.57
+- **CLAIM-4.57-002** [SUPPORTED] C2 — EXP-4.57
+- **CLAIM-4.57-003** [SUPPORTED] C3 — EXP-4.57
+- **CLAIM-4.57-004** [SUPPORTED] C4 — EXP-4.57
+- **CLAIM-4.57-005** [SUPPORTED] C5 — EXP-4.57
+- **CLAIM-4.57-006** [SUPPORTED] C6 — EXP-4.57
+- **CLAIM-4.57-007** [SUPPORTED] C7 — EXP-4.57
+- **CLAIM-4.57-008** [SUPPORTED] C8 — EXP-4.57
+- **CLAIM-4.57-009** [SUPPORTED] C9 — EXP-4.57
+- **CLAIM-4.57-010** [SUPPORTED] C10 — EXP-4.57
+- **CLAIM-4.57-011** [SUPPORTED] C11 — EXP-4.57
+- **CLAIM-4.57-012** [SUPPORTED] C12 — EXP-4.57
+- **CLAIM-4.57-013** [SUPPORTED] C13 — EXP-4.57
+- **CLAIM-4.57-014** [SUPPORTED] C14 — EXP-4.57
+- **CLAIM-4.57-015** [SUPPORTED] C15 — EXP-4.57
+- **CLAIM-4.57-016** [SUPPORTED] C16 — EXP-4.57
+- **CLAIM-4.57-017** [SUPPORTED] C17 — EXP-4.57
+- **CLAIM-4.57-018** [SUPPORTED] C18 — EXP-4.57
+- **CLAIM-4.57-019** [SUPPORTED] C19 — EXP-4.57
+- **CLAIM-4.57-020** [SUPPORTED] C20 — EXP-4.57
+- **CLAIM-4.57-021** [SUPPORTED] C21 — EXP-4.57
+- **CLAIM-4.57-022** [SUPPORTED] C22 — EXP-4.57
+- **CLAIM-4.57-023** [SUPPORTED] C23 — EXP-4.57
+- **CLAIM-4.57-024** [SUPPORTED] C24 — EXP-4.57
+- **CLAIM-4.57-025** [SUPPORTED] C25 — EXP-4.57
+- **CLAIM-4.57-026** [NOT_SUPPORTED] C26 — EXP-4.57
+- **CLAIM-4.57-027** [SUPPORTED] C27 — EXP-4.57
+- **CLAIM-4.57-028** [NOT_SUPPORTED] C28 — EXP-4.57
+- **CLAIM-4.57-029** [NOT_SUPPORTED] C29 — EXP-4.57
+- **CLAIM-4.57-030** [NOT_SUPPORTED] C30 — EXP-4.57
+- **CLAIM-4.57-031** [NOT_SUPPORTED] C31 — EXP-4.57
+- **CLAIM-4.57-032** [SUPPORTED] C32 — EXP-4.57
+- **CLAIM-4.57-033** [SUPPORTED] C33 — EXP-4.57
+- **CLAIM-4.57-034** [SUPPORTED] C34 — EXP-4.57
+- **CLAIM-4.57-035** [NOT_SUPPORTED] C35 — EXP-4.57
+- **CLAIM-4.57-036** [SUPPORTED] C36 — EXP-4.57
+- **CLAIM-4.57-037** [SUPPORTED] C37 — EXP-4.57
+- **CLAIM-4.57-038** [NOT_SUPPORTED] C38 — EXP-4.57
+- **CLAIM-4.57-039** [SUPPORTED] C39 — EXP-4.57
+- **CLAIM-4.57-040** [SUPPORTED] C40 — EXP-4.57
+- **CLAIM-4.57-041** [SUPPORTED] C41 — EXP-4.57
+- **CLAIM-4.57-042** [SUPPORTED] C42 — EXP-4.57
+- **CLAIM-4.57-043** [SUPPORTED] C43 — EXP-4.57
+- **CLAIM-4.57-044** [SUPPORTED] C44 — EXP-4.57
+- **CLAIM-4.57-045** [SUPPORTED] C45 — EXP-4.57
+- **CLAIM-4.57-046** [SUPPORTED] C46 — EXP-4.57
+- **CLAIM-4.57-047** [SUPPORTED] C47 — EXP-4.57
+- **CLAIM-4.57-048** [SUPPORTED] C48 — EXP-4.57
+- **CLAIM-4.57-049** [NOT_SUPPORTED] C49 — EXP-4.57
+- **CLAIM-4.57-050** [NOT_SUPPORTED] C50 — EXP-4.57
+- **CLAIM-4.57-051** [SUPPORTED] C51 — EXP-4.57
+- **CLAIM-4.57-052** [SUPPORTED] C52 — EXP-4.57
+- **CLAIM-4.57-053** [SUPPORTED] C53 — EXP-4.57
+- **CLAIM-4.57-054** [SUPPORTED] C54 — EXP-4.57
+- **CLAIM-4.57-055** [NOT_SUPPORTED] C55 — EXP-4.57
+- **CLAIM-4.57-056** [SUPPORTED] C56 — EXP-4.57
+- **CLAIM-4.57-057** [SUPPORTED] C57 — EXP-4.57
+- **CLAIM-4.57-058** [SUPPORTED] C58 — EXP-4.57
+- **CLAIM-4.57-059** [SUPPORTED] C59 — EXP-4.57
+- **CLAIM-4.57-060** [SUPPORTED] C60 — EXP-4.57
+- **CLAIM-4.57-061** [SUPPORTED] C61 — EXP-4.57
+- **CLAIM-4.57-062** [SUPPORTED] C62 — EXP-4.57
+- **CLAIM-4.57-063** [SUPPORTED] C63 — EXP-4.57
+- **CLAIM-4.57-064** [SUPPORTED] C64 — EXP-4.57
+- **CLAIM-4.57-065** [SUPPORTED] C65 — EXP-4.57
+- **CLAIM-4.57-066** [SUPPORTED] C66 — EXP-4.57
+- **CLAIM-4.57-067** [SUPPORTED] C67 — EXP-4.57
+- **CLAIM-4.57-068** [SUPPORTED] C68 — EXP-4.57
+- **CLAIM-4.57-069** [SUPPORTED] C69 — EXP-4.57
+- **CLAIM-4.57-070** [SUPPORTED] C70 — EXP-4.57
+- **CLAIM-4.58-001** [SUPPORTED] C1 — EXP-4.58
+- **CLAIM-4.58-002** [SUPPORTED] C2 — EXP-4.58
+- **CLAIM-4.58-003** [SUPPORTED] C3 — EXP-4.58
+- **CLAIM-4.58-004** [SUPPORTED] C4 — EXP-4.58
+- **CLAIM-4.58-005** [SUPPORTED] C5 — EXP-4.58
+- **CLAIM-4.58-006** [SUPPORTED] C6 — EXP-4.58
+- **CLAIM-4.58-007** [SUPPORTED] C7 — EXP-4.58
+- **CLAIM-4.58-008** [SUPPORTED] C8 — EXP-4.58
+- **CLAIM-4.58-009** [SUPPORTED] C9 — EXP-4.58
+- **CLAIM-4.58-010** [SUPPORTED] C10 — EXP-4.58
+- **CLAIM-4.58-011** [SUPPORTED] C11 — EXP-4.58
+- **CLAIM-4.58-012** [SUPPORTED] C12 — EXP-4.58
+- **CLAIM-4.58-013** [SUPPORTED] C13 — EXP-4.58
+- **CLAIM-4.58-014** [SUPPORTED] C14 — EXP-4.58
+- **CLAIM-4.58-015** [SUPPORTED] C15 — EXP-4.58
+- **CLAIM-4.58-016** [SUPPORTED] C16 — EXP-4.58
+- **CLAIM-4.58-017** [SUPPORTED] C17 — EXP-4.58
+- **CLAIM-4.58-018** [SUPPORTED] C18 — EXP-4.58
+- **CLAIM-4.58-019** [SUPPORTED] C19 — EXP-4.58
+- **CLAIM-4.58-020** [SUPPORTED] C20 — EXP-4.58
+- **CLAIM-4.58-021** [SUPPORTED] C21 — EXP-4.58
+- **CLAIM-4.58-022** [SUPPORTED] C22 — EXP-4.58
+- **CLAIM-4.58-023** [SUPPORTED] C23 — EXP-4.58
+- **CLAIM-4.58-024** [SUPPORTED] C24 — EXP-4.58
+- **CLAIM-4.58-025** [SUPPORTED] C25 — EXP-4.58
+- **CLAIM-4.58-026** [SUPPORTED] C26 — EXP-4.58
+- **CLAIM-4.58-027** [SUPPORTED] C27 — EXP-4.58
+- **CLAIM-4.58-028** [SUPPORTED] C28 — EXP-4.58
+- **CLAIM-4.58-029** [SUPPORTED] C29 — EXP-4.58
+- **CLAIM-4.58-030** [SUPPORTED] C30 — EXP-4.58
+- **CLAIM-4.58-031** [SUPPORTED] C31 — EXP-4.58
+- **CLAIM-4.58-032** [SUPPORTED] C32 — EXP-4.58
+- **CLAIM-4.58-033** [SUPPORTED] C33 — EXP-4.58
+- **CLAIM-4.58-034** [SUPPORTED] C34 — EXP-4.58
+- **CLAIM-4.58-035** [SUPPORTED] C35 — EXP-4.58
+- **CLAIM-4.58-036** [SUPPORTED] C36 — EXP-4.58
+- **CLAIM-4.58-037** [SUPPORTED] C37 — EXP-4.58
+- **CLAIM-4.58-038** [SUPPORTED] C38 — EXP-4.58
+- **CLAIM-4.58-039** [SUPPORTED] C39 — EXP-4.58
+- **CLAIM-4.58-040** [SUPPORTED] C40 — EXP-4.58
+- **CLAIM-4.58-041** [SUPPORTED] C41 — EXP-4.58
+- **CLAIM-4.58-042** [SUPPORTED] C42 — EXP-4.58
+- **CLAIM-4.58-043** [SUPPORTED] C43 — EXP-4.58
+- **CLAIM-4.58-044** [SUPPORTED] C44 — EXP-4.58
+- **CLAIM-4.58-045** [SUPPORTED] C45 — EXP-4.58
+- **CLAIM-4.58-046** [SUPPORTED] C46 — EXP-4.58
+- **CLAIM-4.58-047** [SUPPORTED] C47 — EXP-4.58
+- **CLAIM-4.58-048** [SUPPORTED] C48 — EXP-4.58
+- **CLAIM-4.58-049** [SUPPORTED] C49 — EXP-4.58
+- **CLAIM-4.58-050** [SUPPORTED] C50 — EXP-4.58
+- **CLAIM-4.58-051** [SUPPORTED] C51 — EXP-4.58
+- **CLAIM-4.58-052** [SUPPORTED] C52 — EXP-4.58
+- **CLAIM-4.58-053** [SUPPORTED] C53 — EXP-4.58
+- **CLAIM-4.58-054** [SUPPORTED] C54 — EXP-4.58
+- **CLAIM-4.58-055** [NOT_SUPPORTED] C55 — EXP-4.58
+- **CLAIM-4.58-056** [SUPPORTED] C56 — EXP-4.58
+- **CLAIM-4.58-057** [SUPPORTED] C57 — EXP-4.58
+- **CLAIM-4.58-058** [SUPPORTED] C58 — EXP-4.58
+- **CLAIM-4.58-059** [SUPPORTED] C59 — EXP-4.58
+- **CLAIM-4.58-060** [SUPPORTED] C60 — EXP-4.58
+- **CLAIM-4.58-061** [SUPPORTED] C61 — EXP-4.58
+- **CLAIM-4.58-062** [SUPPORTED] C62 — EXP-4.58
+- **CLAIM-4.58-063** [SUPPORTED] C63 — EXP-4.58
+- **CLAIM-4.58-064** [SUPPORTED] C64 — EXP-4.58
+- **CLAIM-4.58-065** [SUPPORTED] C65 — EXP-4.58
+- **CLAIM-4.58-066** [SUPPORTED] C66 — EXP-4.58
+- **CLAIM-4.58-067** [SUPPORTED] C67 — EXP-4.58
+- **CLAIM-4.58-068** [SUPPORTED] C68 — EXP-4.58
+- **CLAIM-4.58-069** [SUPPORTED] C69 — EXP-4.58
+- **CLAIM-4.58-070** [SUPPORTED] C70 — EXP-4.58
+- **CLAIM-4.59-001** [SUPPORTED] C1 — EXP-4.59
+- **CLAIM-4.59-002** [SUPPORTED] C2 — EXP-4.59
+- **CLAIM-4.59-003** [SUPPORTED] C3 — EXP-4.59
+- **CLAIM-4.59-004** [SUPPORTED] C4 — EXP-4.59
+- **CLAIM-4.59-005** [SUPPORTED] C5 — EXP-4.59
+- **CLAIM-4.59-006** [SUPPORTED] C6 — EXP-4.59
+- **CLAIM-4.59-007** [SUPPORTED] C7 — EXP-4.59
+- **CLAIM-4.59-008** [SUPPORTED] C8 — EXP-4.59
+- **CLAIM-4.59-009** [SUPPORTED] C9 — EXP-4.59
+- **CLAIM-4.59-010** [SUPPORTED] C10 — EXP-4.59
+- **CLAIM-4.59-011** [SUPPORTED] C11 — EXP-4.59
+- **CLAIM-4.59-012** [SUPPORTED] C12 — EXP-4.59
+- **CLAIM-4.59-013** [SUPPORTED] C13 — EXP-4.59
+- **CLAIM-4.59-014** [SUPPORTED] C14 — EXP-4.59
+- **CLAIM-4.59-015** [SUPPORTED] C15 — EXP-4.59
+- **CLAIM-4.59-016** [SUPPORTED] C16 — EXP-4.59
+- **CLAIM-4.59-017** [SUPPORTED] C17 — EXP-4.59
+- **CLAIM-4.59-018** [SUPPORTED] C18 — EXP-4.59
+- **CLAIM-4.59-019** [SUPPORTED] C19 — EXP-4.59
+- **CLAIM-4.59-020** [SUPPORTED] C20 — EXP-4.59
+- **CLAIM-4.59-021** [SUPPORTED] C21 — EXP-4.59
+- **CLAIM-4.59-022** [SUPPORTED] C22 — EXP-4.59
+- **CLAIM-4.59-023** [SUPPORTED] C23 — EXP-4.59
+- **CLAIM-4.59-024** [SUPPORTED] C24 — EXP-4.59
+- **CLAIM-4.59-025** [SUPPORTED] C25 — EXP-4.59
+- **CLAIM-4.59-026** [SUPPORTED] C26 — EXP-4.59
+- **CLAIM-4.59-027** [SUPPORTED] C27 — EXP-4.59
+- **CLAIM-4.59-028** [SUPPORTED] C28 — EXP-4.59
+- **CLAIM-4.59-029** [SUPPORTED] C29 — EXP-4.59
+- **CLAIM-4.59-030** [SUPPORTED] C30 — EXP-4.59
+- **CLAIM-4.59-031** [SUPPORTED] C31 — EXP-4.59
+- **CLAIM-4.59-032** [SUPPORTED] C32 — EXP-4.59
+- **CLAIM-4.59-033** [SUPPORTED] C33 — EXP-4.59
+- **CLAIM-4.59-034** [SUPPORTED] C34 — EXP-4.59
+- **CLAIM-4.59-035** [SUPPORTED] C35 — EXP-4.59
+- **CLAIM-4.59-036** [SUPPORTED] C36 — EXP-4.59
+- **CLAIM-4.59-037** [SUPPORTED] C37 — EXP-4.59
+- **CLAIM-4.59-038** [SUPPORTED] C38 — EXP-4.59
+- **CLAIM-4.59-039** [SUPPORTED] C39 — EXP-4.59
+- **CLAIM-4.59-040** [SUPPORTED] C40 — EXP-4.59
+- **CLAIM-4.59-041** [SUPPORTED] C41 — EXP-4.59
+- **CLAIM-4.59-042** [SUPPORTED] C42 — EXP-4.59
+- **CLAIM-4.59-043** [SUPPORTED] C43 — EXP-4.59
+- **CLAIM-4.59-044** [SUPPORTED] C44 — EXP-4.59
+- **CLAIM-4.59-045** [SUPPORTED] C45 — EXP-4.59
+- **CLAIM-4.59-046** [SUPPORTED] C46 — EXP-4.59
+- **CLAIM-4.59-047** [SUPPORTED] C47 — EXP-4.59
+- **CLAIM-4.59-048** [SUPPORTED] C48 — EXP-4.59
+- **CLAIM-4.59-049** [SUPPORTED] C49 — EXP-4.59
+- **CLAIM-4.59-050** [SUPPORTED] C50 — EXP-4.59
+- **CLAIM-4.59-051** [SUPPORTED] C51 — EXP-4.59
+- **CLAIM-4.59-052** [SUPPORTED] C52 — EXP-4.59
+- **CLAIM-4.59-053** [SUPPORTED] C53 — EXP-4.59
+- **CLAIM-4.59-054** [SUPPORTED] C54 — EXP-4.59
+- **CLAIM-4.59-055** [SUPPORTED] C55 — EXP-4.59
+- **CLAIM-4.59-056** [SUPPORTED] C56 — EXP-4.59
+- **CLAIM-4.59-057** [SUPPORTED] C57 — EXP-4.59
+- **CLAIM-4.59-058** [SUPPORTED] C58 — EXP-4.59
+- **CLAIM-4.59-059** [SUPPORTED] C59 — EXP-4.59
+- **CLAIM-4.59-060** [SUPPORTED] C60 — EXP-4.59
+- **CLAIM-4.59-061** [SUPPORTED] C61 — EXP-4.59
+- **CLAIM-4.59-062** [SUPPORTED] C62 — EXP-4.59
+- **CLAIM-4.59-063** [SUPPORTED] C63 — EXP-4.59
+- **CLAIM-4.59-064** [SUPPORTED] C64 — EXP-4.59
+- **CLAIM-4.59-065** [SUPPORTED] C65 — EXP-4.59
+- **CLAIM-4.59-066** [SUPPORTED] C66 — EXP-4.59
+- **CLAIM-4.59-067** [SUPPORTED] C67 — EXP-4.59
+- **CLAIM-4.59-068** [SUPPORTED] C68 — EXP-4.59
+- **CLAIM-4.59-069** [SUPPORTED] C69 — EXP-4.59
+- **CLAIM-4.59-070** [SUPPORTED] C70 — EXP-4.59
+- **CLAIM-4.59-071** [SUPPORTED] C71 — EXP-4.59
+- **CLAIM-4.59-072** [SUPPORTED] C72 — EXP-4.59
+- **CLAIM-4.59-073** [SUPPORTED] C73 — EXP-4.59
+- **CLAIM-4.59-074** [SUPPORTED] C74 — EXP-4.59
+- **CLAIM-4.59-075** [SUPPORTED] C75 — EXP-4.59
+- **CLAIM-4.60-001** [SUPPORTED] C1 — EXP-4.60
+- **CLAIM-4.60-002** [SUPPORTED] C2 — EXP-4.60
+- **CLAIM-4.60-003** [SUPPORTED] C3 — EXP-4.60
+- **CLAIM-4.60-004** [SUPPORTED] C4 — EXP-4.60
+- **CLAIM-4.60-005** [SUPPORTED] C5 — EXP-4.60
+- **CLAIM-4.60-006** [SUPPORTED] C6 — EXP-4.60
+- **CLAIM-4.60-007** [SUPPORTED] C7 — EXP-4.60
+- **CLAIM-4.60-008** [SUPPORTED] C8 — EXP-4.60
+- **CLAIM-4.60-009** [SUPPORTED] C9 — EXP-4.60
+- **CLAIM-4.60-010** [SUPPORTED] C10 — EXP-4.60
+- **CLAIM-4.60-011** [SUPPORTED] C11 — EXP-4.60
+- **CLAIM-4.60-012** [SUPPORTED] C12 — EXP-4.60
+- **CLAIM-4.60-013** [SUPPORTED] C13 — EXP-4.60
+- **CLAIM-4.60-014** [SUPPORTED] C14 — EXP-4.60
+- **CLAIM-4.60-015** [SUPPORTED] C15 — EXP-4.60
+- **CLAIM-4.60-016** [SUPPORTED] C16 — EXP-4.60
+- **CLAIM-4.60-017** [SUPPORTED] C17 — EXP-4.60
+- **CLAIM-4.60-018** [SUPPORTED] C18 — EXP-4.60
+- **CLAIM-4.60-019** [SUPPORTED] C19 — EXP-4.60
+- **CLAIM-4.60-020** [SUPPORTED] C20 — EXP-4.60
+- **CLAIM-4.60-021** [SUPPORTED] C21 — EXP-4.60
+- **CLAIM-4.60-022** [SUPPORTED] C22 — EXP-4.60
+- **CLAIM-4.60-023** [SUPPORTED] C23 — EXP-4.60
+- **CLAIM-4.60-024** [SUPPORTED] C24 — EXP-4.60
+- **CLAIM-4.60-025** [SUPPORTED] C25 — EXP-4.60
+- **CLAIM-4.60-026** [SUPPORTED] C26 — EXP-4.60
+- **CLAIM-4.60-027** [SUPPORTED] C27 — EXP-4.60
+- **CLAIM-4.60-028** [SUPPORTED] C28 — EXP-4.60
+- **CLAIM-4.60-029** [SUPPORTED] C29 — EXP-4.60
+- **CLAIM-4.60-030** [SUPPORTED] C30 — EXP-4.60
+- **CLAIM-4.60-031** [SUPPORTED] C31 — EXP-4.60
+- **CLAIM-4.60-032** [SUPPORTED] C32 — EXP-4.60
+- **CLAIM-4.60-033** [SUPPORTED] C33 — EXP-4.60
+- **CLAIM-4.60-034** [SUPPORTED] C34 — EXP-4.60
+- **CLAIM-4.60-035** [SUPPORTED] C35 — EXP-4.60
+- **CLAIM-4.60-036** [SUPPORTED] C36 — EXP-4.60
+- **CLAIM-4.60-037** [SUPPORTED] C37 — EXP-4.60
+- **CLAIM-4.60-038** [SUPPORTED] C38 — EXP-4.60
+- **CLAIM-4.60-039** [SUPPORTED] C39 — EXP-4.60
+- **CLAIM-4.60-040** [SUPPORTED] C40 — EXP-4.60
+- **CLAIM-4.60-041** [SUPPORTED] C41 — EXP-4.60
+- **CLAIM-4.60-042** [SUPPORTED] C42 — EXP-4.60
+- **CLAIM-4.60-043** [SUPPORTED] C43 — EXP-4.60
+- **CLAIM-4.60-044** [SUPPORTED] C44 — EXP-4.60
+- **CLAIM-4.60-045** [SUPPORTED] C45 — EXP-4.60
+- **CLAIM-4.60-046** [SUPPORTED] C46 — EXP-4.60
+- **CLAIM-4.60-047** [SUPPORTED] C47 — EXP-4.60
+- **CLAIM-4.60-048** [SUPPORTED] C48 — EXP-4.60
+- **CLAIM-4.60-049** [SUPPORTED] C49 — EXP-4.60
+- **CLAIM-4.60-050** [SUPPORTED] C50 — EXP-4.60
+- **CLAIM-4.60-051** [SUPPORTED] C51 — EXP-4.60
+- **CLAIM-4.60-052** [SUPPORTED] C52 — EXP-4.60
+- **CLAIM-4.60-053** [SUPPORTED] C53 — EXP-4.60
+- **CLAIM-4.60-054** [SUPPORTED] C54 — EXP-4.60
+- **CLAIM-4.60-055** [SUPPORTED] C55 — EXP-4.60
+- **CLAIM-4.60-056** [SUPPORTED] C56 — EXP-4.60
+- **CLAIM-4.60-057** [SUPPORTED] C57 — EXP-4.60
+- **CLAIM-4.60-058** [SUPPORTED] C58 — EXP-4.60
+- **CLAIM-4.60-059** [SUPPORTED] C59 — EXP-4.60
+- **CLAIM-4.60-060** [SUPPORTED] C60 — EXP-4.60
+- **CLAIM-4.60-061** [SUPPORTED] C61 — EXP-4.60
+- **CLAIM-4.60-062** [SUPPORTED] C62 — EXP-4.60
+- **CLAIM-4.60-063** [SUPPORTED] C63 — EXP-4.60
+- **CLAIM-4.60-064** [SUPPORTED] C64 — EXP-4.60
+- **CLAIM-4.60-065** [SUPPORTED] C65 — EXP-4.60
+- **CLAIM-4.60-066** [SUPPORTED] C66 — EXP-4.60
+- **CLAIM-4.60-067** [SUPPORTED] C67 — EXP-4.60
+- **CLAIM-4.60-068** [SUPPORTED] C68 — EXP-4.60
+- **CLAIM-4.60-069** [SUPPORTED] C69 — EXP-4.60
+- **CLAIM-4.60-070** [SUPPORTED] C70 — EXP-4.60
+- **CLAIM-4.60-071** [SUPPORTED] C71 — EXP-4.60
+- **CLAIM-4.60-072** [SUPPORTED] C72 — EXP-4.60
+- **CLAIM-4.60-073** [SUPPORTED] C73 — EXP-4.60
+- **CLAIM-4.60-074** [SUPPORTED] C74 — EXP-4.60
+- **CLAIM-4.60-075** [SUPPORTED] C75 — EXP-4.60
+- **CLAIM-4.60-076** [SUPPORTED] C76 — EXP-4.60
+- **CLAIM-4.60-077** [SUPPORTED] C77 — EXP-4.60
+- **CLAIM-4.60-078** [SUPPORTED] C78 — EXP-4.60
+- **CLAIM-4.60-079** [SUPPORTED] C79 — EXP-4.60
+- **CLAIM-4.60-080** [SUPPORTED] C80 — EXP-4.60
+- **CLAIM-4.60-081** [SUPPORTED] C81 — EXP-4.60
+- **CLAIM-4.60-082** [SUPPORTED] C82 — EXP-4.60
+- **CLAIM-4.61-001** [SUPPORTED] C1 — EXP-4.61
+- **CLAIM-4.61-002** [SUPPORTED] C2 — EXP-4.61
+- **CLAIM-4.61-003** [SUPPORTED] C3 — EXP-4.61
+- **CLAIM-4.61-004** [SUPPORTED] C4 — EXP-4.61
+- **CLAIM-4.61-005** [SUPPORTED] C5 — EXP-4.61
+- **CLAIM-4.61-006** [SUPPORTED] C6 — EXP-4.61
+- **CLAIM-4.61-007** [SUPPORTED] C7 — EXP-4.61
+- **CLAIM-4.61-008** [SUPPORTED] C8 — EXP-4.61
+- **CLAIM-4.61-009** [SUPPORTED] C9 — EXP-4.61
+- **CLAIM-4.61-010** [SUPPORTED] C10 — EXP-4.61
+- **CLAIM-4.61-011** [SUPPORTED] C11 — EXP-4.61
+- **CLAIM-4.61-012** [SUPPORTED] C12 — EXP-4.61
+- **CLAIM-4.61-013** [SUPPORTED] C13 — EXP-4.61
+- **CLAIM-4.61-014** [SUPPORTED] C14 — EXP-4.61
+- **CLAIM-4.61-015** [SUPPORTED] C15 — EXP-4.61
+- **CLAIM-4.61-016** [SUPPORTED] C16 — EXP-4.61
+- **CLAIM-4.61-017** [SUPPORTED] C17 — EXP-4.61
+- **CLAIM-4.61-018** [SUPPORTED] C18 — EXP-4.61
+- **CLAIM-4.61-019** [SUPPORTED] C19 — EXP-4.61
+- **CLAIM-4.61-020** [SUPPORTED] C20 — EXP-4.61
+- **CLAIM-4.61-021** [SUPPORTED] C21 — EXP-4.61
+- **CLAIM-4.61-022** [SUPPORTED] C22 — EXP-4.61
+- **CLAIM-4.61-023** [SUPPORTED] C23 — EXP-4.61
+- **CLAIM-4.61-024** [SUPPORTED] C24 — EXP-4.61
+- **CLAIM-4.61-025** [SUPPORTED] C25 — EXP-4.61
+- **CLAIM-4.61-026** [SUPPORTED] C26 — EXP-4.61
+- **CLAIM-4.61-027** [SUPPORTED] C27 — EXP-4.61
+- **CLAIM-4.61-028** [SUPPORTED] C28 — EXP-4.61
+- **CLAIM-4.61-029** [SUPPORTED] C29 — EXP-4.61
+- **CLAIM-4.61-030** [SUPPORTED] C30 — EXP-4.61
+- **CLAIM-4.61-031** [SUPPORTED] C31 — EXP-4.61
+- **CLAIM-4.61-032** [SUPPORTED] C32 — EXP-4.61
+- **CLAIM-4.61-033** [SUPPORTED] C33 — EXP-4.61
+- **CLAIM-4.61-034** [SUPPORTED] C34 — EXP-4.61
+- **CLAIM-4.61-035** [SUPPORTED] C35 — EXP-4.61
+- **CLAIM-4.61-036** [SUPPORTED] C36 — EXP-4.61
+- **CLAIM-4.61-037** [SUPPORTED] C37 — EXP-4.61
+- **CLAIM-4.61-038** [SUPPORTED] C38 — EXP-4.61
+- **CLAIM-4.61-039** [SUPPORTED] C39 — EXP-4.61
+- **CLAIM-4.61-040** [SUPPORTED] C40 — EXP-4.61
+- **CLAIM-4.61-041** [SUPPORTED] C41 — EXP-4.61
+- **CLAIM-4.61-042** [SUPPORTED] C42 — EXP-4.61
+- **CLAIM-4.61-043** [SUPPORTED] C43 — EXP-4.61
+- **CLAIM-4.61-044** [SUPPORTED] C44 — EXP-4.61
+- **CLAIM-4.61-045** [SUPPORTED] C45 — EXP-4.61
+- **CLAIM-4.61-046** [SUPPORTED] C46 — EXP-4.61
+- **CLAIM-4.61-047** [SUPPORTED] C47 — EXP-4.61
+- **CLAIM-4.61-048** [SUPPORTED] C48 — EXP-4.61
+- **CLAIM-4.61-049** [SUPPORTED] C49 — EXP-4.61
+- **CLAIM-4.61-050** [SUPPORTED] C50 — EXP-4.61
+- **CLAIM-4.61-051** [SUPPORTED] C51 — EXP-4.61
+- **CLAIM-4.61-052** [SUPPORTED] C52 — EXP-4.61
+- **CLAIM-4.61-053** [SUPPORTED] C53 — EXP-4.61
+- **CLAIM-4.61-054** [SUPPORTED] C54 — EXP-4.61
+- **CLAIM-4.61-055** [SUPPORTED] C55 — EXP-4.61
+- **CLAIM-4.61-056** [SUPPORTED] C56 — EXP-4.61
+- **CLAIM-4.61-057** [SUPPORTED] C57 — EXP-4.61
+- **CLAIM-4.61-058** [SUPPORTED] C58 — EXP-4.61
+- **CLAIM-4.61-059** [SUPPORTED] C59 — EXP-4.61
+- **CLAIM-4.61-060** [SUPPORTED] C60 — EXP-4.61
+- **CLAIM-4.61-061** [SUPPORTED] C61 — EXP-4.61
+- **CLAIM-4.61-062** [SUPPORTED] C62 — EXP-4.61
+- **CLAIM-4.61-063** [SUPPORTED] C63 — EXP-4.61
+- **CLAIM-4.61-064** [SUPPORTED] C64 — EXP-4.61
+- **CLAIM-4.61-065** [SUPPORTED] C65 — EXP-4.61
+- **CLAIM-4.61-066** [SUPPORTED] C66 — EXP-4.61
+- **CLAIM-4.61-067** [SUPPORTED] C67 — EXP-4.61
+- **CLAIM-4.61-068** [SUPPORTED] C68 — EXP-4.61
+- **CLAIM-4.61-069** [SUPPORTED] C69 — EXP-4.61
+- **CLAIM-4.61-070** [SUPPORTED] C70 — EXP-4.61
+- **CLAIM-4.61-071** [SUPPORTED] C71 — EXP-4.61
+- **CLAIM-4.61-072** [SUPPORTED] C72 — EXP-4.61
+- **CLAIM-4.61-073** [SUPPORTED] C73 — EXP-4.61
+- **CLAIM-4.61-074** [SUPPORTED] C74 — EXP-4.61
+- **CLAIM-4.61-075** [SUPPORTED] C75 — EXP-4.61
+- **CLAIM-4.61-076** [SUPPORTED] C76 — EXP-4.61
+- **CLAIM-4.61-077** [SUPPORTED] C77 — EXP-4.61
+- **CLAIM-4.61-078** [SUPPORTED] C78 — EXP-4.61
+- **CLAIM-4.61-079** [SUPPORTED] C79 — EXP-4.61
+- **CLAIM-4.62-001** [SUPPORTED] C1 — EXP-4.62
+- **CLAIM-4.62-002** [SUPPORTED] C2 — EXP-4.62
+- **CLAIM-4.62-003** [SUPPORTED] C3 — EXP-4.62
+- **CLAIM-4.62-004** [SUPPORTED] C4 — EXP-4.62
+- **CLAIM-4.62-005** [SUPPORTED] C5 — EXP-4.62
+- **CLAIM-4.62-006** [SUPPORTED] C6 — EXP-4.62
+- **CLAIM-4.62-007** [SUPPORTED] C7 — EXP-4.62
+- **CLAIM-4.62-008** [SUPPORTED] C8 — EXP-4.62
+- **CLAIM-4.62-009** [SUPPORTED] C9 — EXP-4.62
+- **CLAIM-4.62-010** [SUPPORTED] C10 — EXP-4.62
+- **CLAIM-4.62-011** [SUPPORTED] C11 — EXP-4.62
+- **CLAIM-4.62-012** [SUPPORTED] C12 — EXP-4.62
+- **CLAIM-4.62-013** [SUPPORTED] C13 — EXP-4.62
+- **CLAIM-4.62-014** [SUPPORTED] C14 — EXP-4.62
+- **CLAIM-4.62-015** [SUPPORTED] C15 — EXP-4.62
+- **CLAIM-4.62-016** [SUPPORTED] C16 — EXP-4.62
+- **CLAIM-4.62-017** [SUPPORTED] C17 — EXP-4.62
+- **CLAIM-4.62-018** [SUPPORTED] C18 — EXP-4.62
+- **CLAIM-4.62-019** [SUPPORTED] C19 — EXP-4.62
+- **CLAIM-4.62-020** [SUPPORTED] C20 — EXP-4.62
+- **CLAIM-4.62-021** [SUPPORTED] C21 — EXP-4.62
+- **CLAIM-4.62-022** [SUPPORTED] C22 — EXP-4.62
+- **CLAIM-4.62-023** [SUPPORTED] C23 — EXP-4.62
+- **CLAIM-4.62-024** [SUPPORTED] C24 — EXP-4.62
+- **CLAIM-4.62-025** [SUPPORTED] C25 — EXP-4.62
+- **CLAIM-4.62-026** [SUPPORTED] C26 — EXP-4.62
+- **CLAIM-4.62-027** [SUPPORTED] C27 — EXP-4.62
+- **CLAIM-4.62-028** [SUPPORTED] C28 — EXP-4.62
+- **CLAIM-4.62-029** [SUPPORTED] C29 — EXP-4.62
+- **CLAIM-4.62-030** [SUPPORTED] C30 — EXP-4.62
+- **CLAIM-4.62-031** [SUPPORTED] C31 — EXP-4.62
+- **CLAIM-4.62-032** [SUPPORTED] C32 — EXP-4.62
+- **CLAIM-4.62-033** [SUPPORTED] C33 — EXP-4.62
+- **CLAIM-4.62-034** [SUPPORTED] C34 — EXP-4.62
+- **CLAIM-4.62-035** [SUPPORTED] C35 — EXP-4.62
+- **CLAIM-4.62-036** [SUPPORTED] C36 — EXP-4.62
+- **CLAIM-4.62-037** [SUPPORTED] C37 — EXP-4.62
+- **CLAIM-4.62-038** [SUPPORTED] C38 — EXP-4.62
+- **CLAIM-4.62-039** [SUPPORTED] C39 — EXP-4.62
+- **CLAIM-4.62-040** [SUPPORTED] C40 — EXP-4.62
+- **CLAIM-4.62-041** [SUPPORTED] C41 — EXP-4.62
+- **CLAIM-4.62-042** [SUPPORTED] C42 — EXP-4.62
+- **CLAIM-4.62-043** [SUPPORTED] C43 — EXP-4.62
+- **CLAIM-4.62-044** [SUPPORTED] C44 — EXP-4.62
+- **CLAIM-4.62-045** [SUPPORTED] C45 — EXP-4.62
+- **CLAIM-4.62-046** [SUPPORTED] C46 — EXP-4.62
+- **CLAIM-4.62-047** [SUPPORTED] C47 — EXP-4.62
+- **CLAIM-4.62-048** [SUPPORTED] C48 — EXP-4.62
+- **CLAIM-4.62-049** [SUPPORTED] C49 — EXP-4.62
+- **CLAIM-4.62-050** [SUPPORTED] C50 — EXP-4.62
+- **CLAIM-4.62-051** [SUPPORTED] C51 — EXP-4.62
+- **CLAIM-4.62-052** [SUPPORTED] C52 — EXP-4.62
+- **CLAIM-4.62-053** [SUPPORTED] C53 — EXP-4.62
+- **CLAIM-4.62-054** [SUPPORTED] C54 — EXP-4.62
+- **CLAIM-4.62-055** [SUPPORTED] C55 — EXP-4.62
+- **CLAIM-4.62-056** [SUPPORTED] C56 — EXP-4.62
+- **CLAIM-4.62-057** [SUPPORTED] C57 — EXP-4.62
+- **CLAIM-4.62-058** [SUPPORTED] C58 — EXP-4.62
+- **CLAIM-4.62-059** [SUPPORTED] C59 — EXP-4.62
+- **CLAIM-4.62-060** [SUPPORTED] C60 — EXP-4.62
+- **CLAIM-4.62-061** [SUPPORTED] C61 — EXP-4.62
+- **CLAIM-4.62-062** [SUPPORTED] C62 — EXP-4.62
+- **CLAIM-4.62-063** [SUPPORTED] C63 — EXP-4.62
+- **CLAIM-4.62-064** [SUPPORTED] C64 — EXP-4.62
+- **CLAIM-4.62-065** [SUPPORTED] C65 — EXP-4.62
+- **CLAIM-4.62-066** [SUPPORTED] C66 — EXP-4.62
+- **CLAIM-4.62-067** [SUPPORTED] C67 — EXP-4.62
+- **CLAIM-4.62-068** [SUPPORTED] C68 — EXP-4.62
+- **CLAIM-4.62-069** [SUPPORTED] C69 — EXP-4.62
+- **CLAIM-4.62-070** [SUPPORTED] C70 — EXP-4.62
+- **CLAIM-4.62-071** [SUPPORTED] C71 — EXP-4.62
+- **CLAIM-4.62-072** [SUPPORTED] C72 — EXP-4.62
+- **CLAIM-4.62-073** [SUPPORTED] C73 — EXP-4.62
+- **CLAIM-4.62-074** [SUPPORTED] C74 — EXP-4.62
+- **CLAIM-4.62-075** [SUPPORTED] C75 — EXP-4.62
+- **CLAIM-4.62-076** [SUPPORTED] C76 — EXP-4.62
+- **CLAIM-4.62-077** [SUPPORTED] C77 — EXP-4.62
+- **CLAIM-4.62-078** [SUPPORTED] C78 — EXP-4.62
+- **CLAIM-4.62-079** [SUPPORTED] C79 — EXP-4.62
+- **CLAIM-4.62-080** [SUPPORTED] C80 — EXP-4.62
+- **CLAIM-4.62-081** [SUPPORTED] C81 — EXP-4.62
+- **CLAIM-4.62-082** [SUPPORTED] C82 — EXP-4.62
+- **CLAIM-4.62-083** [SUPPORTED] C83 — EXP-4.62
+- **CLAIM-4.62-084** [SUPPORTED] C84 — EXP-4.62
+- **CLAIM-4.63-001** [SUPPORTED] C1 — EXP-4.63
+- **CLAIM-4.63-002** [SUPPORTED] C2 — EXP-4.63
+- **CLAIM-4.63-003** [SUPPORTED] C3 — EXP-4.63
+- **CLAIM-4.63-004** [SUPPORTED] C4 — EXP-4.63
+- **CLAIM-4.63-005** [SUPPORTED] C5 — EXP-4.63
+- **CLAIM-4.63-006** [SUPPORTED] C6 — EXP-4.63
+- **CLAIM-4.63-007** [SUPPORTED] C7 — EXP-4.63
+- **CLAIM-4.63-008** [SUPPORTED] C8 — EXP-4.63
+- **CLAIM-4.63-009** [SUPPORTED] C9 — EXP-4.63
+- **CLAIM-4.63-010** [SUPPORTED] C10 — EXP-4.63
+- **CLAIM-4.63-011** [SUPPORTED] C11 — EXP-4.63
+- **CLAIM-4.63-012** [SUPPORTED] C12 — EXP-4.63
+- **CLAIM-4.63-013** [SUPPORTED] C13 — EXP-4.63
+- **CLAIM-4.63-014** [SUPPORTED] C14 — EXP-4.63
+- **CLAIM-4.63-015** [SUPPORTED] C15 — EXP-4.63
+- **CLAIM-4.63-016** [SUPPORTED] C16 — EXP-4.63
+- **CLAIM-4.63-017** [SUPPORTED] C17 — EXP-4.63
+- **CLAIM-4.63-018** [SUPPORTED] C18 — EXP-4.63
+- **CLAIM-4.63-019** [SUPPORTED] C19 — EXP-4.63
+- **CLAIM-4.63-020** [SUPPORTED] C20 — EXP-4.63
+- **CLAIM-4.63-021** [SUPPORTED] C21 — EXP-4.63
+- **CLAIM-4.63-022** [SUPPORTED] C22 — EXP-4.63
+- **CLAIM-4.63-023** [SUPPORTED] C23 — EXP-4.63
+- **CLAIM-4.63-024** [SUPPORTED] C24 — EXP-4.63
+- **CLAIM-4.63-025** [SUPPORTED] C25 — EXP-4.63
+- **CLAIM-4.63-026** [SUPPORTED] C26 — EXP-4.63
+- **CLAIM-4.63-027** [SUPPORTED] C27 — EXP-4.63
+- **CLAIM-4.63-028** [SUPPORTED] C28 — EXP-4.63
+- **CLAIM-4.63-029** [SUPPORTED] C29 — EXP-4.63
+- **CLAIM-4.63-030** [SUPPORTED] C30 — EXP-4.63
+- **CLAIM-4.63-031** [SUPPORTED] C31 — EXP-4.63
+- **CLAIM-4.63-032** [SUPPORTED] C32 — EXP-4.63
+- **CLAIM-4.63-033** [SUPPORTED] C33 — EXP-4.63
+- **CLAIM-4.63-034** [SUPPORTED] C34 — EXP-4.63
+- **CLAIM-4.63-035** [SUPPORTED] C35 — EXP-4.63
+- **CLAIM-4.63-036** [SUPPORTED] C36 — EXP-4.63
+- **CLAIM-4.63-037** [SUPPORTED] C37 — EXP-4.63
+- **CLAIM-4.63-038** [SUPPORTED] C38 — EXP-4.63
+- **CLAIM-4.63-039** [SUPPORTED] C39 — EXP-4.63
+- **CLAIM-4.63-040** [SUPPORTED] C40 — EXP-4.63
+- **CLAIM-4.63-041** [SUPPORTED] C41 — EXP-4.63
+- **CLAIM-4.63-042** [SUPPORTED] C42 — EXP-4.63
+- **CLAIM-4.63-043** [SUPPORTED] C43 — EXP-4.63
+- **CLAIM-4.63-044** [SUPPORTED] C44 — EXP-4.63
+- **CLAIM-4.63-045** [SUPPORTED] C45 — EXP-4.63
+- **CLAIM-4.63-046** [SUPPORTED] C46 — EXP-4.63
+- **CLAIM-4.63-047** [SUPPORTED] C47 — EXP-4.63
+- **CLAIM-4.63-048** [SUPPORTED] C48 — EXP-4.63
+- **CLAIM-4.63-049** [SUPPORTED] C49 — EXP-4.63
+- **CLAIM-4.63-050** [SUPPORTED] C50 — EXP-4.63
+- **CLAIM-4.63-051** [SUPPORTED] C51 — EXP-4.63
+- **CLAIM-4.63-052** [SUPPORTED] C52 — EXP-4.63
+- **CLAIM-4.63-053** [SUPPORTED] C53 — EXP-4.63
+- **CLAIM-4.63-054** [SUPPORTED] C54 — EXP-4.63
+- **CLAIM-4.63-055** [SUPPORTED] C55 — EXP-4.63
+- **CLAIM-4.63-056** [SUPPORTED] C56 — EXP-4.63
+- **CLAIM-4.63-057** [SUPPORTED] C57 — EXP-4.63
+- **CLAIM-4.63-058** [SUPPORTED] C58 — EXP-4.63
+- **CLAIM-4.63-059** [SUPPORTED] C59 — EXP-4.63
+- **CLAIM-4.63-060** [SUPPORTED] C60 — EXP-4.63
+- **CLAIM-4.63-061** [SUPPORTED] C61 — EXP-4.63
+- **CLAIM-4.63-062** [SUPPORTED] C62 — EXP-4.63
+- **CLAIM-4.63-063** [SUPPORTED] C63 — EXP-4.63
+- **CLAIM-4.63-064** [SUPPORTED] C64 — EXP-4.63
+- **CLAIM-4.63-065** [SUPPORTED] C65 — EXP-4.63
+- **CLAIM-4.63-066** [SUPPORTED] C66 — EXP-4.63
+- **CLAIM-4.63-067** [SUPPORTED] C67 — EXP-4.63
+- **CLAIM-4.63-068** [SUPPORTED] C68 — EXP-4.63
+- **CLAIM-4.63-069** [SUPPORTED] C69 — EXP-4.63
+- **CLAIM-4.63-070** [SUPPORTED] C70 — EXP-4.63
+- **CLAIM-4.63-071** [SUPPORTED] C71 — EXP-4.63
+- **CLAIM-4.63-072** [SUPPORTED] C72 — EXP-4.63
+- **CLAIM-4.63-073** [SUPPORTED] C73 — EXP-4.63
+- **CLAIM-4.63-074** [SUPPORTED] C74 — EXP-4.63
+- **CLAIM-4.63-075** [SUPPORTED] C75 — EXP-4.63
+- **CLAIM-4.63-076** [SUPPORTED] C76 — EXP-4.63
+- **CLAIM-4.63-077** [SUPPORTED] C77 — EXP-4.63
+- **CLAIM-4.63-078** [SUPPORTED] C78 — EXP-4.63
+- **CLAIM-4.63-079** [SUPPORTED] C79 — EXP-4.63
+- **CLAIM-4.63-080** [SUPPORTED] C80 — EXP-4.63
+- **CLAIM-4.63-081** [SUPPORTED] C81 — EXP-4.63
+- **CLAIM-4.63-082** [SUPPORTED] C82 — EXP-4.63
+- **CLAIM-4.63-083** [SUPPORTED] C83 — EXP-4.63
+- **CLAIM-4.64-001** [SUPPORTED] C1 — EXP-4.64
+- **CLAIM-4.64-002** [SUPPORTED] C2 — EXP-4.64
+- **CLAIM-4.64-003** [SUPPORTED] C3 — EXP-4.64
+- **CLAIM-4.64-004** [SUPPORTED] C4 — EXP-4.64
+- **CLAIM-4.64-005** [SUPPORTED] C5 — EXP-4.64
+- **CLAIM-4.64-006** [SUPPORTED] C6 — EXP-4.64
+- **CLAIM-4.64-007** [SUPPORTED] C7 — EXP-4.64
+- **CLAIM-4.64-008** [SUPPORTED] C8 — EXP-4.64
+- **CLAIM-4.64-009** [SUPPORTED] C9 — EXP-4.64
+- **CLAIM-4.64-010** [SUPPORTED] C10 — EXP-4.64
+- **CLAIM-4.64-011** [SUPPORTED] C11 — EXP-4.64
+- **CLAIM-4.64-012** [SUPPORTED] C12 — EXP-4.64
+- **CLAIM-4.64-013** [SUPPORTED] C13 — EXP-4.64
+- **CLAIM-4.64-014** [SUPPORTED] C14 — EXP-4.64
+- **CLAIM-4.64-015** [SUPPORTED] C15 — EXP-4.64
+- **CLAIM-4.64-016** [SUPPORTED] C16 — EXP-4.64
+- **CLAIM-4.64-017** [SUPPORTED] C17 — EXP-4.64
+- **CLAIM-4.64-018** [SUPPORTED] C18 — EXP-4.64
+- **CLAIM-4.64-019** [SUPPORTED] C19 — EXP-4.64
+- **CLAIM-4.64-020** [SUPPORTED] C20 — EXP-4.64
+- **CLAIM-4.64-021** [SUPPORTED] C21 — EXP-4.64
+- **CLAIM-4.64-022** [SUPPORTED] C22 — EXP-4.64
+- **CLAIM-4.64-023** [SUPPORTED] C23 — EXP-4.64
+- **CLAIM-4.64-024** [SUPPORTED] C24 — EXP-4.64
+- **CLAIM-4.64-025** [SUPPORTED] C25 — EXP-4.64
+- **CLAIM-4.64-026** [SUPPORTED] C26 — EXP-4.64
+- **CLAIM-4.64-027** [SUPPORTED] C27 — EXP-4.64
+- **CLAIM-4.64-028** [SUPPORTED] C28 — EXP-4.64
+- **CLAIM-4.64-029** [SUPPORTED] C29 — EXP-4.64
+- **CLAIM-4.64-030** [SUPPORTED] C30 — EXP-4.64
+- **CLAIM-4.64-031** [SUPPORTED] C31 — EXP-4.64
+- **CLAIM-4.64-032** [SUPPORTED] C32 — EXP-4.64
+- **CLAIM-4.64-033** [SUPPORTED] C33 — EXP-4.64
+- **CLAIM-4.64-034** [SUPPORTED] C34 — EXP-4.64
+- **CLAIM-4.64-035** [SUPPORTED] C35 — EXP-4.64
+- **CLAIM-4.64-036** [SUPPORTED] C36 — EXP-4.64
+- **CLAIM-4.64-037** [SUPPORTED] C37 — EXP-4.64
+- **CLAIM-4.64-038** [SUPPORTED] C38 — EXP-4.64
+- **CLAIM-4.64-039** [SUPPORTED] C39 — EXP-4.64
+- **CLAIM-4.64-040** [SUPPORTED] C40 — EXP-4.64
+- **CLAIM-4.64-041** [SUPPORTED] C41 — EXP-4.64
+- **CLAIM-4.64-042** [SUPPORTED] C42 — EXP-4.64
+- **CLAIM-4.64-043** [SUPPORTED] C43 — EXP-4.64
+- **CLAIM-4.64-044** [SUPPORTED] C44 — EXP-4.64
+- **CLAIM-4.64-045** [SUPPORTED] C45 — EXP-4.64
+- **CLAIM-4.64-046** [SUPPORTED] C46 — EXP-4.64
+- **CLAIM-4.64-047** [SUPPORTED] C47 — EXP-4.64
+- **CLAIM-4.64-048** [SUPPORTED] C48 — EXP-4.64
+- **CLAIM-4.64-049** [SUPPORTED] C49 — EXP-4.64
+- **CLAIM-4.64-050** [SUPPORTED] C50 — EXP-4.64
+- **CLAIM-4.64-051** [SUPPORTED] C51 — EXP-4.64
+- **CLAIM-4.64-052** [SUPPORTED] C52 — EXP-4.64
+- **CLAIM-4.64-053** [SUPPORTED] C53 — EXP-4.64
+- **CLAIM-4.64-054** [SUPPORTED] C54 — EXP-4.64
+- **CLAIM-4.64-055** [SUPPORTED] C55 — EXP-4.64
+- **CLAIM-4.64-056** [SUPPORTED] C56 — EXP-4.64
+- **CLAIM-4.64-057** [SUPPORTED] C57 — EXP-4.64
+- **CLAIM-4.64-058** [SUPPORTED] C58 — EXP-4.64
+- **CLAIM-4.64-059** [SUPPORTED] C59 — EXP-4.64
+- **CLAIM-4.64-060** [SUPPORTED] C60 — EXP-4.64
+- **CLAIM-4.64-061** [SUPPORTED] C61 — EXP-4.64
+- **CLAIM-4.64-062** [SUPPORTED] C62 — EXP-4.64
+- **CLAIM-4.64-063** [SUPPORTED] C63 — EXP-4.64
+- **CLAIM-4.64-064** [SUPPORTED] C64 — EXP-4.64
+- **CLAIM-4.64-065** [SUPPORTED] C65 — EXP-4.64
+- **CLAIM-4.64-066** [SUPPORTED] C66 — EXP-4.64
+- **CLAIM-4.64-067** [SUPPORTED] C67 — EXP-4.64
+- **CLAIM-4.64-068** [SUPPORTED] C68 — EXP-4.64
+- **CLAIM-4.64-069** [SUPPORTED] C69 — EXP-4.64
+- **CLAIM-4.64-070** [SUPPORTED] C70 — EXP-4.64
+- **CLAIM-4.64-071** [SUPPORTED] C71 — EXP-4.64
+- **CLAIM-4.64-072** [SUPPORTED] C72 — EXP-4.64
+- **CLAIM-4.64-073** [SUPPORTED] C73 — EXP-4.64
+- **CLAIM-4.64-074** [SUPPORTED] C74 — EXP-4.64
+- **CLAIM-4.64-075** [SUPPORTED] C75 — EXP-4.64
+- **CLAIM-4.64-076** [SUPPORTED] C76 — EXP-4.64
+- **CLAIM-4.64-077** [SUPPORTED] C77 — EXP-4.64
+- **CLAIM-4.64-078** [SUPPORTED] C78 — EXP-4.64
+- **CLAIM-4.64-079** [SUPPORTED] C79 — EXP-4.64
+- **CLAIM-4.64-080** [SUPPORTED] C80 — EXP-4.64
+- **CLAIM-4.64-081** [SUPPORTED] C81 — EXP-4.64
+- **CLAIM-4.64-082** [SUPPORTED] C82 — EXP-4.64
+- **CLAIM-4.64-083** [SUPPORTED] C83 — EXP-4.64
+- **CLAIM-4.64-084** [SUPPORTED] C84 — EXP-4.64
+- **CLAIM-4.64-085** [SUPPORTED] C85 — EXP-4.64
+- **CLAIM-4.64-086** [SUPPORTED] C86 — EXP-4.64

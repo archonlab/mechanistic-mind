@@ -1,0 +1,90 @@
+{
+  "experiment": "BIOLOGICAL_TIME_AND_MASS_RISK_V031",
+  "version": "0.3.1",
+  "time_contract": {
+    "tick_duration_days": 1.0,
+    "days_per_year": 365.2425
+  },
+  "mass_contract": {
+    "safe_operating_region_kg": [
+      45.0,
+      120.0
+    ],
+    "low_mass_critical_kg": 35.0,
+    "high_mass_critical_kg": 140.0,
+    "hard_simulator_bounds_kg": [
+      25.0,
+      180.0
+    ],
+    "mass_gain_requires_metabolic_intake": true,
+    "progress_directly_changes_mass": false
+  },
+  "cases": [
+    {
+      "case": "CONTROL",
+      "mass_kg_before": 70.0,
+      "mass_kg_after": 69.9904,
+      "mass_delta_kg": -0.009600000000006048,
+      "metabolic_balance": -0.08,
+      "energy_reserve_after": 0.725,
+      "life_day": 1,
+      "age_years": 18.00273790700699,
+      "low_mass_risk": 0.0,
+      "high_mass_risk": 0.0,
+      "physiological_mass_risk": 0.0
+    },
+    {
+      "case": "FUNCTIONAL_RECOVERY_NO_FOOD",
+      "mass_kg_before": 70.0,
+      "mass_kg_after": 69.9904,
+      "mass_delta_kg": -0.009600000000006048,
+      "metabolic_balance": -0.08,
+      "energy_reserve_after": 1.0,
+      "life_day": 1,
+      "age_years": 18.00273790700699,
+      "low_mass_risk": 0.0,
+      "high_mass_risk": 0.0,
+      "physiological_mass_risk": 0.0
+    },
+    {
+      "case": "METABOLIC_INTAKE",
+      "mass_kg_before": 70.0,
+      "mass_kg_after": 70.0168,
+      "mass_delta_kg": 0.01680000000000348,
+      "metabolic_balance": 0.14,
+      "energy_reserve_after": 1.0,
+      "life_day": 1,
+      "age_years": 18.00273790700699,
+      "low_mass_risk": 0.0,
+      "high_mass_risk": 0.0,
+      "physiological_mass_risk": 0.0
+    },
+    {
+      "case": "LOW_MASS_RISK",
+      "mass_kg_before": 40.0,
+      "mass_kg_after": 39.9904,
+      "mass_delta_kg": -0.009599999999998943,
+      "metabolic_balance": -0.08,
+      "energy_reserve_after": 0.719,
+      "life_day": 1,
+      "age_years": 18.00273790700699,
+      "low_mass_risk": 0.5014399982305278,
+      "high_mass_risk": 0.0,
+      "physiological_mass_risk": 0.5014399982305278
+    },
+    {
+      "case": "HIGH_MASS_RISK",
+      "mass_kg_before": 130.0,
+      "mass_kg_after": 129.9904,
+      "mass_delta_kg": -0.009600000000006048,
+      "metabolic_balance": -0.08,
+      "energy_reserve_after": 0.725,
+      "life_day": 1,
+      "age_years": 18.00273790700699,
+      "low_mass_risk": 0.0,
+      "high_mass_risk": 0.4992800002211835,
+      "physiological_mass_risk": 0.49928000022118346
+    }
+  ],
+  "interpretation": "Functional energy/recovery and metabolic intake are separate. Only objective metabolic balance changes long-term body mass. Mass risk is simulator/Observer truth and reaches the psyche only through downstream experienced physical consequences."
+}

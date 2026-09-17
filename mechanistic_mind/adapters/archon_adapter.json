@@ -1,0 +1,20 @@
+{
+  "schema": "archon_adapter_manifest_v1",
+  "id": "mechanistic-mind",
+  "name": "Mechanistic Mind",
+  "version": "0.4.0",
+  "description": "Experimental embodied cognitive architecture for studying emergent organization in a physically grounded world-body-internal system.",
+  "engine_type": "simulation",
+  "capabilities": [
+    "results"
+  ],
+  "entrypoints": {
+    "launch": [
+      "python3",
+      "psychology_observer.py"
+    ]
+  },
+  "data_roots": [
+    "results"
+  ]
+}

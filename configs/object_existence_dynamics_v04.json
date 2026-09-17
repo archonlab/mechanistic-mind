@@ -1,0 +1,45 @@
+{
+  "version": "0.3.9",
+  "world": "object-existence-dynamics",
+  "seed": 17,
+  "update": "Update #4 Object Existence Dynamics",
+  "principle": "Object effects and existence patterns are independent configurable properties.",
+  "presets": {
+    "STATIC": {
+      "effects": {"energy_delta": 0.20},
+      "availability": {"max_uses": 2},
+      "existence": {"mode": "STATIC"}
+    },
+    "RELOCATING_RANDOM": {
+      "effects": {"energy_delta": 0.20},
+      "availability": {"max_uses": 2},
+      "existence": {
+        "mode": "RELOCATING_RANDOM",
+        "trigger": {"type": "DEPLETED"},
+        "transition_delay_ticks": {"min": 2, "max": 2},
+        "allowed_regions": [
+          {"region": "A", "cells": [[1, 1]]},
+          {"region": "B", "cells": [[3, 1]]},
+          {"region": "C", "cells": [[5, 1]]},
+          {"region": "D", "cells": [[7, 1]]}
+        ]
+      }
+    },
+    "RELOCATING_ROUTE": {
+      "effects": {"energy_delta": 0.20},
+      "availability": {"max_uses": 2},
+      "existence": {
+        "mode": "RELOCATING_ROUTE",
+        "trigger": {"type": "DEPLETED"},
+        "route": [
+          {"region": "A", "cells": [[1, 1]]},
+          {"region": "B", "cells": [[3, 1]]},
+          {"region": "C", "cells": [[5, 1]]}
+        ],
+        "cycle": true,
+        "transition_delay_ticks": {"min": 2, "max": 2},
+        "randomize_position_within_region": false
+      }
+    }
+  }
+}

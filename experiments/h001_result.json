@@ -1,0 +1,66 @@
+{
+  "hypothesis_id": "H001-OUTCOME-TRACE",
+  "statement": "A persistent action-outcome trace is sufficient, in this diagnostic environment, to shift choice occupancy toward the higher-yield option after limited exploration.",
+  "control": {
+    "condition": "CONTROL_NO_OUTCOME_TRACE",
+    "ticks": 12,
+    "choose_a": 6,
+    "choose_b": 6,
+    "choose_b_rate": 0.5,
+    "cumulative_outcome": 24.0,
+    "observer_ticks": 12,
+    "archon_observations": 12,
+    "archon_events": 24,
+    "action_sources": [
+      "MECHANISM:H001-CONTROL-ALTERNATOR",
+      "MECHANISM:H001-CONTROL-ALTERNATOR",
+      "MECHANISM:H001-CONTROL-ALTERNATOR",
+      "MECHANISM:H001-CONTROL-ALTERNATOR",
+      "MECHANISM:H001-CONTROL-ALTERNATOR",
+      "MECHANISM:H001-CONTROL-ALTERNATOR",
+      "MECHANISM:H001-CONTROL-ALTERNATOR",
+      "MECHANISM:H001-CONTROL-ALTERNATOR",
+      "MECHANISM:H001-CONTROL-ALTERNATOR",
+      "MECHANISM:H001-CONTROL-ALTERNATOR",
+      "MECHANISM:H001-CONTROL-ALTERNATOR",
+      "MECHANISM:H001-CONTROL-ALTERNATOR"
+    ]
+  },
+  "treatment": {
+    "condition": "TREATMENT_OUTCOME_TRACE",
+    "ticks": 12,
+    "choose_a": 1,
+    "choose_b": 11,
+    "choose_b_rate": 0.9166666666666666,
+    "cumulative_outcome": 34.0,
+    "observer_ticks": 12,
+    "archon_observations": 12,
+    "archon_events": 46,
+    "action_sources": [
+      "MECHANISM:H001-OUTCOME-TRACE",
+      "MECHANISM:H001-OUTCOME-TRACE",
+      "MECHANISM:H001-OUTCOME-TRACE",
+      "MECHANISM:H001-OUTCOME-TRACE",
+      "MECHANISM:H001-OUTCOME-TRACE",
+      "MECHANISM:H001-OUTCOME-TRACE",
+      "MECHANISM:H001-OUTCOME-TRACE",
+      "MECHANISM:H001-OUTCOME-TRACE",
+      "MECHANISM:H001-OUTCOME-TRACE",
+      "MECHANISM:H001-OUTCOME-TRACE",
+      "MECHANISM:H001-OUTCOME-TRACE",
+      "MECHANISM:H001-OUTCOME-TRACE"
+    ]
+  },
+  "observed_effect": {
+    "delta_choose_B_rate": 0.41666666666666663,
+    "delta_cumulative_outcome": 10.0
+  },
+  "interpretation": "The candidate mechanism changed behavior in the predicted direction under a fixed asymmetric environment.",
+  "status": "SUPPORTED_IN_DIAGNOSTIC_WORLD",
+  "limits": [
+    "Deterministic two-option environment.",
+    "Single agent.",
+    "No stochastic outcomes or transfer test.",
+    "This supports the mechanism-world claim only; it does not establish a human psychological mechanism."
+  ]
+}

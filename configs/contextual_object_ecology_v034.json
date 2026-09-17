@@ -1,0 +1,29 @@
+{
+  "version": "0.3.5",
+  "world": "contextual-objects",
+  "seed": 17,
+  "dimensions": [32, 32],
+  "vision_radius": 2,
+  "start_position": [15, 16],
+  "ecology_seed": 17,
+  "object_count": 30,
+  "directional_exposure": {
+    "source_direction": [1, 0],
+    "reach": 3,
+    "energy_cost": 0.055,
+    "hydration_cost": 0.012,
+    "fatigue_cost": 0.035
+  },
+  "internal_load_decay_per_day": 0.04,
+  "history_model_lengths": [2, 3],
+  "object_physics": {
+    "carry_capacity_kg": 12.0,
+    "carry_size_capacity": 0.75,
+    "push_capacity": 18.0,
+    "live_position_geometry": true,
+    "mutable_state": ["quantity", "durability"],
+    "deterministic_regeneration": true
+  },
+  "preset_combination_knowledge": false,
+  "privileged_sequence_model": false
+}

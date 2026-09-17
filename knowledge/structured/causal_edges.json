@@ -1,0 +1,392 @@
+[
+  {
+    "edge_id": "EDGE-WORLD-BODY",
+    "source_state": "WORLD",
+    "target_state": "BODY",
+    "first_introduced": "EXP-4.50",
+    "first_tested": "EXP-4.50",
+    "experiments_testing": [
+      "EXP-4.50",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "structural_status": "STRUCTURALLY_PRESENT",
+    "empirical_status": "CONTROLLED_SUPPORTED; passive existing ecology NOT_SUPPORTED at 4.63",
+    "operating_range_status": "DEFAULT_ON but material passive access not supported",
+    "default_status": "DEFAULT_ON but material passive access not supported",
+    "experimental_only": false,
+    "semantic_dependency": "NONE unless explicitly noted in experiment report",
+    "evidence": [
+      "EXP-4.50",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "counterevidence": [],
+    "latest_status": "CONTROLLED_SUPPORTED; passive existing ecology NOT_SUPPORTED at 4.63",
+    "provenance": [
+      "EXP-4.50",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ]
+  },
+  {
+    "edge_id": "EDGE-BODY-X",
+    "source_state": "BODY",
+    "target_state": "X",
+    "first_introduced": "EXP-4.56",
+    "first_tested": "EXP-4.56",
+    "experiments_testing": [
+      "EXP-4.56",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "structural_status": "STRUCTURALLY_PRESENT",
+    "empirical_status": "CONTROLLED_SUPPORTED",
+    "operating_range_status": "EXPERIMENTAL_ONLY transducer",
+    "default_status": "EXPERIMENTAL_ONLY transducer",
+    "experimental_only": true,
+    "semantic_dependency": "NONE unless explicitly noted in experiment report",
+    "evidence": [
+      "EXP-4.56",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "counterevidence": [],
+    "latest_status": "CONTROLLED_SUPPORTED",
+    "provenance": [
+      "EXP-4.56",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ]
+  },
+  {
+    "edge_id": "EDGE-X-N",
+    "source_state": "X",
+    "target_state": "N",
+    "first_introduced": "EXP-4.56",
+    "first_tested": "EXP-4.56",
+    "experiments_testing": [
+      "EXP-4.56",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "structural_status": "STRUCTURALLY_PRESENT",
+    "empirical_status": "CONTROLLED_SUPPORTED",
+    "operating_range_status": "EXPERIMENTAL_ONLY",
+    "default_status": "EXPERIMENTAL_ONLY",
+    "experimental_only": true,
+    "semantic_dependency": "NONE unless explicitly noted in experiment report",
+    "evidence": [
+      "EXP-4.56",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "counterevidence": [],
+    "latest_status": "CONTROLLED_SUPPORTED",
+    "provenance": [
+      "EXP-4.56",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ]
+  },
+  {
+    "edge_id": "EDGE-N-R",
+    "source_state": "N",
+    "target_state": "R/preact",
+    "first_introduced": "EXP-4.46",
+    "first_tested": "EXP-4.46",
+    "experiments_testing": [
+      "EXP-4.46",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "structural_status": "STRUCTURALLY_PRESENT",
+    "empirical_status": "CONTROLLED_SUPPORTED",
+    "operating_range_status": "RESEARCH_ONLY / bounded",
+    "default_status": "RESEARCH_ONLY / bounded",
+    "experimental_only": false,
+    "semantic_dependency": "NONE unless explicitly noted in experiment report",
+    "evidence": [
+      "EXP-4.46",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "counterevidence": [],
+    "latest_status": "CONTROLLED_SUPPORTED",
+    "provenance": [
+      "EXP-4.46",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ]
+  },
+  {
+    "edge_id": "EDGE-PREACT-C",
+    "source_state": "preact",
+    "target_state": "C",
+    "first_introduced": "EXP-4.60",
+    "first_tested": "EXP-4.60",
+    "experiments_testing": [
+      "EXP-4.60",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "structural_status": "STRUCTURALLY_PRESENT",
+    "empirical_status": "CONTROLLED_SUPPORTED",
+    "operating_range_status": "EXPERIMENTAL_ONLY fixed coupling",
+    "default_status": "EXPERIMENTAL_ONLY fixed coupling",
+    "experimental_only": true,
+    "semantic_dependency": "NONE unless explicitly noted in experiment report",
+    "evidence": [
+      "EXP-4.60",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "counterevidence": [],
+    "latest_status": "CONTROLLED_SUPPORTED",
+    "provenance": [
+      "EXP-4.60",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ]
+  },
+  {
+    "edge_id": "EDGE-C-D",
+    "source_state": "C",
+    "target_state": "D",
+    "first_introduced": "EXP-4.60",
+    "first_tested": "EXP-4.60",
+    "experiments_testing": [
+      "EXP-4.60",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "structural_status": "STRUCTURALLY_PRESENT",
+    "empirical_status": "CONTROLLED_SUPPORTED",
+    "operating_range_status": "EXPERIMENTAL_ONLY",
+    "default_status": "EXPERIMENTAL_ONLY",
+    "experimental_only": true,
+    "semantic_dependency": "NONE unless explicitly noted in experiment report",
+    "evidence": [
+      "EXP-4.60",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "counterevidence": [],
+    "latest_status": "CONTROLLED_SUPPORTED",
+    "provenance": [
+      "EXP-4.60",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ]
+  },
+  {
+    "edge_id": "EDGE-D-E",
+    "source_state": "D",
+    "target_state": "E",
+    "first_introduced": "EXP-4.59",
+    "first_tested": "EXP-4.59",
+    "experiments_testing": [
+      "EXP-4.59",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "structural_status": "STRUCTURALLY_PRESENT",
+    "empirical_status": "CONTROLLED_SUPPORTED",
+    "operating_range_status": "EXPERIMENTAL_ONLY",
+    "default_status": "EXPERIMENTAL_ONLY",
+    "experimental_only": true,
+    "semantic_dependency": "NONE unless explicitly noted in experiment report",
+    "evidence": [
+      "EXP-4.59",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "counterevidence": [],
+    "latest_status": "CONTROLLED_SUPPORTED",
+    "provenance": [
+      "EXP-4.59",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ]
+  },
+  {
+    "edge_id": "EDGE-E-Q",
+    "source_state": "E",
+    "target_state": "Q",
+    "first_introduced": "EXP-4.59",
+    "first_tested": "EXP-4.59",
+    "experiments_testing": [
+      "EXP-4.59",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "structural_status": "STRUCTURALLY_PRESENT",
+    "empirical_status": "CONTROLLED_SUPPORTED",
+    "operating_range_status": "EXPERIMENTAL_ONLY",
+    "default_status": "EXPERIMENTAL_ONLY",
+    "experimental_only": true,
+    "semantic_dependency": "NONE unless explicitly noted in experiment report",
+    "evidence": [
+      "EXP-4.59",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "counterevidence": [],
+    "latest_status": "CONTROLLED_SUPPORTED",
+    "provenance": [
+      "EXP-4.59",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ]
+  },
+  {
+    "edge_id": "EDGE-Q-LATTICE",
+    "source_state": "Q",
+    "target_state": "lattice transition",
+    "first_introduced": "EXP-4.59",
+    "first_tested": "EXP-4.59",
+    "experiments_testing": [
+      "EXP-4.59",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "structural_status": "STRUCTURALLY_PRESENT",
+    "empirical_status": "CONTROLLED_SUPPORTED",
+    "operating_range_status": "live operating range NOT_SUPPORTED at 4.61/4.62",
+    "default_status": "live operating range NOT_SUPPORTED at 4.61/4.62",
+    "experimental_only": false,
+    "semantic_dependency": "NONE unless explicitly noted in experiment report",
+    "evidence": [
+      "EXP-4.59",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "counterevidence": [],
+    "latest_status": "CONTROLLED_SUPPORTED",
+    "provenance": [
+      "EXP-4.59",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ]
+  },
+  {
+    "edge_id": "EDGE-LIVE-THRESHOLD",
+    "source_state": "live body-derived internal activity",
+    "target_state": "physical threshold",
+    "first_introduced": "EXP-4.61",
+    "first_tested": "EXP-4.61",
+    "experiments_testing": [
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "structural_status": "STRUCTURALLY_PRESENT",
+    "empirical_status": "NOT_SUPPORTED",
+    "operating_range_status": "R0/R1/R2/R3 remained subthreshold",
+    "default_status": "R0/R1/R2/R3 remained subthreshold",
+    "experimental_only": false,
+    "semantic_dependency": "NONE unless explicitly noted in experiment report",
+    "evidence": [
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "counterevidence": [],
+    "latest_status": "NOT_SUPPORTED",
+    "provenance": [
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ]
+  },
+  {
+    "edge_id": "EDGE-PASSIVE-ECOLOGY-BODY",
+    "source_state": "existing passive ecology",
+    "target_state": "material body perturbation",
+    "first_introduced": "EXP-4.63",
+    "first_tested": "EXP-4.63",
+    "experiments_testing": [
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "structural_status": "PARTIAL_STRUCTURE",
+    "empirical_status": "NOT_SUPPORTED",
+    "operating_range_status": "field effect below 0.01 materiality criterion",
+    "default_status": "field effect below 0.01 materiality criterion",
+    "experimental_only": false,
+    "semantic_dependency": "NONE unless explicitly noted in experiment report",
+    "evidence": [
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "counterevidence": [],
+    "latest_status": "NOT_SUPPORTED",
+    "provenance": [
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ]
+  },
+  {
+    "edge_id": "EDGE-PREDICTED-N-PRESENT-N",
+    "source_state": "predicted future N",
+    "target_state": "present N modulation",
+    "first_introduced": "EXP-4.39",
+    "first_tested": "EXP-4.39",
+    "experiments_testing": [
+      "EXP-4.39",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "structural_status": "ABSENT_IN_TESTED_ARCHITECTURE",
+    "empirical_status": "NOT_SUPPORTED",
+    "operating_range_status": "prediction did not re-enter present dynamics",
+    "default_status": "prediction did not re-enter present dynamics",
+    "experimental_only": false,
+    "semantic_dependency": "NONE unless explicitly noted in experiment report",
+    "evidence": [
+      "EXP-4.39",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ],
+    "counterevidence": [],
+    "latest_status": "NOT_SUPPORTED",
+    "provenance": [
+      "EXP-4.39",
+      "EXP-4.61",
+      "EXP-4.62",
+      "EXP-4.63"
+    ]
+  }
+]

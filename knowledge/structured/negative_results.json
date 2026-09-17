@@ -1,0 +1,100 @@
+[
+  {
+    "negative_id": "NEG-4.39-001",
+    "question": "Does predicted future N modulate present N?",
+    "expected_possibility": "Anticipatory sensorimotor modulation",
+    "actual_result": "Not observed at matched current state",
+    "controls": "See experiment report and structured artifacts",
+    "what_was_ruled_out": "Prediction did not re-enter present sensorimotor dynamics",
+    "what_was_not_ruled_out": "Other architectures, operating ranges, and untested conditions",
+    "architectural_implication": "Prediction did not re-enter present sensorimotor dynamics",
+    "next_question_generated": "See frontier history",
+    "provenance": [
+      "EXP-4.39"
+    ]
+  },
+  {
+    "negative_id": "NEG-4.42-001",
+    "question": "Does acquired internal structure autonomously alter motor distribution?",
+    "expected_possibility": "Autonomous motor access",
+    "actual_result": "Not supported in the diagnostic",
+    "controls": "See experiment report and structured artifacts",
+    "what_was_ruled_out": "Separated acquired dynamics from motor access",
+    "what_was_not_ruled_out": "Other architectures, operating ranges, and untested conditions",
+    "architectural_implication": "Separated acquired dynamics from motor access",
+    "next_question_generated": "See frontier history",
+    "provenance": [
+      "EXP-4.42"
+    ]
+  },
+  {
+    "negative_id": "NEG-4.43-001",
+    "question": "Does motor variation acquire distal consequence dependence?",
+    "expected_possibility": "Distal consequence effect",
+    "actual_result": "Null/negative outcome preserved by report",
+    "controls": "See experiment report and structured artifacts",
+    "what_was_ruled_out": "Prevented semantic interpretation of motor variation",
+    "what_was_not_ruled_out": "Other architectures, operating ranges, and untested conditions",
+    "architectural_implication": "Prevented semantic interpretation of motor variation",
+    "next_question_generated": "See frontier history",
+    "provenance": [
+      "EXP-4.43"
+    ]
+  },
+  {
+    "negative_id": "NEG-4.47-001",
+    "question": "Does endogenous activity reach the motor pathway?",
+    "expected_possibility": "Endogenous motor access",
+    "actual_result": "Not supported at the tested frontier",
+    "controls": "See experiment report and structured artifacts",
+    "what_was_ruled_out": "Motivated dynamic-range diagnostics",
+    "what_was_not_ruled_out": "Other architectures, operating ranges, and untested conditions",
+    "architectural_implication": "Motivated dynamic-range diagnostics",
+    "next_question_generated": "See frontier history",
+    "provenance": [
+      "EXP-4.47"
+    ]
+  },
+  {
+    "negative_id": "NEG-4.61-001",
+    "question": "Does the controlled chain cross the unchanged physical threshold live?",
+    "expected_possibility": "Live physical transition",
+    "actual_result": "All regimes remained subthreshold",
+    "controls": "See experiment report and structured artifacts",
+    "what_was_ruled_out": "Controlled structural support is not live operating-range support",
+    "what_was_not_ruled_out": "Other architectures, operating ranges, and untested conditions",
+    "architectural_implication": "Controlled structural support is not live operating-range support",
+    "next_question_generated": "See frontier history",
+    "provenance": [
+      "EXP-4.61"
+    ]
+  },
+  {
+    "negative_id": "NEG-4.62-001",
+    "question": "Is one bottleneck responsible for subthreshold activity?",
+    "expected_possibility": "Single removable bottleneck",
+    "actual_result": "No; multiple bounded stages jointly compress/redirect amplitude",
+    "controls": "See experiment report and structured artifacts",
+    "what_was_ruled_out": "Ruled out a one-stage explanation",
+    "what_was_not_ruled_out": "Other architectures, operating ranges, and untested conditions",
+    "architectural_implication": "Ruled out a one-stage explanation",
+    "next_question_generated": "See frontier history",
+    "provenance": [
+      "EXP-4.62"
+    ]
+  },
+  {
+    "negative_id": "NEG-4.63-001",
+    "question": "Does existing passive ecology materially perturb body state under WAIT?",
+    "expected_possibility": "Material body-range expansion",
+    "actual_result": "No relative to basal empty-world control",
+    "controls": "See experiment report and structured artifacts",
+    "what_was_ruled_out": "Existing passive ecology is structurally present but negligible in tested range",
+    "what_was_not_ruled_out": "Other architectures, operating ranges, and untested conditions",
+    "architectural_implication": "Existing passive ecology is structurally present but negligible in tested range",
+    "next_question_generated": "See frontier history",
+    "provenance": [
+      "EXP-4.63"
+    ]
+  }
+]

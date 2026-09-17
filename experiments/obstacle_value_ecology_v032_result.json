@@ -1,0 +1,242 @@
+{
+  "experiment": "OBSTACLE_LEARNING_VALUE_ECOLOGY_V032",
+  "version": "0.3.2",
+  "route_choice_diagnostic": {
+    "SAME_ROUTE_SAFE_HISTORY": {
+      "selected_action": "MOVE:3,2",
+      "selection_reason": "MULTI_OBJECTIVE_VALUE_PLUS_UNCERTAINTY",
+      "direct_value": 0.03695142857142857,
+      "detour_value": 0.02538,
+      "direct_prediction": {
+        "energy_signal": -0.02,
+        "hydration_signal": -0.01,
+        "fatigue_signal": 0.02,
+        "discomfort_signal": 0.0,
+        "effort_signal": 0.03,
+        "__navigation_value": 0.04285714285714286,
+        "__navigation_target": "GOAL",
+        "__prediction_source": "ACTION_MODEL"
+      },
+      "detour_prediction": {
+        "energy_signal": -0.02,
+        "hydration_signal": -0.01,
+        "fatigue_signal": 0.02,
+        "discomfort_signal": 0.0,
+        "effort_signal": 0.03,
+        "__navigation_value": 0.03,
+        "__navigation_target": "GOAL",
+        "__prediction_source": "ACTION_MODEL"
+      }
+    },
+    "SAME_ROUTE_HARMFUL_HISTORY": {
+      "selected_action": "MOVE:2,1",
+      "selection_reason": "MULTI_OBJECTIVE_VALUE_PLUS_UNCERTAINTY",
+      "direct_value": -0.004378571428571433,
+      "detour_value": 0.022925454545454544,
+      "direct_prediction": {
+        "energy_signal": -0.09,
+        "hydration_signal": -0.05,
+        "fatigue_signal": 0.1,
+        "discomfort_signal": 0.05,
+        "effort_signal": 0.08,
+        "__navigation_value": 0.04285714285714286,
+        "__navigation_target": "GOAL",
+        "__prediction_source": "ACTION_MODEL"
+      },
+      "detour_prediction": {
+        "energy_signal": -0.02,
+        "hydration_signal": -0.01,
+        "fatigue_signal": 0.02,
+        "discomfort_signal": 0.0,
+        "effort_signal": 0.03,
+        "__navigation_value": 0.02727272727272727,
+        "__navigation_target": "GOAL",
+        "__prediction_source": "ACTION_MODEL"
+      }
+    }
+  },
+  "cue_navigation_diagnostic": {
+    "NO_LEARNED_CUE_VALUE": {
+      "selected_action": "MOVE:4,1",
+      "selection_reason": "SPATIAL_EXPLORATION",
+      "move_to_decoy_prediction": {
+        "__navigation_value": 0.0,
+        "__prediction_source": "UNKNOWN"
+      },
+      "move_to_decoy_value": {
+        "regulation": 0.0,
+        "progress": 0.0,
+        "habit": 0.0,
+        "navigation": 0.0,
+        "base_total": 0.0
+      }
+    },
+    "LEARNED_CUE_VALUE": {
+      "selected_action": "MOVE:5,0",
+      "selection_reason": "SPATIAL_EXPLORATION",
+      "move_to_decoy_prediction": {
+        "__navigation_value": 0.16481800000000002,
+        "__navigation_target": "GOAL-DECOY",
+        "__prediction_source": "UNKNOWN"
+      },
+      "move_to_decoy_value": {
+        "regulation": 0.0,
+        "progress": 0.0,
+        "habit": 0.0,
+        "navigation": 0.14833620000000003,
+        "base_total": 0.14833620000000003
+      }
+    }
+  },
+  "free_life": {
+    "HAZARD": {
+      "condition": "HAZARD",
+      "ticks_days": 70,
+      "progress": 1.67,
+      "damage": 0.035,
+      "obstacle_contact_days": [
+        17
+      ],
+      "uses": {
+        "USE:HOME-RESOURCE": 1,
+        "USE:GOAL-SMALL": 1,
+        "USE:GOAL-TRAIN": 1,
+        "USE:GOAL-FAR": 1,
+        "USE:GOAL-DECOY": 1
+      },
+      "known_objects": [
+        "GOAL-DECOY",
+        "GOAL-FAR",
+        "GOAL-SMALL",
+        "GOAL-TRAIN",
+        "HOME-RESOURCE"
+      ],
+      "known_obstacles": [
+        "OBS-ROUGH-1"
+      ],
+      "obstacle_cue_model": {
+        "count": 1,
+        "mean": {
+          "energy_signal": -0.05236640603957332,
+          "hydration_signal": -0.015455468679857809,
+          "fatigue_signal": 0.07713867169964442,
+          "discomfort_signal": 0.0245,
+          "effort_signal": 0.03459592654854453,
+          "progress_delta": 0.0
+        }
+      },
+      "value_cue_model": {
+        "count": 2,
+        "mean": {
+          "energy_signal": -0.017000000000000008,
+          "hydration_signal": -0.009000000000000008,
+          "fatigue_signal": 0.014000000000000012,
+          "discomfort_signal": 0.0016000000000000007,
+          "effort_signal": -0.06568873071989503,
+          "progress_delta": 0.275
+        }
+      },
+      "decoy_direct_model": {
+        "count": 1,
+        "mean": {
+          "energy_signal": -0.018000000000000002,
+          "hydration_signal": -0.009000000000000008,
+          "fatigue_signal": 0.016000000000000014,
+          "discomfort_signal": 0.0032000000000000015,
+          "effort_signal": -0.07244517496808858,
+          "progress_delta": 0.0
+        }
+      },
+      "first_decoy_navigation": {
+        "life_day": 39,
+        "action": "MOVE:5,0",
+        "selection_reason": "MULTI_OBJECTIVE_VALUE_PLUS_UNCERTAINTY",
+        "navigation_value": 0.09635425059519276
+      },
+      "first_decoy_use": {
+        "life_day": 40,
+        "prediction_source": "OBJECT_CUE:CUE-AMBER-VALUABLE",
+        "predicted_progress": 0.55,
+        "actual_progress": 0.0,
+        "selection_reason": "NOVEL_AFFORDANCE_PROBE"
+      }
+    },
+    "SHAM_CUE": {
+      "condition": "SHAM_CUE",
+      "ticks_days": 70,
+      "progress": 1.67,
+      "damage": 0.0,
+      "obstacle_contact_days": [
+        17
+      ],
+      "uses": {
+        "USE:HOME-RESOURCE": 1,
+        "USE:GOAL-SMALL": 1,
+        "USE:GOAL-TRAIN": 1,
+        "USE:GOAL-FAR": 1,
+        "USE:GOAL-DECOY": 1
+      },
+      "known_objects": [
+        "GOAL-DECOY",
+        "GOAL-FAR",
+        "GOAL-SMALL",
+        "GOAL-TRAIN",
+        "HOME-RESOURCE"
+      ],
+      "known_obstacles": [
+        "OBS-ROUGH-1"
+      ],
+      "obstacle_cue_model": {
+        "count": 1,
+        "mean": {
+          "energy_signal": -0.0273664060395733,
+          "hydration_signal": -0.015455468679857809,
+          "fatigue_signal": 0.022138671699644424,
+          "discomfort_signal": 0.0,
+          "effort_signal": 0.03459592654854453,
+          "progress_delta": 0.0
+        }
+      },
+      "value_cue_model": {
+        "count": 2,
+        "mean": {
+          "energy_signal": -0.017000000000000008,
+          "hydration_signal": -0.009000000000000008,
+          "fatigue_signal": 0.014000000000000012,
+          "discomfort_signal": 0.0016000000000000016,
+          "effort_signal": -0.061086289898404575,
+          "progress_delta": 0.275
+        }
+      },
+      "decoy_direct_model": {
+        "count": 1,
+        "mean": {
+          "energy_signal": -0.018000000000000002,
+          "hydration_signal": -0.009000000000000008,
+          "fatigue_signal": 0.016000000000000014,
+          "discomfort_signal": 0.003200000000000003,
+          "effort_signal": -0.06754293124667898,
+          "progress_delta": 0.0
+        }
+      },
+      "first_decoy_navigation": {
+        "life_day": 39,
+        "action": "MOVE:5,0",
+        "selection_reason": "MULTI_OBJECTIVE_VALUE_PLUS_UNCERTAINTY",
+        "navigation_value": 0.10245865337451107
+      },
+      "first_decoy_use": {
+        "life_day": 40,
+        "prediction_source": "OBJECT_CUE:CUE-AMBER-VALUABLE",
+        "predicted_progress": 0.55,
+        "actual_progress": 0.0,
+        "selection_reason": "NOVEL_AFFORDANCE_PROBE"
+      }
+    }
+  },
+  "interpretation": {
+    "observation": "With the same known goal/map, changing only the learned consequence of the direct obstacle cell can switch route selection from direct to detour. A learned value cue can also change exploration direction toward a novel look-alike.",
+    "integrated_free_life": "The free-life run demonstrates real cue transfer to the spawned decoy and correction after direct experience. Obstacle contact counts in a short unconstrained run should not be interpreted as a complete avoidance phenotype.",
+    "not_claimed": "No fear, avoidance trait, personality, perseverance, or human psychological mechanism is established by these toy diagnostics."
+  }
+}

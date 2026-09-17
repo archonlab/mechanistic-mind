@@ -1,0 +1,1721 @@
+{
+  "experiment": "ORGANISM_WORLD_FOUNDATION_V03",
+  "version": "0.3.0",
+  "question": "Can identical psyche architecture and initial body state diverge through different objective environments or stochastic histories?",
+  "architecture_invariants": {
+    "psyche_mechanism": "PSYCHE-SINGLE-ORGANISM-V03",
+    "body_truth_agent_visible": false,
+    "world_hidden_roles_agent_visible": false,
+    "exogenous_event_receipts_agent_visible": false,
+    "preset_personality": false
+  },
+  "same_architecture_different_worlds": [
+    {
+      "case_id": "LAYOUT-NEAR",
+      "resource_layout": "near",
+      "seed": 17,
+      "ticks": 90,
+      "world": {
+        "total_progress": 25.0,
+        "final_position": [
+          7,
+          1
+        ],
+        "movement_count": 61,
+        "interaction_count": 28,
+        "wait_count": 1,
+        "random_event_count": 0,
+        "exogenous_event_log": [],
+        "top_actions": [
+          [
+            "USE:OBJ-31",
+            25
+          ],
+          [
+            "MOVE:7,1",
+            2
+          ],
+          [
+            "MOVE:7,2",
+            2
+          ],
+          [
+            "MOVE:7,3",
+            2
+          ],
+          [
+            "MOVE:7,4",
+            2
+          ],
+          [
+            "MOVE:7,5",
+            2
+          ],
+          [
+            "MOVE:0,0",
+            1
+          ],
+          [
+            "MOVE:0,1",
+            1
+          ],
+          [
+            "MOVE:0,2",
+            1
+          ],
+          [
+            "MOVE:0,3",
+            1
+          ]
+        ]
+      },
+      "body_truth": {
+        "mass_kg": 42.000161799059896,
+        "height_m": 1.5,
+        "age_years": 12.024657534246568,
+        "energy_reserve": 0.0,
+        "hydration": 0.0,
+        "fatigue": 1.0,
+        "damage": 0.0,
+        "last_effort_cost": 3.071366191417468e-10
+      },
+      "psyche": {
+        "internal_model": {
+          "interoceptive_model": {
+            "energy_signal": 0.0,
+            "hydration_signal": 0.0,
+            "fatigue_signal": 1.0,
+            "discomfort_signal": 0.11499999999999999,
+            "effort_signal": 6.825258203149929e-10
+          },
+          "need_pressure": {
+            "energy_signal": 0.7,
+            "hydration_signal": 0.72,
+            "fatigue_signal": 0.8,
+            "discomfort_signal": 0.06499999999999999
+          }
+        },
+        "known_positions": 56,
+        "known_objects": {
+          "OBJ-04": {
+            "position": [
+              4,
+              3
+            ],
+            "affordance": "USE",
+            "last_seen_tick": 42
+          },
+          "OBJ-17": {
+            "position": [
+              4,
+              3
+            ],
+            "affordance": "USE",
+            "last_seen_tick": 42
+          },
+          "OBJ-23": {
+            "position": [
+              4,
+              4
+            ],
+            "affordance": "USE",
+            "last_seen_tick": 35
+          },
+          "OBJ-31": {
+            "position": [
+              7,
+              1
+            ],
+            "affordance": "USE",
+            "last_seen_tick": 89
+          }
+        },
+        "learned_action_models": 61,
+        "habit_top": [
+          [
+            "USE:OBJ-31",
+            1.0
+          ],
+          [
+            "MOVE:7,3",
+            0.024960177708274668
+          ],
+          [
+            "MOVE:7,4",
+            0.024637348178377753
+          ],
+          [
+            "MOVE:7,5",
+            0.024444328332431434
+          ],
+          [
+            "MOVE:7,1",
+            0.023422054836528722
+          ],
+          [
+            "MOVE:7,2",
+            0.021782510997971714
+          ],
+          [
+            "WAIT",
+            0.020259320183077585
+          ],
+          [
+            "MOVE:7,6",
+            0.0121900505920753
+          ],
+          [
+            "MOVE:8,3",
+            0.009118791847403619
+          ],
+          [
+            "MOVE:8,2",
+            0.008480476418085366
+          ]
+        ],
+        "self_model": {
+          "executed_actions": 89,
+          "consequence_observations": 89,
+          "agency_reliability": 1.0
+        },
+        "last_selection": {
+          "action": "USE:OBJ-31",
+          "reason": "MULTI_OBJECTIVE_VALUE_PLUS_UNCERTAINTY",
+          "score": 0.11059047713127257
+        },
+        "preset_personality_fields": []
+      }
+    },
+    {
+      "case_id": "LAYOUT-DISTRIBUTED",
+      "resource_layout": "distributed",
+      "seed": 17,
+      "ticks": 90,
+      "world": {
+        "total_progress": 36.0,
+        "final_position": [
+          7,
+          1
+        ],
+        "movement_count": 51,
+        "interaction_count": 38,
+        "wait_count": 1,
+        "random_event_count": 0,
+        "exogenous_event_log": [],
+        "top_actions": [
+          [
+            "USE:OBJ-31",
+            36
+          ],
+          [
+            "MOVE:7,1",
+            2
+          ],
+          [
+            "MOVE:0,0",
+            1
+          ],
+          [
+            "MOVE:0,1",
+            1
+          ],
+          [
+            "MOVE:0,2",
+            1
+          ],
+          [
+            "MOVE:0,3",
+            1
+          ],
+          [
+            "MOVE:0,4",
+            1
+          ],
+          [
+            "MOVE:0,5",
+            1
+          ],
+          [
+            "MOVE:0,6",
+            1
+          ],
+          [
+            "MOVE:1,0",
+            1
+          ]
+        ]
+      },
+      "body_truth": {
+        "mass_kg": 42.00014013341171,
+        "height_m": 1.5,
+        "age_years": 12.024657534246568,
+        "energy_reserve": 0.0,
+        "hydration": 0.0,
+        "fatigue": 1.0,
+        "damage": 0.0,
+        "last_effort_cost": 4.315127104430402e-14
+      },
+      "psyche": {
+        "internal_model": {
+          "interoceptive_model": {
+            "energy_signal": 0.0,
+            "hydration_signal": 0.0,
+            "fatigue_signal": 1.0,
+            "discomfort_signal": 0.11499999999999999,
+            "effort_signal": 9.589171343178671e-14
+          },
+          "need_pressure": {
+            "energy_signal": 0.7,
+            "hydration_signal": 0.72,
+            "fatigue_signal": 0.8,
+            "discomfort_signal": 0.06499999999999999
+          }
+        },
+        "known_positions": 50,
+        "known_objects": {
+          "OBJ-04": {
+            "position": [
+              4,
+              3
+            ],
+            "affordance": "USE",
+            "last_seen_tick": 41
+          },
+          "OBJ-17": {
+            "position": [
+              1,
+              1
+            ],
+            "affordance": "USE",
+            "last_seen_tick": 14
+          },
+          "OBJ-23": {
+            "position": [
+              7,
+              5
+            ],
+            "affordance": "USE",
+            "last_seen_tick": 38
+          },
+          "OBJ-31": {
+            "position": [
+              7,
+              1
+            ],
+            "affordance": "USE",
+            "last_seen_tick": 89
+          }
+        },
+        "learned_action_models": 54,
+        "habit_top": [
+          [
+            "USE:OBJ-31",
+            1.0
+          ],
+          [
+            "MOVE:7,1",
+            0.01337362806229136
+          ],
+          [
+            "WAIT",
+            0.009118791847403619
+          ],
+          [
+            "MOVE:8,1",
+            0.0073347640540020334
+          ],
+          [
+            "MOVE:8,0",
+            0.006821330570221892
+          ],
+          [
+            "MOVE:7,0",
+            0.00634383743030636
+          ],
+          [
+            "MOVE:7,2",
+            0.005102710043928933
+          ],
+          [
+            "MOVE:6,2",
+            0.004745520340853908
+          ],
+          [
+            "MOVE:6,1",
+            0.0044133339169941345
+          ],
+          [
+            "MOVE:6,0",
+            0.0041044005428045455
+          ]
+        ],
+        "self_model": {
+          "executed_actions": 89,
+          "consequence_observations": 89,
+          "agency_reliability": 1.0
+        },
+        "last_selection": {
+          "action": "USE:OBJ-31",
+          "reason": "MULTI_OBJECTIVE_VALUE_PLUS_UNCERTAINTY",
+          "score": 0.10806939429677213
+        },
+        "preset_personality_fields": []
+      }
+    },
+    {
+      "case_id": "LAYOUT-FAR",
+      "resource_layout": "far",
+      "seed": 17,
+      "ticks": 90,
+      "world": {
+        "total_progress": 36.0,
+        "final_position": [
+          7,
+          1
+        ],
+        "movement_count": 51,
+        "interaction_count": 38,
+        "wait_count": 1,
+        "random_event_count": 0,
+        "exogenous_event_log": [],
+        "top_actions": [
+          [
+            "USE:OBJ-31",
+            36
+          ],
+          [
+            "MOVE:7,1",
+            3
+          ],
+          [
+            "MOVE:0,0",
+            1
+          ],
+          [
+            "MOVE:0,1",
+            1
+          ],
+          [
+            "MOVE:0,2",
+            1
+          ],
+          [
+            "MOVE:0,3",
+            1
+          ],
+          [
+            "MOVE:0,4",
+            1
+          ],
+          [
+            "MOVE:0,5",
+            1
+          ],
+          [
+            "MOVE:0,6",
+            1
+          ],
+          [
+            "MOVE:1,0",
+            1
+          ]
+        ]
+      },
+      "body_truth": {
+        "mass_kg": 42.00014003854468,
+        "height_m": 1.5,
+        "age_years": 12.024657534246568,
+        "energy_reserve": 0.0,
+        "hydration": 0.0,
+        "fatigue": 1.0,
+        "damage": 0.0,
+        "last_effort_cost": 9.765674549295769e-14
+      },
+      "psyche": {
+        "internal_model": {
+          "interoceptive_model": {
+            "energy_signal": 0.0,
+            "hydration_signal": 0.0,
+            "fatigue_signal": 1.0,
+            "discomfort_signal": 0.11499999999999999,
+            "effort_signal": 2.170149899843504e-13
+          },
+          "need_pressure": {
+            "energy_signal": 0.7,
+            "hydration_signal": 0.72,
+            "fatigue_signal": 0.8,
+            "discomfort_signal": 0.06499999999999999
+          }
+        },
+        "known_positions": 49,
+        "known_objects": {
+          "OBJ-04": {
+            "position": [
+              4,
+              3
+            ],
+            "affordance": "USE",
+            "last_seen_tick": 41
+          },
+          "OBJ-17": {
+            "position": [
+              0,
+              0
+            ],
+            "affordance": "USE",
+            "last_seen_tick": 10
+          },
+          "OBJ-31": {
+            "position": [
+              7,
+              1
+            ],
+            "affordance": "USE",
+            "last_seen_tick": 89
+          }
+        },
+        "learned_action_models": 53,
+        "habit_top": [
+          [
+            "USE:OBJ-31",
+            1.0
+          ],
+          [
+            "MOVE:7,1",
+            0.020788591981779226
+          ],
+          [
+            "WAIT",
+            0.009118791847403619
+          ],
+          [
+            "MOVE:8,1",
+            0.00788684306881939
+          ],
+          [
+            "MOVE:7,0",
+            0.00634383743030636
+          ],
+          [
+            "MOVE:7,2",
+            0.005102710043928933
+          ],
+          [
+            "MOVE:6,2",
+            0.004745520340853908
+          ],
+          [
+            "MOVE:6,1",
+            0.0044133339169941345
+          ],
+          [
+            "MOVE:6,0",
+            0.0041044005428045455
+          ],
+          [
+            "MOVE:5,0",
+            0.0038170925048082276
+          ]
+        ],
+        "self_model": {
+          "executed_actions": 89,
+          "consequence_observations": 89,
+          "agency_reliability": 1.0
+        },
+        "last_selection": {
+          "action": "USE:OBJ-31",
+          "reason": "MULTI_OBJECTIVE_VALUE_PLUS_UNCERTAINTY",
+          "score": 0.10806939429677213
+        },
+        "preset_personality_fields": []
+      }
+    }
+  ],
+  "same_world_different_random_histories": [
+    {
+      "case_id": "RANDOM-HISTORY-11",
+      "resource_layout": "distributed",
+      "seed": 11,
+      "ticks": 60,
+      "world": {
+        "total_progress": 1.0,
+        "final_position": [
+          6,
+          4
+        ],
+        "movement_count": 55,
+        "interaction_count": 3,
+        "wait_count": 2,
+        "random_event_count": 12,
+        "exogenous_event_log": [
+          {
+            "event_id": "RANDOM-RELOCATE-10-OBJ-04",
+            "kind": "RELOCATE_OBJECT",
+            "effective_tick": 10,
+            "parameters": {
+              "object_id": "OBJ-04",
+              "position": [
+                6,
+                5
+              ]
+            },
+            "before": {
+              "object_id": "OBJ-04",
+              "record": {
+                "id": "OBJ-04",
+                "position": [
+                  4,
+                  3
+                ],
+                "affordance": "USE",
+                "hidden_role": "RECOVERY_SITE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": 0.1,
+                  "hydration_delta": 0.025,
+                  "fatigue_delta": -0.2
+                },
+                "world_effects": {}
+              }
+            },
+            "after": {
+              "object_id": "OBJ-04",
+              "record": {
+                "id": "OBJ-04",
+                "position": [
+                  6,
+                  5
+                ],
+                "affordance": "USE",
+                "hidden_role": "RECOVERY_SITE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": 0.1,
+                  "hydration_delta": 0.025,
+                  "fatigue_delta": -0.2
+                },
+                "world_effects": {}
+              }
+            },
+            "generated_randomly": true
+          },
+          {
+            "event_id": "RANDOM-RELOCATE-11-OBJ-31",
+            "kind": "RELOCATE_OBJECT",
+            "effective_tick": 11,
+            "parameters": {
+              "object_id": "OBJ-31",
+              "position": [
+                4,
+                4
+              ]
+            },
+            "before": {
+              "object_id": "OBJ-31",
+              "record": {
+                "id": "OBJ-31",
+                "position": [
+                  7,
+                  1
+                ],
+                "affordance": "USE",
+                "hidden_role": "PROGRESS_SITE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": -0.035,
+                  "hydration_delta": -0.025,
+                  "fatigue_delta": 0.035
+                },
+                "world_effects": {
+                  "progress_delta": 1.0
+                }
+              }
+            },
+            "after": {
+              "object_id": "OBJ-31",
+              "record": {
+                "id": "OBJ-31",
+                "position": [
+                  4,
+                  4
+                ],
+                "affordance": "USE",
+                "hidden_role": "PROGRESS_SITE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": -0.035,
+                  "hydration_delta": -0.025,
+                  "fatigue_delta": 0.035
+                },
+                "world_effects": {
+                  "progress_delta": 1.0
+                }
+              }
+            },
+            "generated_randomly": true
+          },
+          {
+            "event_id": "RANDOM-RELOCATE-14-OBJ-04",
+            "kind": "RELOCATE_OBJECT",
+            "effective_tick": 14,
+            "parameters": {
+              "object_id": "OBJ-04",
+              "position": [
+                2,
+                1
+              ]
+            },
+            "before": {
+              "object_id": "OBJ-04",
+              "record": {
+                "id": "OBJ-04",
+                "position": [
+                  6,
+                  5
+                ],
+                "affordance": "USE",
+                "hidden_role": "RECOVERY_SITE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": 0.1,
+                  "hydration_delta": 0.025,
+                  "fatigue_delta": -0.2
+                },
+                "world_effects": {}
+              }
+            },
+            "after": {
+              "object_id": "OBJ-04",
+              "record": {
+                "id": "OBJ-04",
+                "position": [
+                  2,
+                  1
+                ],
+                "affordance": "USE",
+                "hidden_role": "RECOVERY_SITE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": 0.1,
+                  "hydration_delta": 0.025,
+                  "fatigue_delta": -0.2
+                },
+                "world_effects": {}
+              }
+            },
+            "generated_randomly": true
+          },
+          {
+            "event_id": "RANDOM-RELOCATE-16-OBJ-17",
+            "kind": "RELOCATE_OBJECT",
+            "effective_tick": 16,
+            "parameters": {
+              "object_id": "OBJ-17",
+              "position": [
+                8,
+                5
+              ]
+            },
+            "before": {
+              "object_id": "OBJ-17",
+              "record": {
+                "id": "OBJ-17",
+                "position": [
+                  1,
+                  1
+                ],
+                "affordance": "USE",
+                "hidden_role": "ENERGY_RESOURCE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": 0.4,
+                  "hydration_delta": 0.01,
+                  "mass_energy_balance": 0.18
+                },
+                "world_effects": {}
+              }
+            },
+            "after": {
+              "object_id": "OBJ-17",
+              "record": {
+                "id": "OBJ-17",
+                "position": [
+                  8,
+                  5
+                ],
+                "affordance": "USE",
+                "hidden_role": "ENERGY_RESOURCE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": 0.4,
+                  "hydration_delta": 0.01,
+                  "mass_energy_balance": 0.18
+                },
+                "world_effects": {}
+              }
+            },
+            "generated_randomly": true
+          },
+          {
+            "event_id": "RANDOM-RELOCATE-29-OBJ-17",
+            "kind": "RELOCATE_OBJECT",
+            "effective_tick": 29,
+            "parameters": {
+              "object_id": "OBJ-17",
+              "position": [
+                8,
+                5
+              ]
+            },
+            "before": {
+              "object_id": "OBJ-17",
+              "record": {
+                "id": "OBJ-17",
+                "position": [
+                  8,
+                  5
+                ],
+                "affordance": "USE",
+                "hidden_role": "ENERGY_RESOURCE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": 0.4,
+                  "hydration_delta": 0.01,
+                  "mass_energy_balance": 0.18
+                },
+                "world_effects": {}
+              }
+            },
+            "after": {
+              "object_id": "OBJ-17",
+              "record": {
+                "id": "OBJ-17",
+                "position": [
+                  8,
+                  5
+                ],
+                "affordance": "USE",
+                "hidden_role": "ENERGY_RESOURCE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": 0.4,
+                  "hydration_delta": 0.01,
+                  "mass_energy_balance": 0.18
+                },
+                "world_effects": {}
+              }
+            },
+            "generated_randomly": true
+          },
+          {
+            "event_id": "RANDOM-RELOCATE-33-OBJ-31",
+            "kind": "RELOCATE_OBJECT",
+            "effective_tick": 33,
+            "parameters": {
+              "object_id": "OBJ-31",
+              "position": [
+                2,
+                3
+              ]
+            },
+            "before": {
+              "object_id": "OBJ-31",
+              "record": {
+                "id": "OBJ-31",
+                "position": [
+                  4,
+                  4
+                ],
+                "affordance": "USE",
+                "hidden_role": "PROGRESS_SITE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": -0.035,
+                  "hydration_delta": -0.025,
+                  "fatigue_delta": 0.035
+                },
+                "world_effects": {
+                  "progress_delta": 1.0
+                }
+              }
+            },
+            "after": {
+              "object_id": "OBJ-31",
+              "record": {
+                "id": "OBJ-31",
+                "position": [
+                  2,
+                  3
+                ],
+                "affordance": "USE",
+                "hidden_role": "PROGRESS_SITE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": -0.035,
+                  "hydration_delta": -0.025,
+                  "fatigue_delta": 0.035
+                },
+                "world_effects": {
+                  "progress_delta": 1.0
+                }
+              }
+            },
+            "generated_randomly": true
+          },
+          {
+            "event_id": "RANDOM-RELOCATE-36-OBJ-31",
+            "kind": "RELOCATE_OBJECT",
+            "effective_tick": 36,
+            "parameters": {
+              "object_id": "OBJ-31",
+              "position": [
+                7,
+                1
+              ]
+            },
+            "before": {
+              "object_id": "OBJ-31",
+              "record": {
+                "id": "OBJ-31",
+                "position": [
+                  2,
+                  3
+                ],
+                "affordance": "USE",
+                "hidden_role": "PROGRESS_SITE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": -0.035,
+                  "hydration_delta": -0.025,
+                  "fatigue_delta": 0.035
+                },
+                "world_effects": {
+                  "progress_delta": 1.0
+                }
+              }
+            },
+            "after": {
+              "object_id": "OBJ-31",
+              "record": {
+                "id": "OBJ-31",
+                "position": [
+                  7,
+                  1
+                ],
+                "affordance": "USE",
+                "hidden_role": "PROGRESS_SITE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": -0.035,
+                  "hydration_delta": -0.025,
+                  "fatigue_delta": 0.035
+                },
+                "world_effects": {
+                  "progress_delta": 1.0
+                }
+              }
+            },
+            "generated_randomly": true
+          },
+          {
+            "event_id": "RANDOM-RELOCATE-37-OBJ-31",
+            "kind": "RELOCATE_OBJECT",
+            "effective_tick": 37,
+            "parameters": {
+              "object_id": "OBJ-31",
+              "position": [
+                2,
+                5
+              ]
+            },
+            "before": {
+              "object_id": "OBJ-31",
+              "record": {
+                "id": "OBJ-31",
+                "position": [
+                  7,
+                  1
+                ],
+                "affordance": "USE",
+                "hidden_role": "PROGRESS_SITE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": -0.035,
+                  "hydration_delta": -0.025,
+                  "fatigue_delta": 0.035
+                },
+                "world_effects": {
+                  "progress_delta": 1.0
+                }
+              }
+            },
+            "after": {
+              "object_id": "OBJ-31",
+              "record": {
+                "id": "OBJ-31",
+                "position": [
+                  2,
+                  5
+                ],
+                "affordance": "USE",
+                "hidden_role": "PROGRESS_SITE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": -0.035,
+                  "hydration_delta": -0.025,
+                  "fatigue_delta": 0.035
+                },
+                "world_effects": {
+                  "progress_delta": 1.0
+                }
+              }
+            },
+            "generated_randomly": true
+          },
+          {
+            "event_id": "RANDOM-RELOCATE-38-OBJ-04",
+            "kind": "RELOCATE_OBJECT",
+            "effective_tick": 38,
+            "parameters": {
+              "object_id": "OBJ-04",
+              "position": [
+                3,
+                0
+              ]
+            },
+            "before": {
+              "object_id": "OBJ-04",
+              "record": {
+                "id": "OBJ-04",
+                "position": [
+                  2,
+                  1
+                ],
+                "affordance": "USE",
+                "hidden_role": "RECOVERY_SITE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": 0.1,
+                  "hydration_delta": 0.025,
+                  "fatigue_delta": -0.2
+                },
+                "world_effects": {}
+              }
+            },
+            "after": {
+              "object_id": "OBJ-04",
+              "record": {
+                "id": "OBJ-04",
+                "position": [
+                  3,
+                  0
+                ],
+                "affordance": "USE",
+                "hidden_role": "RECOVERY_SITE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": 0.1,
+                  "hydration_delta": 0.025,
+                  "fatigue_delta": -0.2
+                },
+                "world_effects": {}
+              }
+            },
+            "generated_randomly": true
+          },
+          {
+            "event_id": "RANDOM-RELOCATE-47-OBJ-04",
+            "kind": "RELOCATE_OBJECT",
+            "effective_tick": 47,
+            "parameters": {
+              "object_id": "OBJ-04",
+              "position": [
+                7,
+                1
+              ]
+            },
+            "before": {
+              "object_id": "OBJ-04",
+              "record": {
+                "id": "OBJ-04",
+                "position": [
+                  3,
+                  0
+                ],
+                "affordance": "USE",
+                "hidden_role": "RECOVERY_SITE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": 0.1,
+                  "hydration_delta": 0.025,
+                  "fatigue_delta": -0.2
+                },
+                "world_effects": {}
+              }
+            },
+            "after": {
+              "object_id": "OBJ-04",
+              "record": {
+                "id": "OBJ-04",
+                "position": [
+                  7,
+                  1
+                ],
+                "affordance": "USE",
+                "hidden_role": "RECOVERY_SITE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": 0.1,
+                  "hydration_delta": 0.025,
+                  "fatigue_delta": -0.2
+                },
+                "world_effects": {}
+              }
+            },
+            "generated_randomly": true
+          },
+          {
+            "event_id": "RANDOM-RELOCATE-56-OBJ-04",
+            "kind": "RELOCATE_OBJECT",
+            "effective_tick": 56,
+            "parameters": {
+              "object_id": "OBJ-04",
+              "position": [
+                7,
+                1
+              ]
+            },
+            "before": {
+              "object_id": "OBJ-04",
+              "record": {
+                "id": "OBJ-04",
+                "position": [
+                  7,
+                  1
+                ],
+                "affordance": "USE",
+                "hidden_role": "RECOVERY_SITE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": 0.1,
+                  "hydration_delta": 0.025,
+                  "fatigue_delta": -0.2
+                },
+                "world_effects": {}
+              }
+            },
+            "after": {
+              "object_id": "OBJ-04",
+              "record": {
+                "id": "OBJ-04",
+                "position": [
+                  7,
+                  1
+                ],
+                "affordance": "USE",
+                "hidden_role": "RECOVERY_SITE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": 0.1,
+                  "hydration_delta": 0.025,
+                  "fatigue_delta": -0.2
+                },
+                "world_effects": {}
+              }
+            },
+            "generated_randomly": true
+          },
+          {
+            "event_id": "RANDOM-RELOCATE-60-OBJ-23",
+            "kind": "RELOCATE_OBJECT",
+            "effective_tick": 60,
+            "parameters": {
+              "object_id": "OBJ-23",
+              "position": [
+                6,
+                1
+              ]
+            },
+            "before": {
+              "object_id": "OBJ-23",
+              "record": {
+                "id": "OBJ-23",
+                "position": [
+                  7,
+                  5
+                ],
+                "affordance": "USE",
+                "hidden_role": "HYDRATION_RESOURCE",
+                "active": true,
+                "body_effects": {
+                  "hydration_delta": 0.48,
+                  "fatigue_delta": -0.01
+                },
+                "world_effects": {}
+              }
+            },
+            "after": {
+              "object_id": "OBJ-23",
+              "record": {
+                "id": "OBJ-23",
+                "position": [
+                  6,
+                  1
+                ],
+                "affordance": "USE",
+                "hidden_role": "HYDRATION_RESOURCE",
+                "active": true,
+                "body_effects": {
+                  "hydration_delta": 0.48,
+                  "fatigue_delta": -0.01
+                },
+                "world_effects": {}
+              }
+            },
+            "generated_randomly": true
+          }
+        ],
+        "top_actions": [
+          [
+            "MOVE:6,4",
+            2
+          ],
+          [
+            "WAIT",
+            2
+          ],
+          [
+            "MOVE:0,0",
+            1
+          ],
+          [
+            "MOVE:0,1",
+            1
+          ],
+          [
+            "MOVE:0,2",
+            1
+          ],
+          [
+            "MOVE:0,3",
+            1
+          ],
+          [
+            "MOVE:0,4",
+            1
+          ],
+          [
+            "MOVE:0,5",
+            1
+          ],
+          [
+            "MOVE:0,6",
+            1
+          ],
+          [
+            "MOVE:1,0",
+            1
+          ]
+        ]
+      },
+      "body_truth": {
+        "mass_kg": 42.00028859760007,
+        "height_m": 1.5,
+        "age_years": 12.016438356164379,
+        "energy_reserve": 0.023381706870104726,
+        "hydration": 0.22582666681818955,
+        "fatigue": 0.9179333329545253,
+        "damage": 0.0,
+        "last_effort_cost": 0.027777191793075702
+      },
+      "psyche": {
+        "internal_model": {
+          "interoceptive_model": {
+            "energy_signal": 0.026881706870104726,
+            "hydration_signal": 0.23032666681818956,
+            "fatigue_signal": 0.9154333329545253,
+            "discomfort_signal": 0.06353766656817664,
+            "effort_signal": 0.06172709287350156
+          },
+          "need_pressure": {
+            "energy_signal": 0.6731182931298952,
+            "hydration_signal": 0.4896733331818104,
+            "fatigue_signal": 0.7154333329545253,
+            "discomfort_signal": 0.013537666568176634
+          }
+        },
+        "known_positions": 54,
+        "known_objects": {
+          "OBJ-04": {
+            "position": [
+              7,
+              1
+            ],
+            "affordance": "USE",
+            "last_seen_tick": 53
+          },
+          "OBJ-17": {
+            "position": [
+              1,
+              1
+            ],
+            "affordance": "USE",
+            "last_seen_tick": 14
+          },
+          "OBJ-31": {
+            "position": [
+              4,
+              4
+            ],
+            "affordance": "USE",
+            "last_seen_tick": 23
+          },
+          "OBJ-23": {
+            "position": [
+              7,
+              5
+            ],
+            "affordance": "USE",
+            "last_seen_tick": 57
+          }
+        },
+        "learned_action_models": 58,
+        "habit_top": [
+          [
+            "MOVE:6,4",
+            0.1181869756626443
+          ],
+          [
+            "WAIT",
+            0.1
+          ],
+          [
+            "MOVE:7,4",
+            0.08649000000000001
+          ],
+          [
+            "MOVE:7,3",
+            0.08043570000000001
+          ],
+          [
+            "MOVE:8,3",
+            0.07480520100000002
+          ],
+          [
+            "MOVE:8,2",
+            0.06956883693000002
+          ],
+          [
+            "MOVE:8,1",
+            0.06469901834490002
+          ],
+          [
+            "MOVE:8,0",
+            0.06017008706075702
+          ],
+          [
+            "MOVE:7,0",
+            0.05595818096650403
+          ],
+          [
+            "MOVE:7,1",
+            0.052041108298848754
+          ]
+        ],
+        "self_model": {
+          "executed_actions": 59,
+          "consequence_observations": 59,
+          "agency_reliability": 1.0
+        },
+        "last_selection": {
+          "action": "WAIT",
+          "reason": "MULTI_OBJECTIVE_VALUE_PLUS_UNCERTAINTY",
+          "score": 0.12217161109884989
+        },
+        "preset_personality_fields": []
+      }
+    },
+    {
+      "case_id": "RANDOM-HISTORY-29",
+      "resource_layout": "distributed",
+      "seed": 29,
+      "ticks": 60,
+      "world": {
+        "total_progress": 6.0,
+        "final_position": [
+          7,
+          1
+        ],
+        "movement_count": 51,
+        "interaction_count": 8,
+        "wait_count": 1,
+        "random_event_count": 4,
+        "exogenous_event_log": [
+          {
+            "event_id": "RANDOM-RELOCATE-8-OBJ-04",
+            "kind": "RELOCATE_OBJECT",
+            "effective_tick": 8,
+            "parameters": {
+              "object_id": "OBJ-04",
+              "position": [
+                4,
+                2
+              ]
+            },
+            "before": {
+              "object_id": "OBJ-04",
+              "record": {
+                "id": "OBJ-04",
+                "position": [
+                  4,
+                  3
+                ],
+                "affordance": "USE",
+                "hidden_role": "RECOVERY_SITE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": 0.1,
+                  "hydration_delta": 0.025,
+                  "fatigue_delta": -0.2
+                },
+                "world_effects": {}
+              }
+            },
+            "after": {
+              "object_id": "OBJ-04",
+              "record": {
+                "id": "OBJ-04",
+                "position": [
+                  4,
+                  2
+                ],
+                "affordance": "USE",
+                "hidden_role": "RECOVERY_SITE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": 0.1,
+                  "hydration_delta": 0.025,
+                  "fatigue_delta": -0.2
+                },
+                "world_effects": {}
+              }
+            },
+            "generated_randomly": true
+          },
+          {
+            "event_id": "RANDOM-RELOCATE-34-OBJ-17",
+            "kind": "RELOCATE_OBJECT",
+            "effective_tick": 34,
+            "parameters": {
+              "object_id": "OBJ-17",
+              "position": [
+                8,
+                0
+              ]
+            },
+            "before": {
+              "object_id": "OBJ-17",
+              "record": {
+                "id": "OBJ-17",
+                "position": [
+                  1,
+                  1
+                ],
+                "affordance": "USE",
+                "hidden_role": "ENERGY_RESOURCE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": 0.4,
+                  "hydration_delta": 0.01,
+                  "mass_energy_balance": 0.18
+                },
+                "world_effects": {}
+              }
+            },
+            "after": {
+              "object_id": "OBJ-17",
+              "record": {
+                "id": "OBJ-17",
+                "position": [
+                  8,
+                  0
+                ],
+                "affordance": "USE",
+                "hidden_role": "ENERGY_RESOURCE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": 0.4,
+                  "hydration_delta": 0.01,
+                  "mass_energy_balance": 0.18
+                },
+                "world_effects": {}
+              }
+            },
+            "generated_randomly": true
+          },
+          {
+            "event_id": "RANDOM-RELOCATE-37-OBJ-17",
+            "kind": "RELOCATE_OBJECT",
+            "effective_tick": 37,
+            "parameters": {
+              "object_id": "OBJ-17",
+              "position": [
+                4,
+                4
+              ]
+            },
+            "before": {
+              "object_id": "OBJ-17",
+              "record": {
+                "id": "OBJ-17",
+                "position": [
+                  8,
+                  0
+                ],
+                "affordance": "USE",
+                "hidden_role": "ENERGY_RESOURCE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": 0.4,
+                  "hydration_delta": 0.01,
+                  "mass_energy_balance": 0.18
+                },
+                "world_effects": {}
+              }
+            },
+            "after": {
+              "object_id": "OBJ-17",
+              "record": {
+                "id": "OBJ-17",
+                "position": [
+                  4,
+                  4
+                ],
+                "affordance": "USE",
+                "hidden_role": "ENERGY_RESOURCE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": 0.4,
+                  "hydration_delta": 0.01,
+                  "mass_energy_balance": 0.18
+                },
+                "world_effects": {}
+              }
+            },
+            "generated_randomly": true
+          },
+          {
+            "event_id": "RANDOM-RELOCATE-60-OBJ-17",
+            "kind": "RELOCATE_OBJECT",
+            "effective_tick": 60,
+            "parameters": {
+              "object_id": "OBJ-17",
+              "position": [
+                5,
+                1
+              ]
+            },
+            "before": {
+              "object_id": "OBJ-17",
+              "record": {
+                "id": "OBJ-17",
+                "position": [
+                  4,
+                  4
+                ],
+                "affordance": "USE",
+                "hidden_role": "ENERGY_RESOURCE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": 0.4,
+                  "hydration_delta": 0.01,
+                  "mass_energy_balance": 0.18
+                },
+                "world_effects": {}
+              }
+            },
+            "after": {
+              "object_id": "OBJ-17",
+              "record": {
+                "id": "OBJ-17",
+                "position": [
+                  5,
+                  1
+                ],
+                "affordance": "USE",
+                "hidden_role": "ENERGY_RESOURCE",
+                "active": true,
+                "body_effects": {
+                  "energy_delta": 0.4,
+                  "hydration_delta": 0.01,
+                  "mass_energy_balance": 0.18
+                },
+                "world_effects": {}
+              }
+            },
+            "generated_randomly": true
+          }
+        ],
+        "top_actions": [
+          [
+            "USE:OBJ-31",
+            6
+          ],
+          [
+            "MOVE:7,1",
+            2
+          ],
+          [
+            "MOVE:0,0",
+            1
+          ],
+          [
+            "MOVE:0,1",
+            1
+          ],
+          [
+            "MOVE:0,2",
+            1
+          ],
+          [
+            "MOVE:0,3",
+            1
+          ],
+          [
+            "MOVE:0,4",
+            1
+          ],
+          [
+            "MOVE:0,5",
+            1
+          ],
+          [
+            "MOVE:0,6",
+            1
+          ],
+          [
+            "MOVE:1,0",
+            1
+          ]
+        ]
+      },
+      "body_truth": {
+        "mass_kg": 42.00027873341167,
+        "height_m": 1.5,
+        "age_years": 12.016438356164379,
+        "energy_reserve": 0.0,
+        "hydration": 0.13175947683081685,
+        "fatigue": 1.0,
+        "damage": 0.0,
+        "last_effort_cost": 0.0010929950103797448
+      },
+      "psyche": {
+        "internal_model": {
+          "interoceptive_model": {
+            "energy_signal": 0.0,
+            "hydration_signal": 0.16125947683081684,
+            "fatigue_signal": 0.9781013079229569,
+            "discomfort_signal": 0.08643134005996884,
+            "effort_signal": 0.002428877800843877
+          },
+          "need_pressure": {
+            "energy_signal": 0.7,
+            "hydration_signal": 0.5587405231691831,
+            "fatigue_signal": 0.7781013079229568,
+            "discomfort_signal": 0.03643134005996884
+          }
+        },
+        "known_positions": 50,
+        "known_objects": {
+          "OBJ-04": {
+            "position": [
+              4,
+              2
+            ],
+            "affordance": "USE",
+            "last_seen_tick": 42
+          },
+          "OBJ-17": {
+            "position": [
+              1,
+              1
+            ],
+            "affordance": "USE",
+            "last_seen_tick": 14
+          },
+          "OBJ-23": {
+            "position": [
+              7,
+              5
+            ],
+            "affordance": "USE",
+            "last_seen_tick": 38
+          },
+          "OBJ-31": {
+            "position": [
+              7,
+              1
+            ],
+            "affordance": "USE",
+            "last_seen_tick": 59
+          }
+        },
+        "learned_action_models": 54,
+        "habit_top": [
+          [
+            "USE:OBJ-31",
+            0.4063363092988488
+          ],
+          [
+            "MOVE:7,1",
+            0.11796706764792936
+          ],
+          [
+            "WAIT",
+            0.08043570000000001
+          ],
+          [
+            "MOVE:8,1",
+            0.06469901834490002
+          ],
+          [
+            "MOVE:8,0",
+            0.06017008706075702
+          ],
+          [
+            "MOVE:7,0",
+            0.05595818096650403
+          ],
+          [
+            "MOVE:7,2",
+            0.04501035456767429
+          ],
+          [
+            "MOVE:6,2",
+            0.0418596297479371
+          ],
+          [
+            "MOVE:6,1",
+            0.0389294556655815
+          ],
+          [
+            "MOVE:6,0",
+            0.036204393768990796
+          ]
+        ],
+        "self_model": {
+          "executed_actions": 59,
+          "consequence_observations": 59,
+          "agency_reliability": 1.0
+        },
+        "last_selection": {
+          "action": "USE:OBJ-31",
+          "reason": "MULTI_OBJECTIVE_VALUE_PLUS_UNCERTAINTY",
+          "score": 0.12852243510701927
+        },
+        "preset_personality_fields": []
+      }
+    }
+  ],
+  "interpretation_rule": "Behavioral divergence is an observation. It is not by itself evidence for a unique psychological mechanism; later matched experiments must identify which process produced the divergence."
+}

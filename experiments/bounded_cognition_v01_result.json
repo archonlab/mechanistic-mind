@@ -1,0 +1,488 @@
+{
+  "claim_boundary": "Bounded mechanistic retrieval; no claim of human cognition, understanding, curiosity, or optimality.",
+  "experiments": {
+    "A": {
+      "candidate_bound_constant": true,
+      "full_store_iterations": 0,
+      "name": "STRUCTURAL_SCALING",
+      "probes": {
+        "100": {
+          "full_store_iterations": 0,
+          "index_bucket_size": 1,
+          "prediction": {
+            "confidence": 0.7141836370132191,
+            "evidence_status": "SUFFICIENT",
+            "expected": {
+              "scalar": 1.0
+            },
+            "match_score": 1.0,
+            "pattern_id": "PAT-00000099",
+            "samples": 9.995000000000001,
+            "source": "PATTERN"
+          },
+          "retrieval": {
+            "budget": {
+              "max_episode_candidates": 8,
+              "max_exception_candidates": 4,
+              "max_pattern_candidates": 4,
+              "max_total_memory_candidates": 12
+            },
+            "cue_dimensions": [
+              "context",
+              "body_bands",
+              "visual_fragments",
+              "recent_action",
+              "response_fragment"
+            ],
+            "cue_schema_version": "bounded-retrieval-cue-v1",
+            "episode_candidates_inspected": 0,
+            "episode_fallback_time_ns": 361,
+            "exception_candidates_inspected": 0,
+            "exception_fallback_time_ns": 1683,
+            "fallback_reason": "PATTERN_SUFFICIENT",
+            "index_probes": 1,
+            "pattern_candidates_inspected": 1,
+            "pattern_lookup_time_ns": 33913,
+            "retrieval_mode": "HIERARCHICAL_BOUNDED",
+            "stage_trace": [
+              "PATTERN"
+            ],
+            "terminal_stage": "PATTERN",
+            "total_candidates_inspected": 1
+          },
+          "retrieval_time_ns": 56825,
+          "stored_representations": 100
+        },
+        "1000": {
+          "full_store_iterations": 0,
+          "index_bucket_size": 1,
+          "prediction": {
+            "confidence": 0.7141836370132191,
+            "evidence_status": "SUFFICIENT",
+            "expected": {
+              "scalar": 1.0
+            },
+            "match_score": 1.0,
+            "pattern_id": "PAT-00000999",
+            "samples": 9.995000000000001,
+            "source": "PATTERN"
+          },
+          "retrieval": {
+            "budget": {
+              "max_episode_candidates": 8,
+              "max_exception_candidates": 4,
+              "max_pattern_candidates": 4,
+              "max_total_memory_candidates": 12
+            },
+            "cue_dimensions": [
+              "context",
+              "body_bands",
+              "visual_fragments",
+              "recent_action",
+              "response_fragment"
+            ],
+            "cue_schema_version": "bounded-retrieval-cue-v1",
+            "episode_candidates_inspected": 0,
+            "episode_fallback_time_ns": 350,
+            "exception_candidates_inspected": 0,
+            "exception_fallback_time_ns": 2225,
+            "fallback_reason": "PATTERN_SUFFICIENT",
+            "index_probes": 1,
+            "pattern_candidates_inspected": 1,
+            "pattern_lookup_time_ns": 22863,
+            "retrieval_mode": "HIERARCHICAL_BOUNDED",
+            "stage_trace": [
+              "PATTERN"
+            ],
+            "terminal_stage": "PATTERN",
+            "total_candidates_inspected": 1
+          },
+          "retrieval_time_ns": 47739,
+          "stored_representations": 1000
+        },
+        "10000": {
+          "full_store_iterations": 0,
+          "index_bucket_size": 1,
+          "prediction": {
+            "confidence": 0.7141836370132191,
+            "evidence_status": "SUFFICIENT",
+            "expected": {
+              "scalar": 1.0
+            },
+            "match_score": 1.0,
+            "pattern_id": "PAT-00009999",
+            "samples": 9.995000000000001,
+            "source": "PATTERN"
+          },
+          "retrieval": {
+            "budget": {
+              "max_episode_candidates": 8,
+              "max_exception_candidates": 4,
+              "max_pattern_candidates": 4,
+              "max_total_memory_candidates": 12
+            },
+            "cue_dimensions": [
+              "context",
+              "body_bands",
+              "visual_fragments",
+              "recent_action",
+              "response_fragment"
+            ],
+            "cue_schema_version": "bounded-retrieval-cue-v1",
+            "episode_candidates_inspected": 0,
+            "episode_fallback_time_ns": 330,
+            "exception_candidates_inspected": 0,
+            "exception_fallback_time_ns": 1963,
+            "fallback_reason": "PATTERN_SUFFICIENT",
+            "index_probes": 1,
+            "pattern_candidates_inspected": 1,
+            "pattern_lookup_time_ns": 26470,
+            "retrieval_mode": "HIERARCHICAL_BOUNDED",
+            "stage_trace": [
+              "PATTERN"
+            ],
+            "terminal_stage": "PATTERN",
+            "total_candidates_inspected": 1
+          },
+          "retrieval_time_ns": 62707,
+          "stored_representations": 10000
+        }
+      }
+    },
+    "B": {
+      "conditions": {
+        "HIERARCHICAL_BOUNDED": {
+          "action_counts": {
+            "CHOOSE_A": 593,
+            "CHOOSE_B": 607
+          },
+          "early": {
+            "max_candidates": 8.0,
+            "max_decision_time_ns": 14497.0,
+            "max_episode_fallback_time_ns": 91520.0,
+            "max_exception_fallback_time_ns": 8186.0,
+            "max_pattern_lookup_time_ns": 4318.0,
+            "max_retrieval_time_ns": 109283.0,
+            "mean_candidates": 7.56,
+            "mean_decision_time_ns": 7739.68,
+            "mean_episode_fallback_time_ns": 22283.48,
+            "mean_exception_fallback_time_ns": 4191.9,
+            "mean_pattern_lookup_time_ns": 3280.59,
+            "mean_retrieval_time_ns": 41867.43
+          },
+          "final_memory": {
+            "agent_memory_bytes": 160240,
+            "bytes_per_episode": 625.9296875,
+            "bytes_per_pattern": 2.0,
+            "compressed_memory_size": 2,
+            "compression_ratio": 4.68359375,
+            "decision_source": "EPISODE_FALLBACK",
+            "episodic_memory_size": 256,
+            "novel_fragment_count": 256,
+            "pattern_confidence_distribution": [],
+            "pattern_count": 0,
+            "prediction_error": null,
+            "total_compressions": 0,
+            "total_evictions": 943
+          },
+          "late": {
+            "max_candidates": 8.0,
+            "max_decision_time_ns": 10690.0,
+            "max_episode_fallback_time_ns": 35246.0,
+            "max_exception_fallback_time_ns": 5801.0,
+            "max_pattern_lookup_time_ns": 4208.0,
+            "max_retrieval_time_ns": 87232.0,
+            "mean_candidates": 8.0,
+            "mean_decision_time_ns": 9712.76,
+            "mean_episode_fallback_time_ns": 24706.28,
+            "mean_exception_fallback_time_ns": 5205.45,
+            "mean_pattern_lookup_time_ns": 3421.81,
+            "mean_retrieval_time_ns": 49077.36
+          },
+          "late_early_candidate_ratio": 1.0582010582010584,
+          "middle": {
+            "max_candidates": 8.0,
+            "max_decision_time_ns": 16140.0,
+            "max_episode_fallback_time_ns": 35877.0,
+            "max_exception_fallback_time_ns": 11261.0,
+            "max_pattern_lookup_time_ns": 4078.0,
+            "max_retrieval_time_ns": 60392.0,
+            "mean_candidates": 7.64,
+            "mean_decision_time_ns": 9766.26,
+            "mean_episode_fallback_time_ns": 23846.38,
+            "mean_exception_fallback_time_ns": 5192.57,
+            "mean_pattern_lookup_time_ns": 3452.54,
+            "mean_retrieval_time_ns": 47929.94
+          },
+          "observer_retrieval_aggregates": {
+            "decision_time_ns": {
+              "approx_p50": 9678.0,
+              "approx_p95": 10259.0,
+              "max": 23143.0,
+              "mean": 9561.214166666667,
+              "sample_reservoir_size": 256
+            },
+            "episode_candidates_inspected": {
+              "approx_p50": 8.0,
+              "approx_p95": 8.0,
+              "max": 8.0,
+              "mean": 7.933333333333334,
+              "sample_reservoir_size": 256
+            },
+            "episode_fallback_time_ns": {
+              "approx_p50": 24396.0,
+              "approx_p95": 25508.0,
+              "max": 91520.0,
+              "mean": 24351.1425,
+              "sample_reservoir_size": 256
+            },
+            "exception_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 0.0,
+              "max": 0.0,
+              "mean": 0.0,
+              "sample_reservoir_size": 256
+            },
+            "exception_fallback_time_ns": {
+              "approx_p50": 5170.0,
+              "approx_p95": 5691.0,
+              "max": 19717.0,
+              "mean": 5094.139166666667,
+              "sample_reservoir_size": 256
+            },
+            "index_probes": {
+              "approx_p50": 6.0,
+              "approx_p95": 6.0,
+              "max": 6.0,
+              "mean": 6.0,
+              "sample_reservoir_size": 256
+            },
+            "pattern_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 0.0,
+              "max": 0.0,
+              "mean": 0.0,
+              "sample_reservoir_size": 256
+            },
+            "pattern_lookup_time_ns": {
+              "approx_p50": 3416.0,
+              "approx_p95": 3877.0,
+              "max": 12003.0,
+              "mean": 3502.535,
+              "sample_reservoir_size": 256
+            },
+            "retrieval_time_ns": {
+              "approx_p50": 48400.0,
+              "approx_p95": 50423.0,
+              "max": 109283.0,
+              "mean": 48120.69,
+              "sample_reservoir_size": 256
+            },
+            "total_candidates_inspected": {
+              "approx_p50": 8.0,
+              "approx_p95": 8.0,
+              "max": 8.0,
+              "mean": 7.933333333333334,
+              "sample_reservoir_size": 256
+            }
+          },
+          "outcomes": {
+            "cumulative": 4179.0,
+            "mean_per_tick": 3.4825
+          }
+        },
+        "LEGACY_UNBOUNDED": {
+          "action_counts": {
+            "CHOOSE_A": 456,
+            "CHOOSE_B": 744
+          },
+          "early": {
+            "max_candidates": 198.0,
+            "max_decision_time_ns": 15740.0,
+            "max_episode_fallback_time_ns": 237672.0,
+            "max_exception_fallback_time_ns": 0.0,
+            "max_pattern_lookup_time_ns": 0.0,
+            "max_retrieval_time_ns": 244675.0,
+            "mean_candidates": 99.0,
+            "mean_decision_time_ns": 8290.24,
+            "mean_episode_fallback_time_ns": 63701.88,
+            "mean_exception_fallback_time_ns": 0.0,
+            "mean_pattern_lookup_time_ns": 0.0,
+            "mean_retrieval_time_ns": 70482.87
+          },
+          "final_memory": {
+            "agent_memory_bytes": 160978,
+            "bytes_per_episode": 628.8125,
+            "bytes_per_pattern": 2.0,
+            "compressed_memory_size": 2,
+            "compression_ratio": 4.68359375,
+            "decision_source": "LEGACY_EPISODE_SCAN",
+            "episodic_memory_size": 256,
+            "novel_fragment_count": 256,
+            "pattern_confidence_distribution": [],
+            "pattern_count": 0,
+            "prediction_error": null,
+            "total_compressions": 0,
+            "total_evictions": 943
+          },
+          "late": {
+            "max_candidates": 512.0,
+            "max_decision_time_ns": 10850.0,
+            "max_episode_fallback_time_ns": 348769.0,
+            "max_exception_fallback_time_ns": 0.0,
+            "max_pattern_lookup_time_ns": 0.0,
+            "max_retrieval_time_ns": 356774.0,
+            "mean_candidates": 512.0,
+            "mean_decision_time_ns": 10033.64,
+            "mean_episode_fallback_time_ns": 301409.11,
+            "mean_exception_fallback_time_ns": 0.0,
+            "mean_pattern_lookup_time_ns": 0.0,
+            "mean_retrieval_time_ns": 309181.63
+          },
+          "late_early_candidate_ratio": 5.171717171717172,
+          "middle": {
+            "max_candidates": 512.0,
+            "max_decision_time_ns": 11141.0,
+            "max_episode_fallback_time_ns": 657932.0,
+            "max_exception_fallback_time_ns": 0.0,
+            "max_pattern_lookup_time_ns": 0.0,
+            "max_retrieval_time_ns": 667821.0,
+            "mean_candidates": 512.0,
+            "mean_decision_time_ns": 10070.39,
+            "mean_episode_fallback_time_ns": 304513.09,
+            "mean_exception_fallback_time_ns": 0.0,
+            "mean_pattern_lookup_time_ns": 0.0,
+            "mean_retrieval_time_ns": 312883.18
+          },
+          "observer_retrieval_aggregates": {
+            "decision_time_ns": {
+              "approx_p50": 10018.0,
+              "approx_p95": 10530.0,
+              "max": 21300.0,
+              "mean": 10007.205,
+              "sample_reservoir_size": 256
+            },
+            "episode_candidates_inspected": {
+              "approx_p50": 512.0,
+              "approx_p95": 512.0,
+              "max": 512.0,
+              "mean": 457.17333333333335,
+              "sample_reservoir_size": 256
+            },
+            "episode_fallback_time_ns": {
+              "approx_p50": 295390.0,
+              "approx_p95": 323682.0,
+              "max": 5656520.0,
+              "mean": 250331.36916666667,
+              "sample_reservoir_size": 256
+            },
+            "exception_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 0.0,
+              "max": 0.0,
+              "mean": 0.0,
+              "sample_reservoir_size": 256
+            },
+            "exception_fallback_time_ns": {
+              "approx_p50": 0.0,
+              "approx_p95": 0.0,
+              "max": 0.0,
+              "mean": 0.0,
+              "sample_reservoir_size": 256
+            },
+            "index_probes": {
+              "approx_p50": 0.0,
+              "approx_p95": 0.0,
+              "max": 0.0,
+              "mean": 0.0,
+              "sample_reservoir_size": 256
+            },
+            "pattern_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 0.0,
+              "max": 0.0,
+              "mean": 0.0,
+              "sample_reservoir_size": 256
+            },
+            "pattern_lookup_time_ns": {
+              "approx_p50": 0.0,
+              "approx_p95": 0.0,
+              "max": 0.0,
+              "mean": 0.0,
+              "sample_reservoir_size": 256
+            },
+            "retrieval_time_ns": {
+              "approx_p50": 303304.0,
+              "approx_p95": 332227.0,
+              "max": 5672238.0,
+              "mean": 258335.0325,
+              "sample_reservoir_size": 256
+            },
+            "total_candidates_inspected": {
+              "approx_p50": 512.0,
+              "approx_p95": 512.0,
+              "max": 512.0,
+              "mean": 457.17333333333335,
+              "sample_reservoir_size": 256
+            }
+          },
+          "outcomes": {
+            "cumulative": 3768.0,
+            "mean_per_tick": 3.14
+          }
+        }
+      },
+      "matched_episode_capacity": 256,
+      "name": "LEGACY_VS_BOUNDED",
+      "ticks": 1200
+    },
+    "C": {
+      "episodes": 15,
+      "exceptions": 2,
+      "max_exceptions_per_pattern": 2,
+      "max_representatives_per_pattern": 2,
+      "memory_event_counts": {
+        "action_changed": 10,
+        "pattern_created": 4,
+        "pattern_invalidated": 1,
+        "pattern_reinforced": 86,
+        "pattern_weakened": 2,
+        "perturbation": 1
+      },
+      "name": "NOVELTY_SENSITIVE_RETENTION",
+      "novelty_changes_action_value": false,
+      "patterns": 4,
+      "representatives": 7,
+      "retention_reasons": {
+        "HIGH_ERROR_EXCEPTION": 2,
+        "UNEXPLAINED": 13,
+        "WELL_EXPLAINED_PATTERN_UPDATE": 84
+      }
+    },
+    "D": {
+      "conditions": {
+        "0": {
+          "action_changes": 127,
+          "first_visible_precontact_tick": null,
+          "movement_action_diversity": 55,
+          "object_interactions": 0,
+          "visible_precontact_ticks": 0
+        },
+        "2": {
+          "action_changes": 156,
+          "first_visible_precontact_tick": 1,
+          "movement_action_diversity": 62,
+          "object_interactions": 0,
+          "visible_precontact_ticks": 49
+        }
+      },
+      "interpretation": "Behavioral differences or a null result are measurements, not a built-in vision policy.",
+      "matched_seed": 17,
+      "name": "VISION_ABLATION",
+      "ticks": 160
+    }
+  },
+  "program": "HIERARCHICAL_BOUNDED_RETRIEVAL_V01",
+  "runtime_version": "0.3.7",
+  "seed": 17
+}

@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Compatibility wrapper — same app as launch_psy_observer.sh (Beta 1 Psy Observer Web).
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+  DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+  LINK="$(readlink "$SOURCE")"
+  case "$LINK" in
+    /*) SOURCE="$LINK" ;;
+    *) SOURCE="$DIR/$LINK" ;;
+  esac
+done
+ROOT="$(cd "$(dirname "$SOURCE")" && pwd)"
+exec "$ROOT/launch_psy_observer.sh" "$@"

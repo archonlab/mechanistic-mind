@@ -1,0 +1,101 @@
+{
+  "schema_version": "mechanistic-mind.environmental-perturbation-pack/0.2.2",
+  "effective_tick": 80,
+  "control": "CONTROL",
+  "conditions": {
+    "CONTROL": {
+      "pack_id": "EPP-CONTROL",
+      "perturbations": []
+    },
+    "RELOCATION": {
+      "pack_id": "EPP-RELOCATION",
+      "perturbations": [
+        {
+          "perturbation_id": "RELOCATE-HYDRATION-01",
+          "effective_tick": 80,
+          "kind": "RELOCATE_OBJECT",
+          "parameters": {
+            "object_id": "OBJ-23",
+            "position": [
+              1,
+              5
+            ]
+          }
+        }
+      ]
+    },
+    "DEPLETION": {
+      "pack_id": "EPP-DEPLETION",
+      "perturbations": [
+        {
+          "perturbation_id": "DEPLETE-RECOVERY-01",
+          "effective_tick": 80,
+          "kind": "SET_OBJECT_ACTIVE",
+          "parameters": {
+            "object_id": "OBJ-04",
+            "active": false
+          }
+        }
+      ]
+    },
+    "OUTCOME_NOISE": {
+      "pack_id": "EPP-OUTCOME-NOISE",
+      "perturbations": [
+        {
+          "perturbation_id": "NOISE-PROGRESS-01",
+          "effective_tick": 80,
+          "kind": "SET_OUTCOME_NOISE",
+          "parameters": {
+            "object_id": "OBJ-31",
+            "amplitudes": {
+              "energy_delta": 0.05,
+              "hydration_delta": 0.05,
+              "fatigue_delta": 0.05,
+              "progress_delta": 0.25
+            }
+          }
+        }
+      ]
+    },
+    "AMBIENT_PRESSURE": {
+      "pack_id": "EPP-AMBIENT-PRESSURE",
+      "perturbations": [
+        {
+          "perturbation_id": "DRY-LOAD-01",
+          "effective_tick": 80,
+          "kind": "SET_AMBIENT_LOAD",
+          "parameters": {
+            "load": {
+              "hydration_delta": -0.018,
+              "fatigue_delta": 0.004
+            }
+          }
+        }
+      ]
+    },
+    "UTILITY_CONFLICT": {
+      "pack_id": "EPP-UTILITY-CONFLICT",
+      "perturbations": [
+        {
+          "perturbation_id": "PROGRESS-COST-SHIFT-01",
+          "effective_tick": 80,
+          "kind": "SHIFT_OBJECT_OUTCOME",
+          "parameters": {
+            "object_id": "OBJ-31",
+            "delta": {
+              "hydration_delta": -0.1,
+              "fatigue_delta": 0.1
+            }
+          }
+        }
+      ]
+    }
+  },
+  "scientific_contract": {
+    "agent_count": 1,
+    "same_seed": true,
+    "same_initial_psyche": true,
+    "agent_receives_intervention_flag": false,
+    "observer_receipt_required": true
+  }
+}

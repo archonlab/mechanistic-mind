@@ -1,0 +1,11 @@
+[
+  {
+    "question_id": "Q-4.63-001",
+    "question": "Which already-existing non-semantic WORLD→BODY path, if any, can materially perturb the exact body variables consumed by X under ordinary passive operation?",
+    "generated_by_experiment": "EXP-4.63",
+    "relevant_unsupported_edge": "EDGE-PASSIVE-ECOLOGY-BODY",
+    "why_unresolved": "4.63 found negligible effects; 4.64 has audit artifacts but no surviving final report and is non-canonical.",
+    "forbidden_shortcut": "Do not raise gain, lower threshold, tune ecology from Q, or add a desired edge.",
+    "prerequisite": "Complete source-grounded path audit without changing runtime."
+  }
+]

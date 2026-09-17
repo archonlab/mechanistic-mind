@@ -1,0 +1,69 @@
+{
+  "hypothesis_id": "H003-REVERSAL-WORLD",
+  "statement": "A hidden reversal of action-outcome contingencies can distinguish candidate mechanisms that are behaviorally equivalent in a stationary environment.",
+  "running_means": {
+    "condition": "RUNNING_MEANS",
+    "mechanism_id": "H001-OUTCOME-TRACE",
+    "ticks": 18,
+    "reversal_after": 6,
+    "pre_a": 1,
+    "pre_b": 5,
+    "post_a": 0,
+    "post_b": 12,
+    "pre_optimal_rate": 0.8333333333333334,
+    "post_optimal_rate": 0.0,
+    "post_switch_tick": null,
+    "adapted": false,
+    "cumulative_outcome": 28.0,
+    "oracle_outcome": 66.0,
+    "regret": 38.0,
+    "final_mechanism_state": {
+      "count_A": 1,
+      "mean_A": 1.0,
+      "count_B": 16,
+      "mean_B": 1.625
+    },
+    "observer_ticks": 18,
+    "archon_observations": 18,
+    "archon_events": 70
+  },
+  "best_seen": {
+    "condition": "BEST_SEEN_ONLY",
+    "mechanism_id": "H002-BEST-SEEN",
+    "ticks": 18,
+    "reversal_after": 6,
+    "pre_a": 1,
+    "pre_b": 5,
+    "post_a": 0,
+    "post_b": 12,
+    "pre_optimal_rate": 0.8333333333333334,
+    "post_optimal_rate": 0.0,
+    "post_switch_tick": null,
+    "adapted": false,
+    "cumulative_outcome": 28.0,
+    "oracle_outcome": 66.0,
+    "regret": 38.0,
+    "final_mechanism_state": {
+      "phase": "EXPLOIT",
+      "best_action": "CHOOSE_B",
+      "best_outcome": 3.0
+    },
+    "observer_ticks": 18,
+    "archon_observations": 18,
+    "archon_events": 42
+  },
+  "status": "BOTH_MODELS_FAIL_REVERSAL_ADAPTATION",
+  "interpretation": "Both candidate mechanisms remain locked onto the formerly advantageous option after the contingency reversal. The reversal world therefore exposes a missing process shared by both models: some mechanism for renewed exploration, recency weighting, forgetting, or change detection.",
+  "observed": {
+    "running_means_post_optimal_rate": 0.0,
+    "best_seen_post_optimal_rate": 0.0,
+    "running_means_regret": 38.0,
+    "best_seen_regret": 38.0
+  },
+  "limits": [
+    "No forced exploration is supplied after reversal.",
+    "The reversal is deterministic and abrupt.",
+    "The agent receives no explicit regime-change signal.",
+    "Failure here identifies missing adaptive machinery but does not uniquely determine which machinery is required."
+  ]
+}

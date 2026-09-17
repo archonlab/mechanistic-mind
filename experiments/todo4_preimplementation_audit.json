@@ -1,0 +1,71 @@
+{
+  "schema": "mechanistic-mind/todo4-preimplementation-audit-v1",
+  "audit_date": "2026-09-10",
+  "baseline_tests": {"command": "python3 -m pytest -q", "passed": 180, "failed": 0},
+  "physiology": {
+    "initial_body": {"energy_reserve": 0.76, "hydration": 0.78, "fatigue": 0.14, "damage": 0.0, "mass_kg": 70.0},
+    "tick_duration_days": 1.0,
+    "passive_per_tick": {"energy": -0.035, "hydration": -0.045, "fatigue": 0.025},
+    "move_increment_per_cell": {"energy": -0.012, "hydration": -0.004, "fatigue": 0.01, "metabolic_expenditure": 0.03},
+    "carried_load_increment_per_kg_tick": {"energy": -0.001, "hydration": -0.0003, "fatigue": 0.0008},
+    "contextual_object_ambient_exposure_at_multiplier_1": {"energy": -0.055, "hydration": -0.012, "fatigue": 0.035},
+    "wait": "Pays passive body cost and contextual ambient exposure; it is not free.",
+    "push_take_release": "World interaction supplies deterministic distance/effort/carried-mass values to BodyEngine; cost is objective and action-dependent.",
+    "internal_loads": "Generic numeric channels decay by 0.04 per tick and can be changed by object effects.",
+    "object_effects": "Objective hidden world configuration applies numeric body deltas; only experienced deltas and lawful interoceptive signals reach cognition."
+  },
+  "perception": {
+    "vision_radius": 2,
+    "visual_features": ["relative_position", "Manhattan_distance", "cue_signature", "cue_salience", "size", "shape", "color", "opacity", "brightness", "generic_signal", "observable_mutable_state", "movement_state"],
+    "geometry": ["visible_object_position", "visible_obstacle_position", "traversable", "available_actions"],
+    "physical_fields": "Directional exposure exists in world truth/receipts but is not represented as a current perceptual modality.",
+    "contact_tactile": "Contacts/resistance are present in action receipts but no explicit compact current tactile modality exists.",
+    "proprioception": "Current position, available actions, prior action, experienced effort signal and carried-object observations are available; no explicit modality envelope exists.",
+    "interoception": ["energy_signal", "hydration_signal", "fatigue_signal", "discomfort_signal", "effort_signal"],
+    "semantic_boundary": "hidden_role, body_effects, world_effects, causal formulas and Observer truth are omitted from local_observation."
+  },
+  "cognition": {
+    "percept_construction": "OrganismWorld merges ObjectiveWorldEngine.local_observation, lawful BodyEngine signals and last experienced action/effects.",
+    "retrieval_cue": ["context", "body_bands", "visual_fragments", "recent_action", "response_fragment"],
+    "retrieval_path": ["pattern index", "linked exceptions/representatives", "bounded episode index"],
+    "inspection_limits": {"pattern": 4, "exception": 4, "episode": 8, "total": 12},
+    "prediction": "Per-action immediate numeric outcome mean with confidence and explicit insufficient-evidence state.",
+    "prediction_error": "Mean absolute distance over observed and expected immediate outcome dimensions.",
+    "action_valuation": "Signed physiological outcome sum plus exploration_gain multiplied by uncertainty.",
+    "selection": "Maximum score with deterministic seeded tie breaking."
+  },
+  "memory": {
+    "bounded_episode_capacity": 64,
+    "pattern_capacity": 256,
+    "prepattern_candidate_capacity": 256,
+    "stores": ["episodes", "patterns", "exceptions", "representatives", "novel fragments"],
+    "retention": "High-error records receive temporary protection; well-explained records may be compressed; stores have deterministic eviction.",
+    "observer_history_access": false
+  },
+  "telemetry": {
+    "psychology_observer_jsonl": "PsychologyObserver currently writes complete world_before/world_after, observations, mechanism outputs, signals, decisions and updates every tick.",
+    "archon_bridge_jsonl": "Derived bridge stream; must remain observer-only.",
+    "compact_observer": "CompactEvidenceObserver already supplies telemetry/event/checkpoint architecture with configurable checkpoint interval 250.",
+    "analyzer": "PsychologyAnalyzer streams JSONL into compact rows but currently expects canonical tick records and uses legacy behavioral labels."
+  },
+  "exploration_gain_audit": {
+    "bounded_cognition": {"value": 2.0, "status": "ACTIVE_IN_FINAL_ACTION_VALUATION", "formula": "outcome_value + exploration_gain * uncertainty"},
+    "legacy_psyche": "Separate legacy action logic also contains uncertainty/exploration branches.",
+    "scientific_conflict": "The current bounded default intrinsically values uncertainty and therefore does not satisfy TODO #4's no-exploration-bonus condition. It must be disabled explicitly in the TODO #4 arm without rewriting the TODO #1 control."
+  },
+  "persistent_condition_broken_audit": {
+    "scope": "PersistentTargetsWorld only; not contextual-object ecology.",
+    "mechanism": "TARGET-ANVIL is mechanically operative before switch_tick 45 and stalls from tick 45 onward.",
+    "body": "Attempts always retain configured physical attempt costs when causal application succeeds; completion recovery ceases after the switch.",
+    "perception": "Operative/broken status and hidden role are not exposed; the visible physical cue remains the same.",
+    "cognition": "Only experienced immediate outcome differences can alter learned estimates.",
+    "world": "No semantic BROKEN value is supplied to cognition or action valuation."
+  },
+  "identified_gaps": [
+    "Physiology and contextual exposure combine into pathological early deterioration relative to a 32x32 exploration horizon.",
+    "No explicit compact multimodal context, supported perceptual expectation, mismatch or decaying activation exists.",
+    "The active uncertainty bonus conflicts with TODO #4.",
+    "Canonical PsychologyObserver telemetry repeats large complete state structures per tick.",
+    "Analyzer regime names over-interpret mobility as exploration/exploitation."
+  ]
+}

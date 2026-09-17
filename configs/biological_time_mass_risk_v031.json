@@ -1,0 +1,41 @@
+{
+  "schema": "mechanistic-mind.body/0.3.1",
+  "biological_time": {
+    "tick_duration_days": 1.0,
+    "days_per_year": 365.2425,
+    "default_start_age_years": 18.0
+  },
+  "mass": {
+    "default_start_mass_kg": 70.0,
+    "safe_operating_region_kg": [
+      45.0,
+      120.0
+    ],
+    "low_mass_critical_kg": 35.0,
+    "high_mass_critical_kg": 140.0,
+    "hard_simulator_bounds_kg": [
+      25.0,
+      180.0
+    ],
+    "max_gain_kg_per_day": 0.05,
+    "max_loss_kg_per_day": 0.08
+  },
+  "causal_rule": {
+    "mass_source": "metabolic_energy_intake - metabolic_energy_expenditure",
+    "functional_energy_delta_direct_mass_effect": false,
+    "progress_direct_mass_effect": false
+  },
+  "agent_visibility": {
+    "mass_kg": false,
+    "mass_risk": false,
+    "age": false,
+    "metabolic_balance": false,
+    "accessible": [
+      "energy_signal",
+      "hydration_signal",
+      "fatigue_signal",
+      "discomfort_signal",
+      "effort_signal"
+    ]
+  }
+}

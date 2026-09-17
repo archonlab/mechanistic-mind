@@ -1,0 +1,338 @@
+[
+  {
+    "architecture_state_id": "ARCH-4.7",
+    "introduced_by": "EXP-4.7",
+    "architecture_change": "1. **Share** geometry, objects, object state, dynamics, fields via one `OrganismWorld` / world dict. 2. **Do not share** memory/experience/retrieval/predictions/body/MPs/decisions — private `mechanisms_by_agent` + per-agent `agent.state` / `bodies`. 3. **Sequential** action apply in `sorted(agent_id)` order; shared dynamics advance once (`advance_dynamics` flag). 4. **No social plumbing** — occupancy blocking + optional anonymous OCCUPANT fragments only. 5. **Observer** — minimal: agent selector + project_tick(agent_id); no large UI rewrite.",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update47_multi_agent_v047/FINAL_REPORT.md",
+      "results/update47_multi_agent_v047/CAUSAL_CHAIN.md",
+      "results/update47_multi_agent_v047/FINAL_REPORT.md",
+      "results/update47_multi_agent_v047/FRONTIER.md",
+      "results/update47_multi_agent_v047/MATRIX_SUMMARY.json"
+    ]
+  },
+  {
+    "architecture_state_id": "ARCH-4.11",
+    "introduced_by": "EXP-4.11",
+    "architecture_change": "- Coarse cognition-visible state key: energy/hydration/fatigue L/M/H (`coarse_body_state_key`) - TC records keyed with state; retrieval prefers EXACT state, falls back to LEGACY/OTHER - `predicted_state(A,L) = current + cumulative_delta(A,L)` - WAIT acquired/predicted as real no-intervention trajectory - `A−WAIT` diagnostic from independently predicted states only (not value) - Per-horizon ordinary valuation for Observer; **no** H1+H2+H3 aggregation - Prospective path does **not** add habit×0.03",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update411_prospective_self_state/UPDATE411_FINAL_REPORT.md",
+      "results/update411_prospective_self_state/ACCEPTANCE_CHECKS.json",
+      "results/update411_prospective_self_state/FREE_POLICY_LOG.json",
+      "results/update411_prospective_self_state/MATCHED_REALIZED_GT.json",
+      "results/update411_prospective_self_state/POST_ACQUISITION_SNAPSHOT.json"
+    ]
+  },
+  {
+    "architecture_state_id": "ARCH-4.19",
+    "introduced_by": "EXP-4.19",
+    "architecture_change": "Continuous numeric background fields evolve every tick (including WAIT). Local `AMBIENT_SCALAR` fragments enter multi-channel perception. Bounded co-occurrence store compresses repeated quantized sensory signatures and supports partial prediction + mismatch measurement. Compositional action patterns are audited from existing legal actions only. No semantic context/curiosity/WORLD_CHANGED.",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update419_context_formation/FINAL_REPORT.md",
+      "results/update419_context_formation/ABLATIONS.json",
+      "results/update419_context_formation/ACCEPTANCE_MATRIX.json",
+      "results/update419_context_formation/ARCHITECTURE_DECISIONS.md",
+      "results/update419_context_formation/CONFIG.json"
+    ]
+  },
+  {
+    "architecture_state_id": "ARCH-4.20",
+    "introduced_by": "EXP-4.20",
+    "architecture_change": "Generic persistent process variables (`internal_a`…) advance every tick including WAIT, modulated by local ambient samples and relieved by ordinary actions (EMIT). Bounded `*_signal` fragments enter interoception. A separate research store tracks local lagged associations and relations among them (no LEVEL_*/SELF cognitive objects).",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update420_hierarchical_body_prediction/FINAL_REPORT.md",
+      "results/update420_hierarchical_body_prediction/ABLATIONS.json",
+      "results/update420_hierarchical_body_prediction/ACCEPTANCE_MATRIX.json",
+      "results/update420_hierarchical_body_prediction/ARCHITECTURE_DECISIONS.md",
+      "results/update420_hierarchical_body_prediction/CHANGING_BODY.json"
+    ]
+  },
+  {
+    "architecture_state_id": "ARCH-4.21",
+    "introduced_by": "EXP-4.21",
+    "architecture_change": "Three timescales: bounded recent buffer; compressed predictive structures with support/EMA; exceptions + frozen prediction-at-event + bounded provenance/revision. Redundant raw_log entries are physically purged. Metrics never affect cognition. Update 4.20 deeper-in-use / presignal / history-divergence NULLs are not tuned.",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update421_predictive_compression/FINAL_REPORT.md",
+      "results/update421_predictive_compression/ABLATION_RESULTS.json",
+      "results/update421_predictive_compression/ACCEPTANCE.json",
+      "results/update421_predictive_compression/ACCEPTANCE_MATRIX.json",
+      "results/update421_predictive_compression/BASELINE_REGRESSION.json"
+    ]
+  },
+  {
+    "architecture_state_id": "ARCH-4.22",
+    "introduced_by": "EXP-4.22",
+    "architecture_change": "Bounded local structures → co-occurrence relations → candidate broader structures with depth safety cap (not a semantic hierarchy). Local-only vs broader-conditioned prediction compared researcher-side. Selective ablations. Integrates 4.21 purge/PAE. No LEVEL_*/REGIME/G labels in cognition. 4.20/4.21 NULLs not acceptance targets.",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update422_multiscale_prediction/FINAL_REPORT.md",
+      "results/update422_multiscale_prediction/ACCEPTANCE_MATRIX.json",
+      "results/update422_multiscale_prediction/BASELINE_REGRESSION.json",
+      "results/update422_multiscale_prediction/BROADER_ABLATION.json",
+      "results/update422_multiscale_prediction/BROADER_STRUCTURES.json"
+    ]
+  },
+  {
+    "architecture_state_id": "ARCH-4.23",
+    "introduced_by": "EXP-4.23",
+    "architecture_change": "Bounded composition over learned action-conditioned transitions only. No world-engine lookahead, no GOAL/PLAN/TARGET, no delayed-reward bonus. Exposure audit for complete sequences. Historical 4.20/4.21/4.22 NULLs preserved.",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update423_prospective_composition/FINAL_REPORT.md",
+      "results/update423_prospective_composition/ACCEPTANCE_MATRIX.json",
+      "results/update423_prospective_composition/ALTERNATIVE_FUTURES.json",
+      "results/update423_prospective_composition/BASELINE_REGRESSION.json",
+      "results/update423_prospective_composition/BRANCH_SELECTION.json"
+    ]
+  },
+  {
+    "architecture_state_id": "ARCH-4.24",
+    "introduced_by": "EXP-4.24",
+    "architecture_change": "State-only vs trajectory-conditioned prediction over ordinary body fragments (internal_a/b, load_c, exchange_d). No CLOCK/ELAPSED_TIME/AGE. Simulator ticks and wall-clock are researcher metrics only. Uses 4.20 persistent process physics with rate/days knobs.",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update424_endogenous_temporal/FINAL_REPORT.md",
+      "results/update424_endogenous_temporal/ACCEPTANCE_MATRIX.json",
+      "results/update424_endogenous_temporal/BASELINE_REGRESSION.json",
+      "results/update424_endogenous_temporal/BODY_RATE_MANIP.json",
+      "results/update424_endogenous_temporal/CHANGING_WORLD_STABLE_BODY.json"
+    ]
+  },
+  {
+    "architecture_state_id": "ARCH-4.25",
+    "introduced_by": "EXP-4.25",
+    "architecture_change": "Physical transduction W->M->BODY only. No TOOL/INFORMATION/EPISTEMIC rewards. C1/C2/C3 evaluated independently. Preserves 4.23 distal->action NULL and 4.24 temporal NULL.",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update425_instrumental_observation/FINAL_REPORT.md",
+      "results/update425_instrumental_observation/ACCEPTANCE_MATRIX.json",
+      "results/update425_instrumental_observation/BASELINE_REGRESSION.json",
+      "results/update425_instrumental_observation/CONFIG.json",
+      "results/update425_instrumental_observation/FINAL_REPORT.md"
+    ]
+  },
+  {
+    "architecture_state_id": "ARCH-4.26",
+    "introduced_by": "EXP-4.26",
+    "architecture_change": "4.23 composition + existing ordinary_state_value (4.5/4.18) blended into softmax action sampling (NOT argmax; NOT goal/desire). Distal blend gated by composition. Preserves historical NULLs for 4.23 distal->action until C3 asserted here.",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update426_prospective_consequence_influence/FINAL_REPORT.md",
+      "results/update426_prospective_consequence_influence/ACCEPTANCE_MATRIX.json",
+      "results/update426_prospective_consequence_influence/BASELINE_REGRESSION.json",
+      "results/update426_prospective_consequence_influence/CONFIG.json",
+      "results/update426_prospective_consequence_influence/FINAL_REPORT.md"
+    ]
+  },
+  {
+    "architecture_state_id": "ARCH-4.27",
+    "introduced_by": "EXP-4.27",
+    "architecture_change": "Physical feature conjunction store (exact / single / pair). No CATEGORY/CLASS/CONCEPT/THREAT. Novel instance {a,b,f} probed with exposure_exact=0. Optional C3 via unchanged 4.26 ordinary_state_value + action_logits. C4 via observe() on counterexample only — no EMA retune.",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update427_predictive_generalization/FINAL_REPORT.md",
+      "results/update427_predictive_generalization/ACCEPTANCE_MATRIX.json",
+      "results/update427_predictive_generalization/BASELINE_REGRESSION.json",
+      "results/update427_predictive_generalization/CONFIG.json",
+      "results/update427_predictive_generalization/FINAL_REPORT.md"
+    ]
+  },
+  {
+    "architecture_state_id": "ARCH-4.28",
+    "introduced_by": "EXP-4.28",
+    "architecture_change": "Existing 4.23 composition + 4.26 ordinary_state_value → softmax. No HABIT/BELIEF/COMMITMENT/CONFIDENCE/ENTRENCHMENT/SWITCHING_COST in cognition. Historical support = ordinary learn_transition / full_sequence exposure counts.",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update428_predictive_scenario_competition/FINAL_REPORT.md",
+      "results/update428_predictive_scenario_competition/ACCEPTANCE_MATRIX.json",
+      "results/update428_predictive_scenario_competition/BASELINE_REGRESSION.json",
+      "results/update428_predictive_scenario_competition/CONFIG.json",
+      "results/update428_predictive_scenario_competition/FINAL_REPORT.md"
+    ]
+  },
+  {
+    "architecture_state_id": "ARCH-4.29",
+    "introduced_by": "EXP-4.29",
+    "architecture_change": "No new cognition variables. Existing 4.23 transitions retain mean + var_sum; pc.reliability(row) is computed on one-step predictions but is NOT consumed by 4.26 action_logits (scalar ordinary_value of mean predicted_distal only). DISTAL_BLEND / T unchanged. No variance/reliability term added to force C3.",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update429_predictive_reliability/FINAL_REPORT.md",
+      "results/update429_predictive_reliability/ACCEPTANCE_MATRIX.json",
+      "results/update429_predictive_reliability/BASELINE_REGRESSION.json",
+      "results/update429_predictive_reliability/CONFIG.json",
+      "results/update429_predictive_reliability/FINAL_REPORT.md"
+    ]
+  },
+  {
+    "architecture_state_id": "ARCH-4.30",
+    "introduced_by": "EXP-4.30",
+    "architecture_change": "WAIT = no active intervention. Autonomous field + body continue evolving. No UNCERTAINTY/URGENCY/WAIT_COST/DELIBERATION. No EMA retune. No variance in logits. Online revision via ordinary learn_transition on field-conditioned distal outcomes. Action via unchanged 4.26 ordinary_state_value → softmax.",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update430_unavoidable_state_transition/FINAL_REPORT.md",
+      "results/update430_unavoidable_state_transition/ACCEPTANCE_MATRIX.json",
+      "results/update430_unavoidable_state_transition/BASELINE_REGRESSION.json",
+      "results/update430_unavoidable_state_transition/CONFIG.json",
+      "results/update430_unavoidable_state_transition/FINAL_REPORT.md"
+    ]
+  },
+  {
+    "architecture_state_id": "ARCH-4.31",
+    "introduced_by": "EXP-4.31",
+    "architecture_change": "Reuses 4.25 WORLD→MEDIATOR→BODY transduction (`instrumental_observation`). Physical action name: CONTACT_M (not OBSERVE/INSPECT). Forced chain: CONTACT_M → mediated signal → io.predict revision → revise later distal via learn_transition → 4.26 action_logits. Free selection: CONTACT_M / PUSH_X / WAIT with matched immediate costs only — no information-gain term (preserves 4.29 NULL).",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update431_evidence_producing_action/FINAL_REPORT.md",
+      "results/update431_evidence_producing_action/ACCEPTANCE_MATRIX.json",
+      "results/update431_evidence_producing_action/BASELINE_REGRESSION.json",
+      "results/update431_evidence_producing_action/CONFIG.json",
+      "results/update431_evidence_producing_action/FINAL_REPORT.md"
+    ]
+  },
+  {
+    "architecture_state_id": "ARCH-4.32",
+    "introduced_by": "EXP-4.32",
+    "architecture_change": "No INFORMATION/CURIOSITY/LEARNING_VALUE. Reuses 4.25/4.26/4.31 machinery. Does not serialize predictive memory as a sensor. Does not inject counterfactual F into CONTACT_M logits (forbidden bridge).",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update432_learning_mediated_futures/FINAL_REPORT.md",
+      "results/update432_learning_mediated_futures/ACCEPTANCE_MATRIX.json",
+      "results/update432_learning_mediated_futures/BASELINE_REGRESSION.json",
+      "results/update432_learning_mediated_futures/CONFIG.json",
+      "results/update432_learning_mediated_futures/FINAL_REPORT.md"
+    ]
+  },
+  {
+    "architecture_state_id": "ARCH-4.33",
+    "introduced_by": "EXP-4.33",
+    "architecture_change": "- fixed_sequence: pc.distal_prediction(store, start, action_seq) and compose_trajectories expand a pre-specified action list / branch_actions; they do not select later actions via ordinary_state_value on predicted future fragments. - mean_collapse: pc.learn_transition keys by (quantized_antecedent, action) and stores one mean consequent; A0->Ox and A0->Oy from the same S0 collapse. - relation_to_432: 4.32 C4 NULL: composition could chain CONTACT_M + pre-specified A/B but could not represent revision-gated A-vs-B. 4.33 removes learning mediation and tests the more primitive physical contingent future.",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update433_conditional_prospection/FINAL_REPORT.md",
+      "results/update433_conditional_prospection/FINAL_REPORT.md",
+      "results/update433_conditional_prospection/OBSERVER_CONDITIONAL_PROSPECTION_SNAPSHOT.json",
+      "results/update433_conditional_prospection/ablations.json",
+      "results/update433_conditional_prospection/architecture_inspection.json"
+    ]
+  },
+  {
+    "architecture_state_id": "ARCH-4.34",
+    "introduced_by": "EXP-4.34",
+    "architecture_change": "{ \"legacy_storage\": \"pc.learn_transition: one mean (sum/n) + var_sum per (antecedent, action)\", \"variance_already\": \"var_sum/reliability (4.29) \\u2014 not multiple centers; reliability -X-> action\", \"raw_observations\": \"bounded exposure_log (256), not full archive\", \"elsewhere_multimodal\": \"4.14 multiple_consequences on tc body-deltas; not wired into pc\", \"bounded_memory_reuse\": \"pc.MAX_TRANSITIONS; 4.14 lowest-support replace; 4.21 structures\", \"smallest_change\": \"learn_transition_mm + components[] on row; predict_components additive; no action wiring\", \"relation_to_433\": \"4.33 C2 NULL from mean collapse; 4.34 tests component retention only\", \"params\": { \"MAX_COMPONENTS\": 4, \"ASSIGN_RADIUS_FLOOR\": 0.08, \"ASSIGN_SPREAD_MULT\": 2.5, \"MIN_COMPONENT_SUPPORT\": 3.0, \"IDLE_SUPPORT_DECAY\": 0.995 } }",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update434_multimodal_consequence_learning/FINAL_REPORT.md",
+      "results/update434_multimodal_consequence_learning/FINAL_REPORT.md",
+      "results/update434_multimodal_consequence_learning/OBSERVER_MULTIMODAL_CONSEQUENCE_SNAPSHOT.json",
+      "results/update434_multimodal_consequence_learning/architecture_inspection.json",
+      "results/update434_multimodal_consequence_learning/claim_matrix.json"
+    ]
+  },
+  {
+    "architecture_state_id": "ARCH-4.35",
+    "introduced_by": "EXP-4.35",
+    "architecture_change": "{ \"after_assignment\": \"4.34 components: id/center/support/spread; legacy mean intact\", \"smallest_change\": \"bounded follow_by_component + follow_by_context; prequential predict\", \"no_retune\": { \"MAX_COMPONENTS\": 4, \"ASSIGN_RADIUS_FLOOR\": 0.08 }, \"bounded\": { \"MAX_FOLLOW_KEYS\": 64, \"HISTORY_LEN\": 2, \"MAX_CTX_FOLLOW\": 64 }, \"relation_434_C4\": \"historical geometric C4 NULL preserved; 4.35 tests predictive contribution\" }",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update435_predictive_structure_selection/FINAL_REPORT.md",
+      "results/update435_predictive_structure_selection/FINAL_REPORT.md",
+      "results/update435_predictive_structure_selection/OBSERVER_PREDICTIVE_STRUCTURE_SNAPSHOT.json",
+      "results/update435_predictive_structure_selection/architecture_inspection.json",
+      "results/update435_predictive_structure_selection/claim_matrix.json"
+    ]
+  },
+  {
+    "architecture_state_id": "ARCH-4.36",
+    "introduced_by": "EXP-4.36",
+    "architecture_change": "{ \"layers\": { \"A_distributional\": \"4.34 components[] on transition row\", \"B_sequential\": \"4.35 follow_by_component / follow_marginal\", \"C_context\": \"4.35 follow_by_context (HISTORY_LEN=2)\", \"D_compact_relational\": \"4.36 bounded IDW anchors (x -> next mean)\" }, \"drift_redundancy\": \"Under smooth drift, 4.35 component identity carries local continuity; R2 can express the same local map without treating component id as essential.\", \"compression_421\": \"4.21 compresses event/structures; not a continuous x->next map.\", \"smallest_change\": \"Additive relational_anchors + compete_representations; 4.34/4.35 untouched.\", \"params\": { \"MAX_ANCHORS\": 12, \"ANCHOR_MERGE_RADIUS\": 0.06, \"IDW_K\": 3, \"EQUAL_ERR_TOL\": 0.005, \"MATERIAL_LOSS\": 0.01, \"434_unchanged\": { \"MAX_COMPONENTS\": 4, \"ASSIGN_RADIUS_FLOOR\": 0.08, \"ASSIGN_SPREAD_MULT\": 2.5 } } }",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update436_predictive_representation_sufficiency/FINAL_REPORT.md",
+      "results/update436_predictive_representation_sufficiency/FINAL_REPORT.md",
+      "results/update436_predictive_representation_sufficiency/OBSERVER_REPRESENTATION_SUFFICIENCY_SNAPSHOT.json",
+      "results/update436_predictive_representation_sufficiency/architecture_inspection.json",
+      "results/update436_predictive_representation_sufficiency/claim_matrix.json"
+    ]
+  },
+  {
+    "architecture_state_id": "ARCH-4.38",
+    "introduced_by": "EXP-4.38",
+    "architecture_change": "No route existed from passively acquired predictive structure to present action independent of inherited `ordinary_state_value`, and the legacy value route itself expects action-conditioned consequences. No new route was added. The native non-WAIT source is stochastic sensorimotor variation.",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update438_psyche_incubation/FINAL_REPORT.md",
+      "results/update438_psyche_incubation/FINAL_REPORT.md",
+      "results/update438_psyche_incubation/OBSERVER_PSYCHE_INCUBATION_SNAPSHOT.json",
+      "results/update438_psyche_incubation/architecture_inspection.json",
+      "results/update438_psyche_incubation/claim_matrix.json"
+    ]
+  },
+  {
+    "architecture_state_id": "ARCH-4.39",
+    "introduced_by": "EXP-4.39",
+    "architecture_change": "The native 4.38 probability of 0.08 is a body-independent stochastic baseline sampled at research action selection. No existing bounded intermediate layer accepted actual body physics and produced motor output, and no value-free path allowed a predicted body state to enter such a layer. Update 4.39 added the smallest generic substrate: three bounded competing channels with decay, persistence, mixed actual-body coupling, bounded sensory perturbation, and stochastic motor emission. It contains no predicted-state input and does not call `ordinary_state_value` or legacy action logits.",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update439_sensorimotor_dynamics/FINAL_REPORT.md",
+      "results/update439_sensorimotor_dynamics/FINAL_REPORT.md",
+      "results/update439_sensorimotor_dynamics/OBSERVER_SENSORIMOTOR_DYNAMICS_SNAPSHOT.json",
+      "results/update439_sensorimotor_dynamics/ablation_results.json",
+      "results/update439_sensorimotor_dynamics/architecture_inspection.json"
+    ]
+  },
+  {
+    "architecture_state_id": "ARCH-4.42",
+    "introduced_by": "EXP-4.42",
+    "architecture_change": "No `.git` in `<local-lab-tree>`. Existing persist `EMIT` / `action_relief` unused. 4.42 adds only distinct X vs A_PAT channels, delayed distal body on `internal_a`/`load_c`, and the probe/control suite. 4.41 learning rule unchanged. M1 is physical A because A_PAT is channel 1.",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update442_body_coupled_regulation/FINAL_REPORT.md",
+      "results/update442_body_coupled_regulation/FINAL_REPORT.md",
+      "results/update442_body_coupled_regulation/OBSERVER_BODY_COUPLED_SNAPSHOT.json",
+      "results/update442_body_coupled_regulation/_inspect_raw.json",
+      "results/update442_body_coupled_regulation/action_repetition_control.json"
+    ]
+  },
+  {
+    "architecture_state_id": "ARCH-4.45",
+    "introduced_by": "EXP-4.45",
+    "architecture_change": "Body does not enter `step()` by itself. 4.45 only constructs `u` as `(world, 0, 0)` then `(0, body, 0)`. Learning rule unchanged. Ablating either channel removes the joint effect. No raw-history lookup.",
+    "default_runtime_status": "UNKNOWN unless explicitly recorded",
+    "experimental_status": "See experiment record",
+    "provenance": [
+      "results/update445_world_body_biography/FINAL_REPORT.md",
+      "results/update445_world_body_biography/ARCHITECTURE_INSPECTION.md",
+      "results/update445_world_body_biography/FINAL_REPORT.md",
+      "results/update445_world_body_biography/PREREGISTRATION.md",
+      "results/update445_world_body_biography/ablations.json"
+    ]
+  }
+]

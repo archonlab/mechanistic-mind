@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Psy Observer
+Comment=Local CURRENT INTEGRATED MM observer
+Exec=@PROJECT_ROOT@/PsyObserver
+Icon=applications-science
+Terminal=false
+Categories=Science;
+StartupNotify=true

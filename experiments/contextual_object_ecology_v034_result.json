@@ -1,0 +1,230 @@
+{
+  "accumulation": [
+    {
+      "action": "USE:OBJ-12",
+      "effect": {
+        "discomfort_signal": 0.0,
+        "effort_signal": 0.0,
+        "energy_signal": -0.08999999999999997,
+        "fatigue_signal": 0.06,
+        "hydration_signal": -0.05699999999999994,
+        "progress_delta": 0.0
+      },
+      "internal_loads": {
+        "channel_1": 0.34
+      }
+    },
+    {
+      "action": "USE:OBJ-12",
+      "effect": {
+        "discomfort_signal": 0.0,
+        "effort_signal": 0.0,
+        "energy_signal": -0.08999999999999997,
+        "fatigue_signal": 0.06,
+        "hydration_signal": -0.05699999999999994,
+        "progress_delta": 0.0
+      },
+      "internal_loads": {
+        "channel_1": 0.6664000000000001
+      }
+    }
+  ],
+  "carried_load": {
+    "loaded": {
+      "age_days": 6575.365,
+      "age_years": 18.00273790700699,
+      "damage": 0.0,
+      "energy_reserve": 0.714,
+      "fatigue": 0.1738,
+      "height_m": 1.75,
+      "high_mass_risk": 0.0,
+      "hydration": 0.7317,
+      "internal_loads": {},
+      "last_daily_metabolic_balance": -0.08,
+      "last_effort_cost": 0.0,
+      "last_mass_delta_kg": -0.009600000000006048,
+      "life_day": 1,
+      "low_mass_risk": 0.0,
+      "mass_kg": 69.9904,
+      "physiological_mass_risk": 0.0,
+      "simulated_days": 1.0
+    },
+    "loaded_objective_effects": {
+      "carried_mass_kg": 11.0,
+      "damage_delta": 0.0,
+      "energy_delta": -0.046,
+      "fatigue_delta": 0.033800000000000004,
+      "hydration_delta": -0.048299999999999996,
+      "metabolic_energy_expenditure": 0.08,
+      "metabolic_energy_intake": 0.0
+    },
+    "unloaded": {
+      "age_days": 6575.365,
+      "age_years": 18.00273790700699,
+      "damage": 0.0,
+      "energy_reserve": 0.725,
+      "fatigue": 0.165,
+      "height_m": 1.75,
+      "high_mass_risk": 0.0,
+      "hydration": 0.735,
+      "internal_loads": {},
+      "last_daily_metabolic_balance": -0.08,
+      "last_effort_cost": 0.0,
+      "last_mass_delta_kg": -0.009600000000006048,
+      "life_day": 1,
+      "low_mass_risk": 0.0,
+      "mass_kg": 69.9904,
+      "physiological_mass_risk": 0.0,
+      "simulated_days": 1.0
+    }
+  },
+  "claim_boundary": "Controlled substrate checks only; no autonomous discovery or stable configuration reconstruction is demonstrated.",
+  "composition": {
+    "a_only_final_effect": {
+      "discomfort_signal": 0.0,
+      "effort_signal": 0.0,
+      "energy_signal": -0.08999999999999997,
+      "fatigue_signal": 0.06,
+      "hydration_signal": -0.05699999999999994,
+      "progress_delta": 0.0
+    },
+    "a_then_b_final_effect": {
+      "discomfort_signal": 0.0,
+      "effort_signal": 0.0,
+      "energy_signal": 0.15000000000000002,
+      "fatigue_signal": -0.13,
+      "hydration_signal": -0.05699999999999994,
+      "progress_delta": 0.0
+    },
+    "b_only_final_effect": {
+      "discomfort_signal": 0.0,
+      "effort_signal": 0.0,
+      "energy_signal": -0.08999999999999997,
+      "fatigue_signal": 0.07,
+      "hydration_signal": -0.05699999999999994,
+      "progress_delta": 0.0
+    }
+  },
+  "geometry": {
+    "after_move": {
+      "attenuating_objects": [
+        {
+          "attenuation": 0.5,
+          "object_id": "OBJ-42",
+          "position": [
+            5,
+            2
+          ]
+        }
+      ],
+      "exposure_multiplier": 0.5
+    },
+    "before_move": {
+      "attenuating_objects": [
+        {
+          "attenuation": 0.65,
+          "object_id": "OBJ-41",
+          "position": [
+            4,
+            2
+          ]
+        },
+        {
+          "attenuation": 0.5,
+          "object_id": "OBJ-42",
+          "position": [
+            5,
+            2
+          ]
+        }
+      ],
+      "exposure_multiplier": 0.175
+    },
+    "both": {
+      "attenuating_objects": [
+        {
+          "attenuation": 0.65,
+          "object_id": "OBJ-41",
+          "position": [
+            4,
+            2
+          ]
+        },
+        {
+          "attenuation": 0.5,
+          "object_id": "OBJ-42",
+          "position": [
+            5,
+            2
+          ]
+        }
+      ],
+      "exposure_multiplier": 0.175
+    },
+    "first_only": {
+      "attenuating_objects": [
+        {
+          "attenuation": 0.65,
+          "object_id": "OBJ-41",
+          "position": [
+            4,
+            2
+          ]
+        }
+      ],
+      "exposure_multiplier": 0.35
+    },
+    "moved_object_position": [
+      4,
+      3
+    ],
+    "second_only": {
+      "attenuating_objects": [
+        {
+          "attenuation": 0.5,
+          "object_id": "OBJ-42",
+          "position": [
+            5,
+            2
+          ]
+        }
+      ],
+      "exposure_multiplier": 0.5
+    }
+  },
+  "matched_context": {
+    "energy_difference": 0.24,
+    "high_state_effect": {
+      "discomfort_signal": 0.0,
+      "effort_signal": 0.0,
+      "energy_signal": 0.15000000000000002,
+      "fatigue_signal": -0.13,
+      "hydration_signal": -0.05699999999999994,
+      "progress_delta": 0.0
+    },
+    "low_state_effect": {
+      "discomfort_signal": 0.0,
+      "effort_signal": 0.0,
+      "energy_signal": -0.08999999999999997,
+      "fatigue_signal": 0.07,
+      "hydration_signal": -0.05699999999999994,
+      "progress_delta": 0.0
+    }
+  },
+  "release": "0.3.4",
+  "seed": 17,
+  "short_history": {
+    "prediction": {
+      "__context_sample_count": 0,
+      "__history_length": 3,
+      "__physiology_context": "energy_signal:HIGH|hydration_signal:HIGH|fatigue_signal:LOW|discomfort_signal:LOW",
+      "__prediction_scope": "GLOBAL_FALLBACK",
+      "__prediction_source": "ACTION_HISTORY_N3",
+      "energy_signal": 0.19
+    },
+    "retained_model_keys": [
+      "WAIT\u241fUSE:OBJ-12",
+      "WAIT\u241fUSE:OBJ-29\u241fUSE:OBJ-12"
+    ]
+  }
+}

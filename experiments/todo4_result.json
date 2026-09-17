@@ -1,0 +1,1437 @@
+{
+  "boundaries": {
+    "forced_exploration": false,
+    "novelty_reward_in_todo4": false,
+    "temporal_credit_assignment": false
+  },
+  "matrix": {
+    "A_CURRENT_BASELINE": [
+      {
+        "action_counts": {
+          "MOVE": 80,
+          "PUSH": 3,
+          "WAIT": 17
+        },
+        "episodes": 64,
+        "final_body": {
+          "age_days": 6674.365,
+          "age_years": 18.27379070069885,
+          "damage": 0.0,
+          "energy_reserve": 0.0,
+          "fatigue": 1.0,
+          "height_m": 1.75,
+          "high_mass_risk": 0.0,
+          "hydration": 0.0,
+          "internal_loads": {},
+          "last_daily_metabolic_balance": -0.1327852777283496,
+          "last_effort_cost": 0.14076074060893232,
+          "last_mass_delta_kg": -0.01593423332739974,
+          "life_day": 100,
+          "low_mass_risk": 0.0,
+          "mass_kg": 68.40942578490358,
+          "physiological_mass_risk": 0.0,
+          "simulated_days": 100.0
+        },
+        "interaction_fraction": 0.030000000000000027,
+        "max_inspected": 5,
+        "mean_activation": 0.0,
+        "mean_mismatch": 0.0,
+        "move_fraction": 0.8,
+        "objects_encountered": 8,
+        "patterns": 2,
+        "seed": 17,
+        "telemetry": {
+          "bytes_per_tick": 14938.12,
+          "checkpoint_count": 3,
+          "checkpoint_storage_bytes": 1108099,
+          "event_count": 187,
+          "event_storage_bytes": 22671,
+          "legacy_full_history_bytes": 0,
+          "observer_history_bytes": 1493812,
+          "ram_peak_bytes": 33415168,
+          "reduction_ratio": null,
+          "retrieval_metrics": {
+            "decision_time_ns": {
+              "approx_p50": 14828.0,
+              "approx_p95": 21240.0,
+              "max": 24146.0,
+              "mean": 16088.91,
+              "sample_reservoir_size": 100
+            },
+            "episode_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 3.0,
+              "max": 3.0,
+              "mean": 0.65,
+              "sample_reservoir_size": 100
+            },
+            "episode_fallback_time_ns": {
+              "approx_p50": 3246.0,
+              "approx_p95": 75562.0,
+              "max": 3228974.0,
+              "mean": 58708.89,
+              "sample_reservoir_size": 100
+            },
+            "exception_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 0.0,
+              "max": 0.0,
+              "mean": 0.0,
+              "sample_reservoir_size": 100
+            },
+            "exception_fallback_time_ns": {
+              "approx_p50": 8797.0,
+              "approx_p95": 9969.0,
+              "max": 33533.0,
+              "mean": 9310.85,
+              "sample_reservoir_size": 100
+            },
+            "index_probes": {
+              "approx_p50": 15.0,
+              "approx_p95": 18.0,
+              "max": 21.0,
+              "mean": 15.12,
+              "sample_reservoir_size": 100
+            },
+            "pattern_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 0.0,
+              "max": 2.0,
+              "mean": 0.04,
+              "sample_reservoir_size": 100
+            },
+            "pattern_lookup_time_ns": {
+              "approx_p50": 5300.0,
+              "approx_p95": 6612.0,
+              "max": 33163.0,
+              "mean": 6108.72,
+              "sample_reservoir_size": 100
+            },
+            "retrieval_time_ns": {
+              "approx_p50": 35307.0,
+              "approx_p95": 129014.0,
+              "max": 3270101.0,
+              "mean": 91179.17,
+              "sample_reservoir_size": 100
+            },
+            "total_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 3.0,
+              "max": 5.0,
+              "mean": 0.69,
+              "sample_reservoir_size": 100
+            }
+          },
+          "telemetry_storage_bytes": 361488,
+          "ticks": 100,
+          "total_output_bytes": 1493812
+        },
+        "ticks": 100,
+        "unique_positions": 42,
+        "unknown_fraction": 1.0,
+        "wait_fraction": 0.17
+      },
+      {
+        "action_counts": {
+          "MOVE": 75,
+          "PUSH": 2,
+          "WAIT": 23
+        },
+        "episodes": 64,
+        "final_body": {
+          "age_days": 6674.365,
+          "age_years": 18.27379070069885,
+          "damage": 0.0,
+          "energy_reserve": 0.0,
+          "fatigue": 1.0,
+          "height_m": 1.75,
+          "high_mass_risk": 0.0,
+          "hydration": 0.0,
+          "internal_loads": {},
+          "last_daily_metabolic_balance": -0.13283299695039627,
+          "last_effort_cost": 0.14088799186772336,
+          "last_mass_delta_kg": -0.01593995963405348,
+          "life_day": 100,
+          "low_mass_risk": 0.0,
+          "mass_kg": 68.47127830939813,
+          "physiological_mass_risk": 0.0,
+          "simulated_days": 100.0
+        },
+        "interaction_fraction": 0.020000000000000018,
+        "max_inspected": 9,
+        "mean_activation": 0.0,
+        "mean_mismatch": 0.0,
+        "move_fraction": 0.75,
+        "objects_encountered": 5,
+        "patterns": 1,
+        "seed": 23,
+        "telemetry": {
+          "bytes_per_tick": 9227.93,
+          "checkpoint_count": 2,
+          "checkpoint_storage_bytes": 536815,
+          "event_count": 174,
+          "event_storage_bytes": 21137,
+          "legacy_full_history_bytes": 0,
+          "observer_history_bytes": 922793,
+          "ram_peak_bytes": 33415168,
+          "reduction_ratio": null,
+          "retrieval_metrics": {
+            "decision_time_ns": {
+              "approx_p50": 14868.0,
+              "approx_p95": 22592.0,
+              "max": 259479.0,
+              "mean": 18867.51,
+              "sample_reservoir_size": 100
+            },
+            "episode_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 6.0,
+              "max": 8.0,
+              "mean": 1.05,
+              "sample_reservoir_size": 100
+            },
+            "episode_fallback_time_ns": {
+              "approx_p50": 3246.0,
+              "approx_p95": 116169.0,
+              "max": 143380.0,
+              "mean": 26435.5,
+              "sample_reservoir_size": 100
+            },
+            "exception_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 0.0,
+              "max": 0.0,
+              "mean": 0.0,
+              "sample_reservoir_size": 100
+            },
+            "exception_fallback_time_ns": {
+              "approx_p50": 8626.0,
+              "approx_p95": 9638.0,
+              "max": 12514.0,
+              "mean": 8678.36,
+              "sample_reservoir_size": 100
+            },
+            "index_probes": {
+              "approx_p50": 15.0,
+              "approx_p95": 18.0,
+              "max": 18.0,
+              "mean": 15.16,
+              "sample_reservoir_size": 100
+            },
+            "pattern_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 0.0,
+              "max": 1.0,
+              "mean": 0.02,
+              "sample_reservoir_size": 100
+            },
+            "pattern_lookup_time_ns": {
+              "approx_p50": 5260.0,
+              "approx_p95": 5981.0,
+              "max": 16982.0,
+              "mean": 5532.36,
+              "sample_reservoir_size": 100
+            },
+            "retrieval_time_ns": {
+              "approx_p50": 34976.0,
+              "approx_p95": 145745.0,
+              "max": 181372.0,
+              "mean": 57447.12,
+              "sample_reservoir_size": 100
+            },
+            "total_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 6.0,
+              "max": 9.0,
+              "mean": 1.07,
+              "sample_reservoir_size": 100
+            }
+          },
+          "telemetry_storage_bytes": 363287,
+          "ticks": 100,
+          "total_output_bytes": 922793
+        },
+        "ticks": 100,
+        "unique_positions": 38,
+        "unknown_fraction": 1.0,
+        "wait_fraction": 0.23
+      },
+      {
+        "action_counts": {
+          "MOVE": 75,
+          "USE": 1,
+          "WAIT": 24
+        },
+        "episodes": 64,
+        "final_body": {
+          "age_days": 6674.365,
+          "age_years": 18.27379070069885,
+          "damage": 0.0,
+          "energy_reserve": 0.0,
+          "fatigue": 1.0,
+          "height_m": 1.75,
+          "high_mass_risk": 0.0,
+          "hydration": 0.0,
+          "internal_loads": {},
+          "last_daily_metabolic_balance": -0.13290854409399078,
+          "last_effort_cost": 0.14108945091730873,
+          "last_mass_delta_kg": -0.015949025291277508,
+          "life_day": 100,
+          "low_mass_risk": 0.0,
+          "mass_kg": 68.56920072617825,
+          "physiological_mass_risk": 0.0,
+          "simulated_days": 100.0
+        },
+        "interaction_fraction": 0.010000000000000009,
+        "max_inspected": 9,
+        "mean_activation": 0.0,
+        "mean_mismatch": 0.0,
+        "move_fraction": 0.75,
+        "objects_encountered": 5,
+        "patterns": 4,
+        "seed": 41,
+        "telemetry": {
+          "bytes_per_tick": 23509.66,
+          "checkpoint_count": 5,
+          "checkpoint_storage_bytes": 1967019,
+          "event_count": 190,
+          "event_storage_bytes": 22980,
+          "legacy_full_history_bytes": 0,
+          "observer_history_bytes": 2350966,
+          "ram_peak_bytes": 34414592,
+          "reduction_ratio": null,
+          "retrieval_metrics": {
+            "decision_time_ns": {
+              "approx_p50": 14688.0,
+              "approx_p95": 22773.0,
+              "max": 29656.0,
+              "mean": 16335.71,
+              "sample_reservoir_size": 100
+            },
+            "episode_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 7.0,
+              "max": 8.0,
+              "mean": 1.16,
+              "sample_reservoir_size": 100
+            },
+            "episode_fallback_time_ns": {
+              "approx_p50": 3206.0,
+              "approx_p95": 121028.0,
+              "max": 143911.0,
+              "mean": 28609.93,
+              "sample_reservoir_size": 100
+            },
+            "exception_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 0.0,
+              "max": 0.0,
+              "mean": 0.0,
+              "sample_reservoir_size": 100
+            },
+            "exception_fallback_time_ns": {
+              "approx_p50": 8576.0,
+              "approx_p95": 9769.0,
+              "max": 33994.0,
+              "mean": 9099.67,
+              "sample_reservoir_size": 100
+            },
+            "index_probes": {
+              "approx_p50": 15.0,
+              "approx_p95": 15.0,
+              "max": 18.0,
+              "mean": 14.92,
+              "sample_reservoir_size": 100
+            },
+            "pattern_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 1.0,
+              "max": 3.0,
+              "mean": 0.13,
+              "sample_reservoir_size": 100
+            },
+            "pattern_lookup_time_ns": {
+              "approx_p50": 5230.0,
+              "approx_p95": 16221.0,
+              "max": 37550.0,
+              "mean": 6850.47,
+              "sample_reservoir_size": 100
+            },
+            "retrieval_time_ns": {
+              "approx_p50": 35246.0,
+              "approx_p95": 165732.0,
+              "max": 183846.0,
+              "mean": 61771.11,
+              "sample_reservoir_size": 100
+            },
+            "total_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 8.0,
+              "max": 9.0,
+              "mean": 1.29,
+              "sample_reservoir_size": 100
+            }
+          },
+          "telemetry_storage_bytes": 359413,
+          "ticks": 100,
+          "total_output_bytes": 2350966
+        },
+        "ticks": 100,
+        "unique_positions": 50,
+        "unknown_fraction": 1.0,
+        "wait_fraction": 0.24
+      }
+    ],
+    "B_PHYSIOLOGY_ONLY": [
+      {
+        "action_counts": {
+          "MOVE": 81,
+          "PUSH": 4,
+          "USE": 1,
+          "WAIT": 14
+        },
+        "episodes": 64,
+        "final_body": {
+          "age_days": 6674.365,
+          "age_years": 18.27379070069885,
+          "damage": 0.0,
+          "energy_reserve": 0.49786077320926764,
+          "fatigue": 0.37232712009304886,
+          "height_m": 1.75,
+          "high_mass_risk": 0.0,
+          "hydration": 0.5845885899534745,
+          "internal_loads": {
+            "channel_1": 0.08353950827101335
+          },
+          "last_daily_metabolic_balance": -0.011880890208201628,
+          "last_effort_cost": 0.10349040555204342,
+          "last_mass_delta_kg": -0.0014257068249889926,
+          "life_day": 100,
+          "low_mass_risk": 0.0,
+          "mass_kg": 69.85543562794398,
+          "physiological_mass_risk": 0.0,
+          "simulated_days": 100.0
+        },
+        "interaction_fraction": 0.050000000000000044,
+        "max_inspected": 2,
+        "mean_activation": 0.0,
+        "mean_mismatch": 0.0,
+        "move_fraction": 0.81,
+        "objects_encountered": 9,
+        "patterns": 0,
+        "seed": 17,
+        "telemetry": {
+          "bytes_per_tick": 4357.37,
+          "checkpoint_count": 1,
+          "checkpoint_storage_bytes": 37549,
+          "event_count": 195,
+          "event_storage_bytes": 23557,
+          "legacy_full_history_bytes": 0,
+          "observer_history_bytes": 435737,
+          "ram_peak_bytes": 34414592,
+          "reduction_ratio": null,
+          "retrieval_metrics": {
+            "decision_time_ns": {
+              "approx_p50": 14156.0,
+              "approx_p95": 18044.0,
+              "max": 26090.0,
+              "mean": 14618.54,
+              "sample_reservoir_size": 100
+            },
+            "episode_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 1.0,
+              "max": 2.0,
+              "mean": 0.2,
+              "sample_reservoir_size": 100
+            },
+            "episode_fallback_time_ns": {
+              "approx_p50": 2926.0,
+              "approx_p95": 49453.0,
+              "max": 117722.0,
+              "mean": 10883.79,
+              "sample_reservoir_size": 100
+            },
+            "exception_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 0.0,
+              "max": 0.0,
+              "mean": 0.0,
+              "sample_reservoir_size": 100
+            },
+            "exception_fallback_time_ns": {
+              "approx_p50": 8647.0,
+              "approx_p95": 10069.0,
+              "max": 34074.0,
+              "mean": 9409.68,
+              "sample_reservoir_size": 100
+            },
+            "index_probes": {
+              "approx_p50": 15.0,
+              "approx_p95": 18.0,
+              "max": 21.0,
+              "mean": 15.24,
+              "sample_reservoir_size": 100
+            },
+            "pattern_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 0.0,
+              "max": 0.0,
+              "mean": 0.0,
+              "sample_reservoir_size": 100
+            },
+            "pattern_lookup_time_ns": {
+              "approx_p50": 5120.0,
+              "approx_p95": 5872.0,
+              "max": 6352.0,
+              "mean": 5215.82,
+              "sample_reservoir_size": 100
+            },
+            "retrieval_time_ns": {
+              "approx_p50": 34124.0,
+              "approx_p95": 82656.0,
+              "max": 145794.0,
+              "mean": 42050.56,
+              "sample_reservoir_size": 100
+            },
+            "total_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 1.0,
+              "max": 2.0,
+              "mean": 0.2,
+              "sample_reservoir_size": 100
+            }
+          },
+          "telemetry_storage_bytes": 373078,
+          "ticks": 100,
+          "total_output_bytes": 435737
+        },
+        "ticks": 100,
+        "unique_positions": 46,
+        "unknown_fraction": 1.0,
+        "wait_fraction": 0.14
+      },
+      {
+        "action_counts": {
+          "MOVE": 82,
+          "WAIT": 18
+        },
+        "episodes": 64,
+        "final_body": {
+          "age_days": 6674.365,
+          "age_years": 18.27379070069885,
+          "damage": 0.0,
+          "energy_reserve": 0.522623853675946,
+          "fatigue": 0.3180621097430399,
+          "height_m": 1.75,
+          "high_mass_risk": 0.0,
+          "hydration": 0.5911039451284786,
+          "internal_loads": {},
+          "last_daily_metabolic_balance": -0.011751713788467998,
+          "last_effort_cost": 0.10004570102581328,
+          "last_mass_delta_kg": -0.001410205654622132,
+          "life_day": 100,
+          "low_mass_risk": 0.0,
+          "mass_kg": 69.86907273415406,
+          "physiological_mass_risk": 0.0,
+          "simulated_days": 100.0
+        },
+        "interaction_fraction": 0.0,
+        "max_inspected": 3,
+        "mean_activation": 0.0,
+        "mean_mismatch": 0.0,
+        "move_fraction": 0.82,
+        "objects_encountered": 5,
+        "patterns": 0,
+        "seed": 23,
+        "telemetry": {
+          "bytes_per_tick": 4312.57,
+          "checkpoint_count": 1,
+          "checkpoint_storage_bytes": 37326,
+          "event_count": 189,
+          "event_storage_bytes": 22701,
+          "legacy_full_history_bytes": 0,
+          "observer_history_bytes": 431257,
+          "ram_peak_bytes": 34414592,
+          "reduction_ratio": null,
+          "retrieval_metrics": {
+            "decision_time_ns": {
+              "approx_p50": 14046.0,
+              "approx_p95": 17533.0,
+              "max": 19657.0,
+              "mean": 14431.71,
+              "sample_reservoir_size": 100
+            },
+            "episode_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 2.0,
+              "max": 3.0,
+              "mean": 0.27,
+              "sample_reservoir_size": 100
+            },
+            "episode_fallback_time_ns": {
+              "approx_p50": 2996.0,
+              "approx_p95": 54793.0,
+              "max": 70814.0,
+              "mean": 11982.31,
+              "sample_reservoir_size": 100
+            },
+            "exception_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 0.0,
+              "max": 0.0,
+              "mean": 0.0,
+              "sample_reservoir_size": 100
+            },
+            "exception_fallback_time_ns": {
+              "approx_p50": 8536.0,
+              "approx_p95": 9307.0,
+              "max": 5237705.0,
+              "mean": 60812.31,
+              "sample_reservoir_size": 100
+            },
+            "index_probes": {
+              "approx_p50": 15.0,
+              "approx_p95": 15.0,
+              "max": 18.0,
+              "mean": 15.0,
+              "sample_reservoir_size": 100
+            },
+            "pattern_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 0.0,
+              "max": 0.0,
+              "mean": 0.0,
+              "sample_reservoir_size": 100
+            },
+            "pattern_lookup_time_ns": {
+              "approx_p50": 5130.0,
+              "approx_p95": 5470.0,
+              "max": 6051.0,
+              "mean": 5151.23,
+              "sample_reservoir_size": 100
+            },
+            "retrieval_time_ns": {
+              "approx_p50": 33694.0,
+              "approx_p95": 84098.0,
+              "max": 5275056.0,
+              "mean": 94121.62,
+              "sample_reservoir_size": 100
+            },
+            "total_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 2.0,
+              "max": 3.0,
+              "mean": 0.27,
+              "sample_reservoir_size": 100
+            }
+          },
+          "telemetry_storage_bytes": 369677,
+          "ticks": 100,
+          "total_output_bytes": 431257
+        },
+        "ticks": 100,
+        "unique_positions": 52,
+        "unknown_fraction": 1.0,
+        "wait_fraction": 0.18
+      },
+      {
+        "action_counts": {
+          "MOVE": 74,
+          "USE": 3,
+          "WAIT": 23
+        },
+        "episodes": 64,
+        "final_body": {
+          "age_days": 6674.365,
+          "age_years": 18.27379070069885,
+          "damage": 0.0,
+          "energy_reserve": 0.5334228158242633,
+          "fatigue": 0.33041788813180156,
+          "height_m": 1.75,
+          "high_mass_risk": 0.0,
+          "hydration": 0.5969735559340978,
+          "internal_loads": {
+            "channel_1": 0.20987864792037794
+          },
+          "last_daily_metabolic_balance": -0.011781473070078416,
+          "last_effort_cost": 0.10083928186875774,
+          "last_mass_delta_kg": -0.0014137767684161417,
+          "life_day": 100,
+          "low_mass_risk": 0.0,
+          "mass_kg": 69.87229426712071,
+          "physiological_mass_risk": 0.0,
+          "simulated_days": 100.0
+        },
+        "interaction_fraction": 0.030000000000000027,
+        "max_inspected": 4,
+        "mean_activation": 0.0,
+        "mean_mismatch": 0.0,
+        "move_fraction": 0.74,
+        "objects_encountered": 5,
+        "patterns": 0,
+        "seed": 41,
+        "telemetry": {
+          "bytes_per_tick": 4372.25,
+          "checkpoint_count": 1,
+          "checkpoint_storage_bytes": 39376,
+          "event_count": 195,
+          "event_storage_bytes": 23266,
+          "legacy_full_history_bytes": 0,
+          "observer_history_bytes": 437225,
+          "ram_peak_bytes": 34414592,
+          "reduction_ratio": null,
+          "retrieval_metrics": {
+            "decision_time_ns": {
+              "approx_p50": 14287.0,
+              "approx_p95": 18004.0,
+              "max": 20409.0,
+              "mean": 14768.83,
+              "sample_reservoir_size": 100
+            },
+            "episode_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 1.0,
+              "max": 4.0,
+              "mean": 0.22,
+              "sample_reservoir_size": 100
+            },
+            "episode_fallback_time_ns": {
+              "approx_p50": 2925.0,
+              "approx_p95": 40997.0,
+              "max": 165973.0,
+              "mean": 10696.23,
+              "sample_reservoir_size": 100
+            },
+            "exception_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 0.0,
+              "max": 0.0,
+              "mean": 0.0,
+              "sample_reservoir_size": 100
+            },
+            "exception_fallback_time_ns": {
+              "approx_p50": 8676.0,
+              "approx_p95": 9688.0,
+              "max": 15449.0,
+              "mean": 8797.08,
+              "sample_reservoir_size": 100
+            },
+            "index_probes": {
+              "approx_p50": 15.0,
+              "approx_p95": 18.0,
+              "max": 21.0,
+              "mean": 15.54,
+              "sample_reservoir_size": 100
+            },
+            "pattern_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 0.0,
+              "max": 0.0,
+              "mean": 0.0,
+              "sample_reservoir_size": 100
+            },
+            "pattern_lookup_time_ns": {
+              "approx_p50": 5220.0,
+              "approx_p95": 6191.0,
+              "max": 12864.0,
+              "mean": 5469.65,
+              "sample_reservoir_size": 100
+            },
+            "retrieval_time_ns": {
+              "approx_p50": 34234.0,
+              "approx_p95": 72456.0,
+              "max": 193865.0,
+              "mean": 42185.13,
+              "sample_reservoir_size": 100
+            },
+            "total_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 1.0,
+              "max": 4.0,
+              "mean": 0.22,
+              "sample_reservoir_size": 100
+            }
+          },
+          "telemetry_storage_bytes": 373030,
+          "ticks": 100,
+          "total_output_bytes": 437225
+        },
+        "ticks": 100,
+        "unique_positions": 56,
+        "unknown_fraction": 1.0,
+        "wait_fraction": 0.23
+      }
+    ],
+    "C_TODO4": [
+      {
+        "action_counts": {
+          "MOVE": 75,
+          "PUSH": 3,
+          "WAIT": 22
+        },
+        "episodes": 64,
+        "final_body": {
+          "age_days": 6674.365,
+          "age_years": 18.27379070069885,
+          "damage": 0.0,
+          "energy_reserve": 0.5161352062835403,
+          "fatigue": 0.32386669528734435,
+          "height_m": 1.75,
+          "high_mass_risk": 0.0,
+          "hydration": 0.592423102356327,
+          "internal_loads": {},
+          "last_daily_metabolic_balance": -0.011765273234790423,
+          "last_effort_cost": 0.10040728626107791,
+          "last_mass_delta_kg": -0.0014118327881789128,
+          "life_day": 100,
+          "low_mass_risk": 0.0,
+          "mass_kg": 69.86277568282743,
+          "physiological_mass_risk": 0.0,
+          "simulated_days": 100.0
+        },
+        "interaction_fraction": 0.030000000000000027,
+        "max_inspected": 6,
+        "mean_activation": 0.0,
+        "mean_mismatch": 0.0,
+        "move_fraction": 0.75,
+        "objects_encountered": 9,
+        "patterns": 1,
+        "seed": 17,
+        "telemetry": {
+          "bytes_per_tick": 8756.6,
+          "checkpoint_count": 2,
+          "checkpoint_storage_bytes": 476448,
+          "event_count": 182,
+          "event_storage_bytes": 22240,
+          "legacy_full_history_bytes": 0,
+          "observer_history_bytes": 875660,
+          "ram_peak_bytes": 34414592,
+          "reduction_ratio": null,
+          "retrieval_metrics": {
+            "decision_time_ns": {
+              "approx_p50": 14478.0,
+              "approx_p95": 19637.0,
+              "max": 46307.0,
+              "mean": 15598.17,
+              "sample_reservoir_size": 100
+            },
+            "episode_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 2.0,
+              "max": 5.0,
+              "mean": 0.48,
+              "sample_reservoir_size": 100
+            },
+            "episode_fallback_time_ns": {
+              "approx_p50": 3026.0,
+              "approx_p95": 54472.0,
+              "max": 95610.0,
+              "mean": 16866.17,
+              "sample_reservoir_size": 100
+            },
+            "exception_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 0.0,
+              "max": 0.0,
+              "mean": 0.0,
+              "sample_reservoir_size": 100
+            },
+            "exception_fallback_time_ns": {
+              "approx_p50": 8546.0,
+              "approx_p95": 9257.0,
+              "max": 9858.0,
+              "mean": 8506.25,
+              "sample_reservoir_size": 100
+            },
+            "index_probes": {
+              "approx_p50": 15.0,
+              "approx_p95": 18.0,
+              "max": 21.0,
+              "mean": 14.98,
+              "sample_reservoir_size": 100
+            },
+            "pattern_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 1.0,
+              "max": 1.0,
+              "mean": 0.08,
+              "sample_reservoir_size": 100
+            },
+            "pattern_lookup_time_ns": {
+              "approx_p50": 5220.0,
+              "approx_p95": 15339.0,
+              "max": 15890.0,
+              "mean": 6092.34,
+              "sample_reservoir_size": 100
+            },
+            "retrieval_time_ns": {
+              "approx_p50": 33854.0,
+              "approx_p95": 93456.0,
+              "max": 137519.0,
+              "mean": 47899.72,
+              "sample_reservoir_size": 100
+            },
+            "total_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 3.0,
+              "max": 6.0,
+              "mean": 0.56,
+              "sample_reservoir_size": 100
+            }
+          },
+          "telemetry_storage_bytes": 375429,
+          "ticks": 100,
+          "total_output_bytes": 875660
+        },
+        "ticks": 100,
+        "unique_positions": 44,
+        "unknown_fraction": 0.94,
+        "wait_fraction": 0.22
+      },
+      {
+        "action_counts": {
+          "MOVE": 40,
+          "WAIT": 60
+        },
+        "episodes": 64,
+        "final_body": {
+          "age_days": 6674.365,
+          "age_years": 18.27379070069885,
+          "damage": 0.0,
+          "energy_reserve": 0.5739423377083844,
+          "fatigue": 0.2809657467187101,
+          "height_m": 1.75,
+          "high_mass_risk": 0.0,
+          "hydration": 0.6159183766406429,
+          "internal_loads": {},
+          "last_daily_metabolic_balance": -0.011663836639283505,
+          "last_effort_cost": 0.09770231038089348,
+          "last_mass_delta_kg": -0.0013996603967143528,
+          "life_day": 100,
+          "low_mass_risk": 0.0,
+          "mass_kg": 69.88715305196833,
+          "physiological_mass_risk": 0.0,
+          "simulated_days": 100.0
+        },
+        "interaction_fraction": 0.0,
+        "max_inspected": 5,
+        "mean_activation": 0.0,
+        "mean_mismatch": 0.0,
+        "move_fraction": 0.4,
+        "objects_encountered": 5,
+        "patterns": 5,
+        "seed": 23,
+        "telemetry": {
+          "bytes_per_tick": 21561.17,
+          "checkpoint_count": 6,
+          "checkpoint_storage_bytes": 1744081,
+          "event_count": 121,
+          "event_storage_bytes": 15940,
+          "legacy_full_history_bytes": 0,
+          "observer_history_bytes": 2156117,
+          "ram_peak_bytes": 34414592,
+          "reduction_ratio": null,
+          "retrieval_metrics": {
+            "decision_time_ns": {
+              "approx_p50": 15690.0,
+              "approx_p95": 18245.0,
+              "max": 44233.0,
+              "mean": 16066.28,
+              "sample_reservoir_size": 100
+            },
+            "episode_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 3.0,
+              "max": 4.0,
+              "mean": 0.73,
+              "sample_reservoir_size": 100
+            },
+            "episode_fallback_time_ns": {
+              "approx_p50": 30397.0,
+              "approx_p95": 57037.0,
+              "max": 75903.0,
+              "mean": 23393.38,
+              "sample_reservoir_size": 100
+            },
+            "exception_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 0.0,
+              "max": 0.0,
+              "mean": 0.0,
+              "sample_reservoir_size": 100
+            },
+            "exception_fallback_time_ns": {
+              "approx_p50": 8286.0,
+              "approx_p95": 9809.0,
+              "max": 44985.0,
+              "mean": 9059.27,
+              "sample_reservoir_size": 100
+            },
+            "index_probes": {
+              "approx_p50": 15.0,
+              "approx_p95": 18.0,
+              "max": 18.0,
+              "mean": 14.51,
+              "sample_reservoir_size": 100
+            },
+            "pattern_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 1.0,
+              "max": 1.0,
+              "mean": 0.36,
+              "sample_reservoir_size": 100
+            },
+            "pattern_lookup_time_ns": {
+              "approx_p50": 5520.0,
+              "approx_p95": 15679.0,
+              "max": 20399.0,
+              "mean": 8980.22,
+              "sample_reservoir_size": 100
+            },
+            "retrieval_time_ns": {
+              "approx_p50": 61757.0,
+              "approx_p95": 95770.0,
+              "max": 116650.0,
+              "mean": 57848.88,
+              "sample_reservoir_size": 100
+            },
+            "total_candidates_inspected": {
+              "approx_p50": 1.0,
+              "approx_p95": 3.0,
+              "max": 5.0,
+              "mean": 1.09,
+              "sample_reservoir_size": 100
+            }
+          },
+          "telemetry_storage_bytes": 394553,
+          "ticks": 100,
+          "total_output_bytes": 2156117
+        },
+        "ticks": 100,
+        "unique_positions": 20,
+        "unknown_fraction": 0.72,
+        "wait_fraction": 0.6
+      },
+      {
+        "action_counts": {
+          "MOVE": 41,
+          "PUSH": 1,
+          "USE": 1,
+          "WAIT": 57
+        },
+        "episodes": 64,
+        "final_body": {
+          "age_days": 6674.365,
+          "age_years": 18.27379070069885,
+          "damage": 0.0,
+          "energy_reserve": 0.5559293660256346,
+          "fatigue": 0.3032029754807717,
+          "height_m": 1.75,
+          "high_mass_risk": 0.0,
+          "hydration": 0.6040735122596113,
+          "internal_loads": {},
+          "last_daily_metabolic_balance": -0.008,
+          "last_effort_cost": 6.156889506772373e-07,
+          "last_mass_delta_kg": -0.0009600000000062892,
+          "life_day": 100,
+          "low_mass_risk": 0.0,
+          "mass_kg": 69.8836282147112,
+          "physiological_mass_risk": 0.0,
+          "simulated_days": 100.0
+        },
+        "interaction_fraction": 0.020000000000000018,
+        "max_inspected": 5,
+        "mean_activation": 0.013045857525644975,
+        "mean_mismatch": 0.010752688172043012,
+        "move_fraction": 0.41,
+        "objects_encountered": 4,
+        "patterns": 3,
+        "seed": 41,
+        "telemetry": {
+          "bytes_per_tick": 16021.77,
+          "checkpoint_count": 4,
+          "checkpoint_storage_bytes": 1198494,
+          "event_count": 130,
+          "event_storage_bytes": 16963,
+          "legacy_full_history_bytes": 0,
+          "observer_history_bytes": 1602177,
+          "ram_peak_bytes": 34414592,
+          "reduction_ratio": null,
+          "retrieval_metrics": {
+            "decision_time_ns": {
+              "approx_p50": 15639.0,
+              "approx_p95": 22302.0,
+              "max": 196811.0,
+              "mean": 18483.36,
+              "sample_reservoir_size": 100
+            },
+            "episode_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 4.0,
+              "max": 4.0,
+              "mean": 1.09,
+              "sample_reservoir_size": 100
+            },
+            "episode_fallback_time_ns": {
+              "approx_p50": 3206.0,
+              "approx_p95": 89078.0,
+              "max": 94948.0,
+              "mean": 29386.2,
+              "sample_reservoir_size": 100
+            },
+            "exception_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 0.0,
+              "max": 0.0,
+              "mean": 0.0,
+              "sample_reservoir_size": 100
+            },
+            "exception_fallback_time_ns": {
+              "approx_p50": 8255.0,
+              "approx_p95": 9598.0,
+              "max": 20378.0,
+              "mean": 8457.1,
+              "sample_reservoir_size": 100
+            },
+            "index_probes": {
+              "approx_p50": 15.0,
+              "approx_p95": 18.0,
+              "max": 21.0,
+              "mean": 14.55,
+              "sample_reservoir_size": 100
+            },
+            "pattern_candidates_inspected": {
+              "approx_p50": 0.0,
+              "approx_p95": 1.0,
+              "max": 1.0,
+              "mean": 0.39,
+              "sample_reservoir_size": 100
+            },
+            "pattern_lookup_time_ns": {
+              "approx_p50": 5550.0,
+              "approx_p95": 19708.0,
+              "max": 20428.0,
+              "mean": 9981.42,
+              "sample_reservoir_size": 100
+            },
+            "retrieval_time_ns": {
+              "approx_p50": 42771.0,
+              "approx_p95": 132890.0,
+              "max": 204174.0,
+              "mean": 65740.08,
+              "sample_reservoir_size": 100
+            },
+            "total_candidates_inspected": {
+              "approx_p50": 1.0,
+              "approx_p95": 5.0,
+              "max": 5.0,
+              "mean": 1.48,
+              "sample_reservoir_size": 100
+            }
+          },
+          "telemetry_storage_bytes": 385177,
+          "ticks": 100,
+          "total_output_bytes": 1602177
+        },
+        "ticks": 100,
+        "unique_positions": 30,
+        "unknown_fraction": 0.69,
+        "wait_fraction": 0.57
+      }
+    ]
+  },
+  "physiology": {
+    "17": {
+      "calibrated_locomotion": {
+        "actions": {
+          "MOVE": 268
+        },
+        "final_body": {
+          "age_days": 6842.365,
+          "age_years": 18.733759077872918,
+          "damage": 0.0,
+          "energy_reserve": 0.048988425017875786,
+          "fatigue": 0.6732586812365926,
+          "height_m": 1.75,
+          "high_mass_risk": 0.0,
+          "hydration": 0.24537065938170333,
+          "internal_loads": {},
+          "last_daily_metabolic_balance": -0.012585527930693986,
+          "last_effort_cost": 0.12228074481850627,
+          "last_mass_delta_kg": -0.0015102633516903552,
+          "life_day": 268,
+          "low_mass_risk": 0.0,
+          "mass_kg": 69.61572479125817,
+          "physiological_mass_risk": 0.0,
+          "simulated_days": 268.0
+        },
+        "threshold_ticks": {
+          "energy_low": 165,
+          "fatigue_high": 265,
+          "hydration_low": 226,
+          "severe": 268
+        },
+        "ticks_run": 268
+      },
+      "calibrated_wait_resource_free": {
+        "actions": {
+          "WAIT": 444
+        },
+        "final_body": {
+          "age_days": 7018.365,
+          "age_years": 19.215630711102897,
+          "damage": 0.0,
+          "energy_reserve": 0.04959999999999471,
+          "fatigue": 0.6727999999999932,
+          "height_m": 1.75,
+          "high_mass_risk": 0.0,
+          "hydration": 0.06959999999999418,
+          "internal_loads": {},
+          "last_daily_metabolic_balance": -0.008,
+          "last_effort_cost": 0.0,
+          "last_mass_delta_kg": -0.0009600000000062892,
+          "life_day": 444,
+          "low_mass_risk": 0.0,
+          "mass_kg": 69.57375999999721,
+          "physiological_mass_risk": 0.0,
+          "simulated_days": 444.0
+        },
+        "threshold_ticks": {
+          "energy_low": 267,
+          "fatigue_high": 439,
+          "hydration_low": 280,
+          "severe": 444
+        },
+        "ticks_run": 444
+      },
+      "legacy_wait": {
+        "actions": {
+          "WAIT": 8
+        },
+        "final_body": {
+          "age_days": 6582.365,
+          "age_years": 18.021903256055907,
+          "damage": 0.0,
+          "energy_reserve": 0.040000000000000174,
+          "fatigue": 0.6200000000000001,
+          "height_m": 1.75,
+          "high_mass_risk": 0.0,
+          "hydration": 0.3240000000000003,
+          "internal_loads": {},
+          "last_daily_metabolic_balance": -0.08,
+          "last_effort_cost": 0.0,
+          "last_mass_delta_kg": -0.009600000000006048,
+          "life_day": 8,
+          "low_mass_risk": 0.0,
+          "mass_kg": 69.92319999999995,
+          "physiological_mass_risk": 0.0,
+          "simulated_days": 8.0
+        },
+        "threshold_ticks": {
+          "energy_low": 5,
+          "fatigue_high": null,
+          "hydration_low": 8,
+          "severe": 8
+        },
+        "ticks_run": 8
+      }
+    },
+    "23": {
+      "calibrated_locomotion": {
+        "actions": {
+          "MOVE": 268
+        },
+        "final_body": {
+          "age_days": 6842.365,
+          "age_years": 18.733759077872918,
+          "damage": 0.0,
+          "energy_reserve": 0.048988425017875786,
+          "fatigue": 0.6732586812365926,
+          "height_m": 1.75,
+          "high_mass_risk": 0.0,
+          "hydration": 0.24537065938170333,
+          "internal_loads": {},
+          "last_daily_metabolic_balance": -0.012585527930693986,
+          "last_effort_cost": 0.12228074481850627,
+          "last_mass_delta_kg": -0.0015102633516903552,
+          "life_day": 268,
+          "low_mass_risk": 0.0,
+          "mass_kg": 69.61572479125817,
+          "physiological_mass_risk": 0.0,
+          "simulated_days": 268.0
+        },
+        "threshold_ticks": {
+          "energy_low": 165,
+          "fatigue_high": 265,
+          "hydration_low": 226,
+          "severe": 268
+        },
+        "ticks_run": 268
+      },
+      "calibrated_wait_resource_free": {
+        "actions": {
+          "WAIT": 444
+        },
+        "final_body": {
+          "age_days": 7018.365,
+          "age_years": 19.215630711102897,
+          "damage": 0.0,
+          "energy_reserve": 0.04959999999999471,
+          "fatigue": 0.6727999999999932,
+          "height_m": 1.75,
+          "high_mass_risk": 0.0,
+          "hydration": 0.06959999999999418,
+          "internal_loads": {},
+          "last_daily_metabolic_balance": -0.008,
+          "last_effort_cost": 0.0,
+          "last_mass_delta_kg": -0.0009600000000062892,
+          "life_day": 444,
+          "low_mass_risk": 0.0,
+          "mass_kg": 69.57375999999721,
+          "physiological_mass_risk": 0.0,
+          "simulated_days": 444.0
+        },
+        "threshold_ticks": {
+          "energy_low": 267,
+          "fatigue_high": 439,
+          "hydration_low": 280,
+          "severe": 444
+        },
+        "ticks_run": 444
+      },
+      "legacy_wait": {
+        "actions": {
+          "WAIT": 8
+        },
+        "final_body": {
+          "age_days": 6582.365,
+          "age_years": 18.021903256055907,
+          "damage": 0.0,
+          "energy_reserve": 0.040000000000000174,
+          "fatigue": 0.6200000000000001,
+          "height_m": 1.75,
+          "high_mass_risk": 0.0,
+          "hydration": 0.3240000000000003,
+          "internal_loads": {},
+          "last_daily_metabolic_balance": -0.08,
+          "last_effort_cost": 0.0,
+          "last_mass_delta_kg": -0.009600000000006048,
+          "life_day": 8,
+          "low_mass_risk": 0.0,
+          "mass_kg": 69.92319999999995,
+          "physiological_mass_risk": 0.0,
+          "simulated_days": 8.0
+        },
+        "threshold_ticks": {
+          "energy_low": 5,
+          "fatigue_high": null,
+          "hydration_low": 8,
+          "severe": 8
+        },
+        "ticks_run": 8
+      }
+    },
+    "41": {
+      "calibrated_locomotion": {
+        "actions": {
+          "MOVE": 268
+        },
+        "final_body": {
+          "age_days": 6842.365,
+          "age_years": 18.733759077872918,
+          "damage": 0.0,
+          "energy_reserve": 0.048988425017875786,
+          "fatigue": 0.6732586812365926,
+          "height_m": 1.75,
+          "high_mass_risk": 0.0,
+          "hydration": 0.24537065938170333,
+          "internal_loads": {},
+          "last_daily_metabolic_balance": -0.012585527930693986,
+          "last_effort_cost": 0.12228074481850627,
+          "last_mass_delta_kg": -0.0015102633516903552,
+          "life_day": 268,
+          "low_mass_risk": 0.0,
+          "mass_kg": 69.61572479125817,
+          "physiological_mass_risk": 0.0,
+          "simulated_days": 268.0
+        },
+        "threshold_ticks": {
+          "energy_low": 165,
+          "fatigue_high": 265,
+          "hydration_low": 226,
+          "severe": 268
+        },
+        "ticks_run": 268
+      },
+      "calibrated_wait_resource_free": {
+        "actions": {
+          "WAIT": 444
+        },
+        "final_body": {
+          "age_days": 7018.365,
+          "age_years": 19.215630711102897,
+          "damage": 0.0,
+          "energy_reserve": 0.04959999999999471,
+          "fatigue": 0.6727999999999932,
+          "height_m": 1.75,
+          "high_mass_risk": 0.0,
+          "hydration": 0.06959999999999418,
+          "internal_loads": {},
+          "last_daily_metabolic_balance": -0.008,
+          "last_effort_cost": 0.0,
+          "last_mass_delta_kg": -0.0009600000000062892,
+          "life_day": 444,
+          "low_mass_risk": 0.0,
+          "mass_kg": 69.57375999999721,
+          "physiological_mass_risk": 0.0,
+          "simulated_days": 444.0
+        },
+        "threshold_ticks": {
+          "energy_low": 267,
+          "fatigue_high": 439,
+          "hydration_low": 280,
+          "severe": 444
+        },
+        "ticks_run": 444
+      },
+      "legacy_wait": {
+        "actions": {
+          "WAIT": 8
+        },
+        "final_body": {
+          "age_days": 6582.365,
+          "age_years": 18.021903256055907,
+          "damage": 0.0,
+          "energy_reserve": 0.040000000000000174,
+          "fatigue": 0.6200000000000001,
+          "height_m": 1.75,
+          "high_mass_risk": 0.0,
+          "hydration": 0.3240000000000003,
+          "internal_loads": {},
+          "last_daily_metabolic_balance": -0.08,
+          "last_effort_cost": 0.0,
+          "last_mass_delta_kg": -0.009600000000006048,
+          "life_day": 8,
+          "low_mass_risk": 0.0,
+          "mass_kg": 69.92319999999995,
+          "physiological_mass_risk": 0.0,
+          "simulated_days": 8.0
+        },
+        "threshold_ticks": {
+          "energy_low": 5,
+          "fatigue_high": null,
+          "hydration_low": 8,
+          "severe": 8
+        },
+        "ticks_run": 8
+      }
+    }
+  },
+  "schema": "mechanistic-mind/todo4-experiment-v1",
+  "seeds": [
+    17,
+    23,
+    41
+  ]
+}

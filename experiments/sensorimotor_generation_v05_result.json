@@ -1,0 +1,41 @@
+{
+  "claim_boundary": "Experience-structured sensorimotor generation. No claim of curiosity, exploration drive, or preference.",
+  "A_newborn_to_experienced": {
+    "ticks": 40,
+    "early_unknown_fraction": 0.125,
+    "late_unknown_fraction": 0.0,
+    "early_learned_fraction": 0.0,
+    "late_learned_fraction": 0.0,
+    "interaction_fraction": 0.0,
+    "max_inspected": 1
+  },
+  "B_newborn_vs_experienced": {
+    "newborn_unknown": true,
+    "experienced_unknown": false,
+    "newborn_sources": [
+      "ENDOGENOUS_VARIATION",
+      "ENDOGENOUS_VARIATION",
+      "ENDOGENOUS_VARIATION"
+    ],
+    "experienced_sources": [
+      "ENDOGENOUS_VARIATION",
+      "ENDOGENOUS_VARIATION",
+      "ENDOGENOUS_VARIATION"
+    ]
+  },
+  "C_familiar_vs_unfamiliar": {
+    "familiar_quality": 0.0,
+    "unfamiliar_quality": 0.0,
+    "familiar_bin": "NO_RELEVANT_EVIDENCE",
+    "unfamiliar_bin": "NO_RELEVANT_EVIDENCE"
+  },
+  "D_reversal": {
+    "pre_quality": 0.0,
+    "post_quality": 0.0,
+    "post_unknown": false
+  },
+  "E_controllability_without_reward": {
+    "note": "Predictive structure may form without preferential interaction.",
+    "interaction_fraction": 0.0
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "schema": "mechanistic-mind.organism-world/0.3",
+  "world_engine": {
+    "geometry": {
+      "width": 9,
+      "height": 7,
+      "vision_radius": 1
+    },
+    "resource_layouts": [
+      "near",
+      "distributed",
+      "far"
+    ],
+    "objective_properties": [
+      "geometry",
+      "resource positions",
+      "resource effects",
+      "causal reliability",
+      "exogenous event rate",
+      "terrain cost"
+    ],
+    "agent_hidden_fields": [
+      "hidden_role",
+      "body_effects",
+      "world_effects",
+      "exogenous event receipts"
+    ]
+  },
+  "body_engine": {
+    "objective_state": [
+      "mass_kg",
+      "height_m",
+      "age_years",
+      "energy_reserve",
+      "hydration",
+      "fatigue",
+      "damage"
+    ],
+    "agent_signals": [
+      "energy_signal",
+      "hydration_signal",
+      "fatigue_signal",
+      "discomfort_signal",
+      "effort_signal"
+    ]
+  },
+  "psyche_engine": {
+    "mechanism": "PSYCHE-SINGLE-ORGANISM-V03",
+    "preset_personality": false,
+    "initial_learning": "empty",
+    "initial_habits": "empty",
+    "initial_spatial_memory": "empty"
+  }
+}

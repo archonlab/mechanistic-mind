@@ -1,0 +1,7 @@
+{
+  "experiment": "autonomous_world_dynamics_v03",
+  "seed": 17,
+  "ab_ticks": 200,
+  "passive_ticks": 100,
+  "note": "Short CI defaults. Suggested scientific windows remain 5k-10k for A/B and 500-1000 for passive."
+}

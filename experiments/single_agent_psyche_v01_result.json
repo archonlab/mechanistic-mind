@@ -1,0 +1,50 @@
+{
+  "experiment": "SINGLE_AGENT_PSYCHE_V01",
+  "ticks": 60,
+  "actions": {
+    "REST": 29,
+    "WORK": 31,
+    "switches": 57
+  },
+  "world": {
+    "total_progress": 31.0
+  },
+  "psyche": {
+    "final_internal": {
+      "energy": 0.5699999999999998,
+      "progress": 30.0
+    },
+    "learned_action_models": {
+      "REST": {
+        "count": 29,
+        "mean": {
+          "energy_delta": 0.18,
+          "progress_delta": 0.0
+        }
+      },
+      "WORK": {
+        "count": 30,
+        "mean": {
+          "energy_delta": -0.14,
+          "progress_delta": 1.0
+        }
+      }
+    },
+    "memory_episodes": 32,
+    "self_model": {
+      "executed_actions": 59,
+      "consequence_observations": 59,
+      "agency_reliability": 1.0
+    },
+    "habit_strength": {
+      "REST": 0.720656444740073,
+      "WORK": 0.6125855497822902
+    }
+  },
+  "observer": {
+    "ticks": 60,
+    "archon_observations": 60,
+    "archon_events": 180
+  },
+  "interpretation": "A single persistent agent alternates behavior as learned action consequences interact with internal regulation, goals, uncertainty, habit bias, and multi-objective valuation."
+}

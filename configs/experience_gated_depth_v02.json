@@ -1,0 +1,38 @@
+{
+  "experiment": "experience_gated_depth_v02",
+  "seed": 17,
+  "phase_a_ticks": 60,
+  "phase_b_ticks": 40,
+  "conditions": {
+    "EXPERIENCE_GATED": {
+      "condition": "EXPERIENCE_GATED",
+      "min_ticks": 15,
+      "target_ticks": 30,
+      "max_ticks": 60,
+      "target_fragments": 30,
+      "target_transition_diversity": 12,
+      "target_interaction_diversity": 4,
+      "target_repeated_consequences": 8,
+      "target_predictive_evidence": 6,
+      "local_target_fragments": 6,
+      "local_target_diversity": 3,
+      "local_target_repeats": 3,
+      "local_target_predictive": 2
+    },
+    "ADULT_FROM_TICK_0": {
+      "condition": "ADULT_FROM_TICK_0",
+      "min_ticks": 15,
+      "target_ticks": 30,
+      "max_ticks": 60
+    }
+  },
+  "novelty": {
+    "note": "Phase B uses a different ecology seed for physically novel object layout while preserving agent memory.",
+    "novel_world_seed_offset": 1000
+  },
+  "amnesia_control_prepared": {
+    "MATURE_WITH_HISTORY": "run EXPERIENCE_GATED to maturity then continue",
+    "MATURE_MEMORY_CLEARED": "clear psyche memory stores then continue with same modules",
+    "NEW_EXPERIENCE_GATED": "fresh agent with EXPERIENCE_GATED"
+  }
+}
