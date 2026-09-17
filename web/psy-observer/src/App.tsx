@@ -4,6 +4,7 @@ import type { ObserverFrame, ViewMode } from './types';
 import {
   applyExperiment, connectLive, getSnapshot, getSnapshotMeta, getState, getTimeline,
   getStopInfo, inspectTick, postControl, replayTick,
+  listRuns, getAnalysisEvidence, saveAnalysisReport,
 } from './api/client';
 import { WorldMap } from './components/WorldMap';
 import { ActionDecisionInspector } from './components/ActionDecisionInspector';
@@ -24,6 +25,7 @@ import {
   createAnalysisState,
   ingestAnalysisInput,
   shouldResetAnalysis,
+  analyzeEvidencePackage,
   type AnalysisState,
   type RunAnalysis,
 } from './analysis';
@@ -38,7 +40,7 @@ import {
   type RunArchiveStore,
 } from './analysis/runArchive';
 import type { ObserverRunRecord } from './analysis/types';
-import { AnalyzeResultsPanel } from './components/AnalyzeResultsPanel';
+import { AnalyzeResultsPanel, type AnalysisSourceMode, type RunCatalogEntry } from './components/AnalyzeResultsPanel';
 import { OverviewPanel } from './components/OverviewPanel';
 import { compressConsecutiveEvents, compressedEventSummary } from './eventCompression';
 
@@ -158,7 +160,60 @@ export default function App() {
   const [overviewFilter, setOverviewFilter] = useState('ALL');
   const [overviewAgentFilter, setOverviewAgentFilter] = useState('ALL AGENTS');
   const [analysisCopyMsg, setAnalysisCopyMsg] = useState<string | null>(null);
+  const [analysisSource, setAnalysisSource] = useState<AnalysisSourceMode>('current');
+  const [savedRunCatalog, setSavedRunCatalog] = useState<RunCatalogEntry[]>([]);
+  const [selectedSavedRunId, setSelectedSavedRunId] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
   useEffect(() => { modeRef.current = mode; }, [mode]);
+
+  async function refreshSavedRuns() {
+    try {
+      const data = await listRuns();
+      setSavedRunCatalog((data.runs || []) as RunCatalogEntry[]);
+    } catch {
+      setSavedRunCatalog([]);
+    }
+  }
+
+  async function runExplicitAnalysis() {
+    setAnalyzing(true);
+    try {
+      const pkg = await getAnalysisEvidence({
+        source: analysisSource,
+        run_id: analysisSource === 'saved' ? selectedSavedRunId : null,
+      });
+      if (pkg.error) {
+        setAnalysisCopyMsg(String(pkg.error));
+        return;
+      }
+      const built = analyzeEvidencePackage(pkg, {
+        frame: analysisSource === 'current' ? (liveFrame ?? viewFrame ?? undefined) : undefined,
+        mechanisms,
+      });
+      setRunAnalysis(built);
+      // Persist versioned report for saved runs (never overwrite prior analyses).
+      if (analysisSource === 'saved' && selectedSavedRunId && built.analysis_log) {
+        try {
+          await saveAnalysisReport({
+            run_id: selectedSavedRunId,
+            report_text: built.analysis_log,
+            report_json: {
+              evidence_meta: built.evidence_meta,
+              coverage: built.coverage,
+              identity: built.identity,
+              lifecycle: built.lifecycle,
+            },
+          });
+        } catch {
+          /* save is best-effort */
+        }
+      }
+    } catch (err) {
+      setAnalysisCopyMsg(String(err));
+    } finally {
+      setAnalyzing(false);
+    }
+  }
 
   function persistArchive(store: RunArchiveStore) {
     runArchiveRef.current = store;
@@ -1021,6 +1076,14 @@ export default function App() {
     tab === 'TIMELINE' ? timelineTab : tab === 'EXPERIMENT' ? experimentTab
     : tab === 'ANALYZE RESULTS' ? <AnalyzeResultsPanel
         analysis={runAnalysis}
+        analyzing={analyzing}
+        analysisSource={analysisSource}
+        onAnalysisSourceChange={setAnalysisSource}
+        savedRuns={savedRunCatalog}
+        selectedRunId={selectedSavedRunId}
+        onSelectRunId={setSelectedSavedRunId}
+        onRefreshRuns={refreshSavedRuns}
+        onAnalyze={runExplicitAnalysis}
         onCopy={async () => {
           const text = runAnalysis?.analysis_log || '';
           try {

@@ -27,11 +27,13 @@ export function buildAgentAnalyses(state: AnalysisState): AgentAnalysis[] {
   return Object.values(state.agents)
     .sort((a, b) => a.agent_id.localeCompare(b.agent_id))
     .map((agg) => {
+      // Tick-level occupancy only — never use runtime cumulative here.
       const wait = Number(agg.action_counts.WAIT || 0);
       const move = Object.entries(agg.action_counts)
         .filter(([k]) => k.startsWith('MOVE'))
         .reduce((s, [, v]) => s + Number(v), 0);
-      const total = Object.values(agg.action_counts).reduce((s, v) => s + Number(v), 0) || wait + move;
+      const occupancyTotal = Object.values(agg.action_counts).reduce((s, v) => s + Number(v), 0);
+      const hasTickOccupancy = agg.ticks > 0 && occupancyTotal > 0;
       const moveDist: Record<string, number> = {};
       for (const [k, v] of Object.entries(agg.action_counts)) {
         if (k.startsWith('MOVE')) moveDist[k] = Number(v);
@@ -41,21 +43,34 @@ export function buildAgentAnalyses(state: AnalysisState): AgentAnalysis[] {
       const net = agg.start_xy && agg.last_xy
         ? Math.hypot(agg.last_xy.x - agg.start_xy.x, agg.last_xy.y - agg.start_xy.y)
         : null;
+      const cumulative = (agg as any)._cumulative_action_counts as Record<string, number> | undefined;
+      // Prefer tick-derived ticks; never invent ticks_observed from cumulative totals.
+      const ticksObserved = agg.ticks;
       return {
         agent_id: agg.agent_id,
         seed: naNum(agg.seed),
         body_id: agg.body_id,
-        ticks_observed: Math.max(agg.ticks, total),
+        ticks_observed: ticksObserved,
         actions: {
-          wait_count: total ? wait : naNum(null),
-          wait_pct: pct(wait, total),
-          move_count: total ? move : naNum(null),
-          move_pct: pct(move, total),
+          wait_count: hasTickOccupancy ? wait : naNum(null),
+          wait_pct: hasTickOccupancy ? pct(wait, occupancyTotal) : naNum(null),
+          move_count: hasTickOccupancy ? move : naNum(null),
+          move_pct: hasTickOccupancy ? pct(move, occupancyTotal) : naNum(null),
           move_distribution: Object.keys(moveDist).length ? moveDist : 'NOT AVAILABLE',
-          action_transitions: Object.keys(agg.action_transitions).length ? { ...agg.action_transitions } : 'NOT AVAILABLE',
-          longest_wait_streak: agg.longest_wait_streak || (wait ? 0 : 'NOT AVAILABLE'),
-          longest_move_streak: agg.longest_move_streak || (move ? 0 : 'NOT AVAILABLE'),
+          action_transitions: Object.keys(agg.action_transitions).length
+            ? { ...agg.action_transitions }
+            : 'NOT AVAILABLE',
+          longest_wait_streak: hasTickOccupancy
+            ? (agg.longest_wait_streak || 0)
+            : 'NOT AVAILABLE',
+          longest_move_streak: hasTickOccupancy
+            ? (agg.longest_move_streak || 0)
+            : 'NOT AVAILABLE',
+          semantics: 'TICK_LEVEL_OCCUPANCY',
+          occupancy_total: occupancyTotal,
         },
+        cumulative_runtime_action_counts:
+          cumulative && Object.keys(cumulative).length ? { ...cumulative } : 'NOT AVAILABLE',
         movement: {
           distance_travelled: agg.distance > 0 || unique > 0 ? agg.distance : naNum(agg.distance === 0 ? 0 : null),
           net_displacement: naNum(net),

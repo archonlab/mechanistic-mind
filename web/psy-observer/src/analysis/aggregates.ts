@@ -1,8 +1,11 @@
 /**
  * Bounded incremental aggregates for Observer analysis.
  * Sublinear / capped memory — never retain every raw tick forever.
+ * Scientific counters must be based on unique simulation ticks / event IDs,
+ * not Observer sample multiplicity.
  */
 import type { AgentId, KeyFrameRef } from './types.ts';
+import { rememberKey, timelineAgentKey } from './dedup.ts';
 
 export const BOUNDS = {
   important_events: 120,
@@ -75,6 +78,10 @@ export type AgentAgg = {
   conversion_events: number;
   first_move_tick: number | null;
   first_wait_after_move_tick: number | null;
+  /** Last simulation tick for which action selection was counted (dedupe). */
+  last_action_tick: number | null;
+  /** Last simulation tick for which XY/distance was applied (dedupe). */
+  last_xy_tick: number | null;
 };
 
 export type AnalysisState = {
@@ -94,7 +101,11 @@ export type AnalysisState = {
   agents: Record<string, AgentAgg>;
   firsts: Record<string, { tick: number; meta?: any }>;
   extrema: Record<string, { tick: number; value: number; meta?: any }>;
+  /** Unique simulation ticks with contact present (scientific). */
   contact_ticks: number;
+  contact_tick_set: Set<number>;
+  /** Unique ticks for which contact FSM already advanced. */
+  contact_fsm_ticks: Set<string>;
   contact_active: boolean;
   contact_episode_start: number | null;
   contact_episodes: Array<{ start: number; end: number; ticks: number }>;
@@ -102,9 +113,16 @@ export type AnalysisState = {
   important: any[];
   keyframes: KeyFrameRef[];
   seen_event_keys: Set<string>;
+  /** Timeline agent-state keys already applied scientifically (tick|agent). */
+  seen_timeline_agent_keys: Set<string>;
+  /** Unique simulation ticks represented in timeline ingestion. */
+  unique_simulation_ticks: Set<number>;
   last_processed_timeline_tick: number;
+  /** Last live-summary frame tick applied (rotation / selection_source increments). */
+  last_live_summary_tick: number | null;
   telemetry_samples: number;
   event_samples: number;
+  /** Raw Observer timeline sample count (diagnostic; not simulation duration). */
   timeline_samples: number;
   causal_pairs: Array<{ tick: number; parent: string; child: string; meta?: any }>;
 };
@@ -167,6 +185,8 @@ export function makeAgentAgg(agent_id: string, body_id: string, seed: number | n
     conversion_events: 0,
     first_move_tick: null,
     first_wait_after_move_tick: null,
+    last_action_tick: null,
+    last_xy_tick: null,
   };
 }
 
@@ -189,6 +209,8 @@ export function createAnalysisState(): AnalysisState {
     firsts: {},
     extrema: {},
     contact_ticks: 0,
+    contact_tick_set: new Set(),
+    contact_fsm_ticks: new Set(),
     contact_active: false,
     contact_episode_start: null,
     contact_episodes: [],
@@ -196,7 +218,10 @@ export function createAnalysisState(): AnalysisState {
     important: [],
     keyframes: [],
     seen_event_keys: new Set(),
+    seen_timeline_agent_keys: new Set(),
+    unique_simulation_ticks: new Set(),
     last_processed_timeline_tick: -1,
+    last_live_summary_tick: null,
     telemetry_samples: 0,
     event_samples: 0,
     timeline_samples: 0,
@@ -259,12 +284,27 @@ export function updateResourceSeries(
   box.max = box.max == null ? v : Math.max(box.max, v);
 }
 
-export function ingestAction(agg: AgentAgg, action: string | null | undefined, tick: number) {
-  if (!action) return;
+/**
+ * Count one canonical action per (agent, simulation tick) — tick-level occupancy.
+ * Returns false if this tick was already counted (repeated Observer sample).
+ * Streaks require consecutive simulation ticks; gaps reset streak counters.
+ */
+export function ingestAction(agg: AgentAgg, action: string | null | undefined, tick: number): boolean {
+  if (!action) return false;
+  if (agg.last_action_tick != null && tick === agg.last_action_tick) return false;
+  // Out-of-order duplicate of an older tick — ignore for streaks/counts.
+  if (agg.last_action_tick != null && tick < agg.last_action_tick) return false;
+  // Evidence gap: streak is consecutive-tick occupancy, not a count of any WAIT rows.
+  if (agg.last_action_tick != null && tick > agg.last_action_tick + 1) {
+    agg.wait_streak = 0;
+    agg.move_streak = 0;
+  }
+  const prevAction = agg.last_action;
+  agg.last_action_tick = tick;
   agg.ticks += 1;
   agg.action_counts[action] = (agg.action_counts[action] || 0) + 1;
-  if (agg.last_action && agg.last_action !== action) {
-    const key = `${agg.last_action}→${action}`;
+  if (prevAction && prevAction !== action) {
+    const key = `${prevAction}→${action}`;
     const keys = Object.keys(agg.action_transitions);
     if (keys.length < BOUNDS.action_transition_keys || key in agg.action_transitions) {
       agg.action_transitions[key] = (agg.action_transitions[key] || 0) + 1;
@@ -289,10 +329,24 @@ export function ingestAction(agg: AgentAgg, action: string | null | undefined, t
     agg.move_streak = 0;
   }
   agg.last_action = action;
+  return true;
 }
 
-export function ingestXy(agg: AgentAgg, x: number, y: number, speed?: number) {
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+/**
+ * Apply body position once per simulation tick.
+ * Repeated samples of the same tick must not inflate distance.
+ */
+export function ingestXy(agg: AgentAgg, x: number, y: number, speed?: number, tick?: number): boolean {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+  if (tick != null && Number.isFinite(tick)) {
+    if (agg.last_xy_tick != null && tick === agg.last_xy_tick) {
+      // Same tick re-sample: keep latest coords without adding distance.
+      agg.last_xy = { x, y };
+      return false;
+    }
+    if (agg.last_xy_tick != null && tick < agg.last_xy_tick) return false;
+    agg.last_xy_tick = tick;
+  }
   if (!agg.start_xy) agg.start_xy = { x, y };
   if (agg.last_xy) {
     agg.distance += Math.abs(x - agg.last_xy.x) + Math.abs(y - agg.last_xy.y);
@@ -304,4 +358,14 @@ export function ingestXy(agg: AgentAgg, x: number, y: number, speed?: number) {
     agg.speed_sum += speed;
     agg.speed_n += 1;
   }
+  return true;
+}
+
+/** Mark a timeline agent-state as scientifically consumed; false if duplicate. */
+export function claimTimelineAgentState(
+  state: AnalysisState,
+  tick: number,
+  agentId: string,
+): boolean {
+  return rememberKey(state.seen_timeline_agent_keys, timelineAgentKey(tick, agentId));
 }

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { RunAnalysis } from '../analysis/types';
 
 function show(v: any) {
@@ -7,73 +8,243 @@ function show(v: any) {
   return String(v);
 }
 
+export type AnalysisSourceMode = 'current' | 'saved';
+
+export type RunCatalogEntry = {
+  run_id: string;
+  final_tick?: number | null;
+  seed?: number | null;
+  runtime_type?: string | null;
+  agent_count?: number | null;
+  has_scientific_timeline?: boolean;
+  scientific_tick_range?: [number | null, number | null] | null;
+  termination_reason?: string | null;
+};
+
 export function AnalyzeResultsPanel({
   analysis,
+  analyzing,
+  analysisSource,
+  onAnalysisSourceChange,
+  savedRuns,
+  selectedRunId,
+  onSelectRunId,
+  onRefreshRuns,
+  onAnalyze,
   onCopy,
   onDownload,
   onInspectTick,
 }: {
   analysis: RunAnalysis | null;
+  analyzing?: boolean;
+  analysisSource: AnalysisSourceMode;
+  onAnalysisSourceChange: (s: AnalysisSourceMode) => void;
+  savedRuns: RunCatalogEntry[];
+  selectedRunId: string | null;
+  onSelectRunId: (id: string | null) => void;
+  onRefreshRuns: () => void;
+  onAnalyze: () => void;
   onCopy: () => void;
   onDownload: () => void;
   onInspectTick: (tick: number) => void;
 }) {
-  if (!analysis) {
-    return <section className="panel science-card"><h3>Analyze Results</h3><div className="na">ANALYSIS: INSUFFICIENT DATA — waiting for Observer telemetry…</div></section>;
-  }
-  const id = analysis.identity;
-  const life = analysis.lifecycle;
+  const [showPicker, setShowPicker] = useState(false);
+  const meta = analysis?.evidence_meta;
+  const id = analysis?.identity;
+  const life = analysis?.lifecycle;
+
   return <div className="dashboard-grid">
     <section className="panel science-card wide" style={{ borderColor: '#334155' }}>
-      <div className="inspecting-banner">
-        <strong>{life?.banner || `ANALYSIS: ${id.analysis_mode}`}</strong>
-        <span className="badge on">AUTOMATIC</span>
-        <span className="badge">{life?.coverage || '—'}</span>
+      <h3>ANALYZE RESULTS</h3>
+      <div className="subtle" style={{ marginBottom: 8 }}>
+        Analysis is read-only. It does not pause, advance, or modify the scientific runtime.
       </div>
-      <div className="subtle" style={{ marginTop: 6 }}>
-        Analysis starts automatically with the run — no Start Analysis button.
-        Observer-only; does not alter the scientific runtime.
-      </div>
-      <div className="metric"><span>Analyzed ticks</span><strong>{life?.analyzed_start ?? '—'}–{life?.analyzed_end ?? '—'}</strong></div>
-      {life?.phase === 'PAUSED' || life?.phase === 'LIVE' ? (
-        <div className="metric"><span>Live runtime tick</span><strong>{life?.live_runtime_tick ?? '—'}</strong></div>
-      ) : null}
-      <div className="metric"><span>Agents</span><strong>{life?.agents ?? id.agent_count}</strong></div>
-      <div className="metric"><span>Events observed</span><strong>{life?.events_observed ?? 0}</strong></div>
-      <div className="metric"><span>Frames sampled</span><strong>{life?.frames_sampled ?? 0}</strong></div>
-      <div className="metric"><span>Coverage</span><strong>{life?.coverage ?? '—'}</strong></div>
-      <div className="availability">{life?.coverage_reason || analysis.coverage.reason}</div>
-      {life?.insufficient ? <div className="na" style={{ marginTop: 8 }}>INSUFFICIENT DATA — extrema and regime claims suppressed until a sensible observation window exists.</div> : null}
-      <div className="toolbar-row" style={{ marginTop: 8 }}>
-        <button className="active" onClick={onCopy}>COPY ANALYSIS LOG</button>
-        <button onClick={onDownload}>DOWNLOAD ANALYSIS LOG</button>
-      </div>
+      <fieldset style={{ border: '1px solid #334155', borderRadius: 4, padding: 10, margin: 0 }}>
+        <legend style={{ padding: '0 6px' }}>Analysis source</legend>
+        <label style={{ display: 'block', marginBottom: 8 }}>
+          <input
+            type="radio"
+            name="analysis-source"
+            checked={analysisSource === 'current'}
+            onChange={() => onAnalysisSourceChange('current')}
+          />{' '}
+          <strong>Current running experiment</strong>
+          <div className="subtle" style={{ marginLeft: 22 }}>
+            Analyze all scientific evidence recorded so far.
+            Runtime continues running and is not modified.
+          </div>
+        </label>
+        <label style={{ display: 'block', marginBottom: 8 }}>
+          <input
+            type="radio"
+            name="analysis-source"
+            checked={analysisSource === 'saved'}
+            onChange={() => onAnalysisSourceChange('saved')}
+          />{' '}
+          <strong>Saved experiment</strong>
+          <div className="subtle" style={{ marginLeft: 22 }}>
+            Select an existing run and analyze its recorded evidence.
+          </div>
+        </label>
+        {analysisSource === 'saved' ? (
+          <div style={{ marginLeft: 22, marginBottom: 8 }}>
+            <div className="toolbar-row">
+              <button type="button" onClick={() => { onRefreshRuns(); setShowPicker((v) => !v); }}>
+                {selectedRunId ? `Selected: ${selectedRunId}` : 'Select Run…'}
+              </button>
+              {selectedRunId ? (
+                <button type="button" onClick={() => onSelectRunId(null)}>Clear</button>
+              ) : null}
+            </div>
+            {showPicker ? (
+              <div className="science-card" style={{ marginTop: 8, maxHeight: 220, overflow: 'auto', padding: 8 }}>
+                {savedRuns.length === 0 ? (
+                  <div className="na">No saved psyweb runs found.</div>
+                ) : savedRuns.map((r) => (
+                  <button
+                    key={r.run_id}
+                    type="button"
+                    className="edge-row"
+                    style={{ display: 'block', width: '100%', textAlign: 'left', marginBottom: 4 }}
+                    onClick={() => { onSelectRunId(r.run_id); setShowPicker(false); }}
+                  >
+                    <b>{r.run_id}</b>
+                    <div className="subtle">
+                      t{show(r.final_tick)} · seed {show(r.seed)} · {r.runtime_type || '—'} · agents {show(r.agent_count)}
+                      {' · '}
+                      scientific: {r.has_scientific_timeline ? `YES ${r.scientific_tick_range?.[0]}–${r.scientific_tick_range?.[1]}` : 'NO (legacy PARTIAL)'}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        <div className="toolbar-row" style={{ marginTop: 8 }}>
+          <button
+            className="active"
+            type="button"
+            disabled={analyzing || (analysisSource === 'saved' && !selectedRunId)}
+            onClick={onAnalyze}
+          >
+            {analyzing ? 'Analyzing…' : 'Analyze'}
+          </button>
+        </div>
+      </fieldset>
+
+      {!analysis ? (
+        <div className="na" style={{ marginTop: 12 }}>
+          ANALYSIS: waiting — choose a source and press Analyze (or open this tab during a live run for automatic buffer view).
+        </div>
+      ) : (
+        <>
+          <div className="inspecting-banner" style={{ marginTop: 12 }}>
+            <strong>{life?.banner || `ANALYSIS: ${id?.analysis_mode}`}</strong>
+            <span className="badge">{life?.coverage || meta?.coverage || '—'}</span>
+            {meta?.complete_tick_level_reanalysis === false ? (
+              <span className="badge">PARTIAL RECONSTRUCTION</span>
+            ) : meta?.complete_tick_level_reanalysis ? (
+              <span className="badge on">FULL RECONSTRUCTION</span>
+            ) : null}
+          </div>
+          {meta ? (
+            <div style={{ marginTop: 8 }}>
+              <div className="metric"><span>Runtime status</span><strong>{show(meta.runtime_status)}</strong></div>
+              <div className="metric"><span>Analysis cutoff tick</span><strong>{show(meta.analysis_cutoff_tick)}</strong></div>
+              <div className="metric">
+                <span>Scientific tick range analyzed</span>
+                <strong>{meta.scientific_tick_range[0]}–{meta.scientific_tick_range[1]}</strong>
+              </div>
+              <div className="metric"><span>Coverage</span><strong>{show(meta.coverage)}</strong></div>
+              <div className="metric">
+                <span>Complete tick-level re-analysis</span>
+                <strong>{meta.complete_tick_level_reanalysis ? 'YES' : 'NO'}</strong>
+              </div>
+              <div className="subtle">Evidence files: {(meta.evidence_files || []).join(', ') || '—'}</div>
+              {meta.used_cumulative_runtime_summaries ? (
+                <div className="availability" style={{ marginTop: 6 }}>
+                  Cumulative runtime action_counts are available as a separate summary — not reconstructed tick-level history.
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="metric"><span>Analyzed ticks</span><strong>{life?.analyzed_start ?? '—'}–{life?.analyzed_end ?? '—'}</strong></div>
+          {life?.phase === 'PAUSED' || life?.phase === 'LIVE' ? (
+            <div className="metric"><span>Live runtime tick</span><strong>{life?.live_runtime_tick ?? '—'}</strong></div>
+          ) : null}
+          <div className="metric"><span>Agents</span><strong>{life?.agents ?? id?.agent_count}</strong></div>
+          <div className="metric"><span>Events observed</span><strong>{life?.events_observed ?? 0}</strong></div>
+          <div className="metric"><span>Frames sampled</span><strong>{life?.frames_sampled ?? 0}</strong></div>
+          <div className="availability">{life?.coverage_reason || analysis.coverage.reason}</div>
+          {life?.insufficient ? <div className="na" style={{ marginTop: 8 }}>INSUFFICIENT DATA — extrema and regime claims suppressed until a sensible observation window exists.</div> : null}
+          <div className="toolbar-row" style={{ marginTop: 8 }}>
+            <button className="active" onClick={onCopy}>COPY ANALYSIS LOG</button>
+            <button onClick={onDownload}>DOWNLOAD ANALYSIS LOG</button>
+          </div>
+        </>
+      )}
     </section>
 
+    {!analysis ? null : <>
     <section className="panel science-card wide">
       <h3>RUN SUMMARY</h3>
-      <div className="metric"><span>Runtime</span><strong>{id.runtime}</strong></div>
-      <div className="metric"><span>Seed</span><strong>{show(id.seed)}</strong></div>
-      <div className="metric"><span>Generation</span><strong>{show(id.generation)}</strong></div>
-      <div className="metric"><span>Map</span><strong>{show(id.map_width)}×{show(id.map_height)} {id.boundary}</strong></div>
-      <div className="metric"><span>Ticks</span><strong>{id.start_tick}–{id.end_tick}</strong></div>
-      <div className="metric"><span>Duration</span><strong>{id.duration_ticks}</strong></div>
-      <div className="metric"><span>Status</span><strong>{id.status}</strong></div>
-      <div className="subtle">Agents: {id.agents.map(a => `${a.agent_id}/${a.body_id}/seed=${show(a.seed)}`).join(' · ') || '—'}</div>
-      <div className="subtle">Mechanisms: {id.active_mechanisms.join(', ') || 'NONE / NOT AVAILABLE'}</div>
+      <div className="metric"><span>Runtime</span><strong>{id?.runtime}</strong></div>
+      <div className="metric"><span>Seed</span><strong>{show(id?.seed)}</strong></div>
+      <div className="metric"><span>Generation</span><strong>{show(id?.generation)}</strong></div>
+      <div className="metric"><span>Map</span><strong>{show(id?.map_width)}×{show(id?.map_height)} {id?.boundary}</strong></div>
+      <div className="metric"><span>Ticks</span><strong>{id?.start_tick}–{id?.end_tick}</strong></div>
+      <div className="metric"><span>Duration</span><strong>{id?.duration_ticks}</strong></div>
+      <div className="metric"><span>Status</span><strong>{id?.status}</strong></div>
+      <div className="subtle">Agents: {id?.agents.map(a => `${a.agent_id}/${a.body_id}/seed=${show(a.seed)}`).join(' · ') || '—'}</div>
+      <div className="subtle">Mechanisms: {id?.active_mechanisms.join(', ') || 'NONE / NOT AVAILABLE'}</div>
     </section>
+
+    {meta?.cumulative_runtime_summaries?.length ? (
+      <section className="panel science-card wide">
+        <h3>CUMULATIVE RUNTIME SUMMARY</h3>
+        <div className="availability">
+          These counters come from runtime cumulative state. They are NOT tick-level reconstructions
+          and must not be used to infer transition timing, streak structure, or phase boundaries.
+        </div>
+        {meta.cumulative_runtime_summaries.map((row: any, i: number) => (
+          <div key={i} className="subtle" style={{ marginTop: 6 }}>
+            <b>{row.agent_id}</b> action_counts={JSON.stringify(row.action_counts || {})}
+            {row.wait_count != null ? ` · wait=${row.wait_count}` : ''}
+            {row.move_count != null ? ` · move=${row.move_count}` : ''}
+          </div>
+        ))}
+      </section>
+    ) : null}
 
     {life?.insufficient ? (
       <section className="panel science-card wide"><div className="na">INSUFFICIENT DATA for per-agent metrics — keep the simulation running.</div></section>
     ) : analysis.agents.map(a => (
       <section className="panel science-card" key={a.agent_id}>
         <h3>{a.agent_id.toUpperCase()}</h3>
-        <div className="subtle">seed {show(a.seed)} · {a.body_id} · ticks {a.ticks_observed}</div>
-        <h4>ACTIONS</h4>
-        <div className="metric"><span>WAIT</span><strong>{show(a.actions.wait_count)} ({show(a.actions.wait_pct)}%)</strong></div>
-        <div className="metric"><span>MOVE</span><strong>{show(a.actions.move_count)} ({show(a.actions.move_pct)}%)</strong></div>
+        <div className="subtle">seed {show(a.seed)} · {a.body_id} · canonical action ticks {a.ticks_observed}</div>
+        <h4>TICK-LEVEL ACTION OCCUPANCY</h4>
+        <div className="subtle">One canonical action per (simulation tick, agent). Not selection-event counts.</div>
+        <div className="metric"><span>WAIT ticks</span><strong>{show(a.actions.wait_count)} ({show(a.actions.wait_pct)}%)</strong></div>
+        <div className="metric"><span>MOVE ticks</span><strong>{show(a.actions.move_count)} ({show(a.actions.move_pct)}%)</strong></div>
+        <div className="metric"><span>Occupancy total</span><strong>{a.actions.occupancy_total} ≤ {a.ticks_observed}</strong></div>
         <div className="subtle">dist {show(a.actions.move_distribution)}</div>
-        <div className="subtle">longest WAIT {show(a.actions.longest_wait_streak)} · MOVE {show(a.actions.longest_move_streak)}</div>
+        <div className="subtle">longest WAIT streak {show(a.actions.longest_wait_streak)} · MOVE {show(a.actions.longest_move_streak)}</div>
+        <div className="subtle">transitions {show(a.actions.action_transitions)}</div>
+        {a.cumulative_runtime_action_counts !== 'NOT AVAILABLE' ? (
+          <>
+            <h4>CUMULATIVE RUNTIME ACTION COUNTS</h4>
+            <div className="availability">
+              Cognition metrics.action_counts for the full runtime so far. Separate from tick-level occupancy; not merged into WAIT/MOVE ticks above.
+            </div>
+            <div className="subtle">{show(a.cumulative_runtime_action_counts)}</div>
+          </>
+        ) : null}
+        <h4>ACTION / SCENARIO SELECTION EVENTS</h4>
+        <div className="metric"><span>SCENARIO_SELECTED</span><strong>{show(a.cognition.scenario_selected)}</strong></div>
+        <div className="subtle">scenario WAIT/MOVE {show(a.cognition.scenario_selected_wait)}/{show(a.cognition.scenario_selected_move)}</div>
+        <div className="metric"><span>Cognitive WAIT</span><strong>{show(a.cognition.cognitive_wait_selections)}</strong></div>
+        <div className="metric"><span>Fallback WAIT</span><strong>{show(a.cognition.fallback_wait_selections)}</strong></div>
+        <div className="subtle">sources {show(a.cognition.selected_action_sources)}</div>
         <h4>MOVEMENT</h4>
         <div className="metric"><span>Distance</span><strong>{show(a.movement.distance_travelled)}</strong></div>
         <div className="metric"><span>Net disp.</span><strong>{show(a.movement.net_displacement)}</strong></div>
@@ -86,11 +257,6 @@ export function AnalyzeResultsPanel({
         <h4>COGNITION</h4>
         <div className="metric"><span>Predictions</span><strong>{show(a.cognition.prediction_count)}</strong></div>
         <div className="metric"><span>Prospective</span><strong>{show(a.cognition.prospective_compositions)}</strong></div>
-        <div className="metric"><span>SCENARIO_SELECTED</span><strong>{show(a.cognition.scenario_selected)}</strong></div>
-        <div className="metric"><span>Cognitive WAIT</span><strong>{show(a.cognition.cognitive_wait_selections)}</strong></div>
-        <div className="metric"><span>Fallback WAIT</span><strong>{show(a.cognition.fallback_wait_selections)}</strong></div>
-        <div className="subtle">scenario WAIT/MOVE {show(a.cognition.scenario_selected_wait)}/{show(a.cognition.scenario_selected_move)}</div>
-        <div className="subtle">sources {show(a.cognition.selected_action_sources)}</div>
         <h4>SIGNALS</h4>
         <div className="subtle">emit A/B {a.signals.emissions_A}/{a.signals.emissions_B} · recv A/B {a.signals.receptions_A}/{a.signals.receptions_B}</div>
         <div className="subtle">contact emit {a.signals.contact_triggered_emissions} · motion emit {a.signals.motion_triggered_emissions}</div>
@@ -179,7 +345,12 @@ export function AnalyzeResultsPanel({
       <div className="subtle">cognition: {analysis.coverage.cognition}</div>
       <div className="subtle">signals: {analysis.coverage.signals}</div>
       <div className="subtle">causal provenance: {analysis.coverage.causal_provenance}</div>
-      <div className="subtle">samples timeline/events/telemetry: {analysis.coverage.timeline_samples}/{analysis.coverage.event_samples}/{analysis.coverage.telemetry_samples}</div>
+      <div className="subtle">
+        samples timeline/events/telemetry: {analysis.coverage.timeline_samples}/{analysis.coverage.event_samples}/{analysis.coverage.telemetry_samples}
+        {' · '}
+        unique simulation ticks: {analysis.coverage.unique_simulation_ticks ?? '—'}
+      </div>
     </section>
+    </>}
   </div>;
 }

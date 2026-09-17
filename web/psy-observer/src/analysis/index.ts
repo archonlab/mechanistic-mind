@@ -15,12 +15,26 @@ export {
   resetAnalysis,
   shouldResetAnalysis,
 } from './runAnalysis.ts';
+export type { AnalysisInput } from './runAnalysis.ts';
+export {
+  analyzeEvidencePackage,
+  reanalyzeEvidence,
+  scientificCoreFingerprint,
+  ANALYZER_VERSION,
+} from './scientificEvidence.ts';
+export type { EvidencePackage } from './scientificEvidence.ts';
 export { createAnalysisState, BOUNDS } from './aggregates.ts';
 export type { AnalysisState } from './aggregates.ts';
 export { formatAnalysisLog } from './analysisLog.ts';
 export { selectRepresentativeKeyframes } from './importantEvents.ts';
 export { detectPhases } from './phaseDetection.ts';
 export { buildOverview } from './overviewNarrative.ts';
+export {
+  structuredEventKey,
+  episodesFromContactTicks,
+  sanitizeContactEpisode,
+  rememberKey,
+} from './dedup.ts';
 export {
   buildLifecycle,
   buildCoverageBlock,

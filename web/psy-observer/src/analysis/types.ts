@@ -11,7 +11,7 @@ export type AnalysisMode = 'LIVE' | 'FINAL';
 
 export type AnalysisLifecyclePhase = 'INSUFFICIENT_DATA' | 'LIVE' | 'PAUSED' | 'COMPLETE';
 
-export type CoverageLevel = 'INSUFFICIENT' | 'LIVE' | 'INCREMENTAL' | 'PARTIAL' | 'COMPLETE';
+export type CoverageLevel = 'INSUFFICIENT' | 'LIVE' | 'INCREMENTAL' | 'PARTIAL' | 'COMPLETE' | 'FULL';
 
 export type AnalysisLifecycle = {
   phase: AnalysisLifecyclePhase;
@@ -59,17 +59,27 @@ export type AgentAnalysis = {
   agent_id: string;
   seed: NaMetric;
   body_id: string;
+  /** Unique simulation ticks with a canonical action for this agent. */
   ticks_observed: number;
   actions: {
+    /** Tick-level WAIT occupancy (one per simulation tick). */
     wait_count: NaMetric;
     wait_pct: NaMetric;
+    /** Tick-level MOVE occupancy (sum of MOVE:* keys). */
     move_count: NaMetric;
     move_pct: NaMetric;
     move_distribution: Record<string, number> | 'NOT AVAILABLE';
+    /** Transitions across ordered unique simulation ticks only. */
     action_transitions: Record<string, number> | 'NOT AVAILABLE';
     longest_wait_streak: NaMetric;
     longest_move_streak: NaMetric;
+    /** Explicit semantics for report/UI. */
+    semantics: 'TICK_LEVEL_OCCUPANCY';
+    /** wait_count + move_count (+ other non-WAIT/MOVE actions if any). */
+    occupancy_total: number;
   };
+  /** Runtime cumulative cognition metrics.action_counts — NOT tick-level occupancy. */
+  cumulative_runtime_action_counts: Record<string, number> | 'NOT AVAILABLE';
   movement: {
     distance_travelled: NaMetric;
     net_displacement: NaMetric;
@@ -205,7 +215,10 @@ export type DataCoverage = {
   cognition: string;
   signals: string;
   causal_provenance: string;
+  /** Raw Observer timeline sample count (diagnostic). */
   timeline_samples: number;
+  /** Unique simulation ticks represented in timeline ingestion. */
+  unique_simulation_ticks: number;
   event_samples: number;
   telemetry_samples: number;
   level: CoverageLevel;
@@ -229,6 +242,23 @@ export type RunAnalysis = {
   coverage: DataCoverage;
   analysis_log: string;
   generated_at_tick: number;
+  /** Present when analysis was built from a scientific evidence package. */
+  evidence_meta?: {
+    analyzer_version: string;
+    analysis_timestamp: string;
+    run_id: string | null;
+    runtime_status: string | null;
+    analysis_cutoff_tick: number | null;
+    scientific_tick_range: [number | null, number | null];
+    coverage: CoverageLevel | string;
+    complete_tick_level_reanalysis: boolean;
+    evidence_files: string[];
+    evidence_counts: Record<string, number>;
+    used_cumulative_runtime_summaries: boolean;
+    cumulative_runtime_summaries: any[];
+    source: string | null;
+    note: string | null;
+  };
 };
 
 /** Compact archived observer run (not scientific snapshot). */

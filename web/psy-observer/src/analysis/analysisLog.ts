@@ -16,12 +16,39 @@ export function formatAnalysisLog(analysis: RunAnalysis): string {
   lines.push('MECHANISTIC MIND — RUN ANALYSIS');
   lines.push('================================');
   lines.push('');
+  const meta = analysis.evidence_meta;
+  if (meta) {
+    lines.push('EVIDENCE / ANALYSIS METADATA');
+    lines.push(`Analyzer version: ${meta.analyzer_version}`);
+    lines.push(`Analysis timestamp: ${meta.analysis_timestamp}`);
+    lines.push(`Run id: ${show(meta.run_id)}`);
+    lines.push(`Source: ${show(meta.source)}`);
+    lines.push(`Runtime status: ${show(meta.runtime_status)}`);
+    lines.push(`Analysis cutoff tick: ${show(meta.analysis_cutoff_tick)}`);
+    lines.push(`Scientific tick range analyzed: ${meta.scientific_tick_range[0]}–${meta.scientific_tick_range[1]}`);
+    lines.push(`Coverage: ${meta.coverage}`);
+    lines.push(`Complete tick-level re-analysis: ${meta.complete_tick_level_reanalysis ? 'YES' : 'NO'}`);
+    lines.push(`Evidence files: ${(meta.evidence_files || []).join(', ') || 'NONE'}`);
+    lines.push(`Evidence counts: ${JSON.stringify(meta.evidence_counts || {})}`);
+    lines.push(`Used cumulative runtime summaries: ${meta.used_cumulative_runtime_summaries ? 'YES' : 'NO'}`);
+    if (meta.used_cumulative_runtime_summaries && meta.cumulative_runtime_summaries?.length) {
+      lines.push('CUMULATIVE RUNTIME SUMMARY (NOT tick-level history):');
+      for (const row of meta.cumulative_runtime_summaries) {
+        lines.push(`  ${row.agent_id}: action_counts=${JSON.stringify(row.action_counts || {})}`);
+      }
+      lines.push('  Note: cumulative counters do NOT reconstruct transition timing, streaks, or phase boundaries.');
+    }
+    if (meta.note) lines.push(`Note: ${meta.note}`);
+    lines.push('');
+  }
   lines.push('RUN');
   lines.push(`Runtime: ${id.runtime}`);
   lines.push(`Seed: ${show(id.seed)}`);
   lines.push(`Generation: ${show(id.generation)}`);
   lines.push(`Map: ${show(id.map_width)}×${show(id.map_height)} ${id.boundary}`);
   lines.push(`Ticks: ${id.start_tick}–${id.end_tick} (duration ${id.duration_ticks})`);
+  lines.push(`Simulation ticks analyzed (unique): ${analysis.coverage.unique_simulation_ticks}`);
+  lines.push(`Observer timeline samples ingested: ${analysis.coverage.timeline_samples}`);
   lines.push(`Agent count: ${id.agent_count}`);
   lines.push(`Cognition enabled: ${show(id.cognition_enabled)}`);
   lines.push(`Status: ${id.status}`);
@@ -32,11 +59,21 @@ export function formatAnalysisLog(analysis: RunAnalysis): string {
 
   for (const a of analysis.agents) {
     lines.push(a.agent_id.toUpperCase());
-    lines.push(`  Seed: ${show(a.seed)}  Body: ${a.body_id}  Ticks observed: ${a.ticks_observed}`);
-    lines.push(`  ACTIONS: WAIT ${show(a.actions.wait_count)} (${show(a.actions.wait_pct)}%)  MOVE ${show(a.actions.move_count)} (${show(a.actions.move_pct)}%)`);
-    lines.push(`  MOVE distribution: ${show(a.actions.move_distribution)}`);
-    lines.push(`  Longest WAIT streak: ${show(a.actions.longest_wait_streak)}  Longest MOVE streak: ${show(a.actions.longest_move_streak)}`);
-    lines.push(`  Transitions: ${show(a.actions.action_transitions)}`);
+    lines.push(`  Seed: ${show(a.seed)}  Body: ${a.body_id}  Ticks observed (canonical action ticks): ${a.ticks_observed}`);
+    lines.push(`  TICK-LEVEL ACTION OCCUPANCY (one canonical action per simulation tick):`);
+    lines.push(`    WAIT ticks: ${show(a.actions.wait_count)} (${show(a.actions.wait_pct)}%)  MOVE ticks: ${show(a.actions.move_count)} (${show(a.actions.move_pct)}%)`);
+    lines.push(`    Occupancy total: ${a.actions.occupancy_total}  (must be ≤ ticks observed)`);
+    lines.push(`    MOVE distribution: ${show(a.actions.move_distribution)}`);
+    lines.push(`    Longest WAIT streak: ${show(a.actions.longest_wait_streak)}  Longest MOVE streak: ${show(a.actions.longest_move_streak)}`);
+    lines.push(`    Transitions (ordered unique ticks): ${show(a.actions.action_transitions)}`);
+    if (a.cumulative_runtime_action_counts !== 'NOT AVAILABLE') {
+      lines.push(`  CUMULATIVE RUNTIME ACTION COUNTS (cognition metrics; not tick-level occupancy merge):`);
+      lines.push(`    ${JSON.stringify(a.cumulative_runtime_action_counts)}`);
+    }
+    lines.push(`  ACTION / SCENARIO SELECTION EVENTS (structured; may exceed tick occupancy):`);
+    lines.push(`    SCENARIO_SELECTED: ${show(a.cognition.scenario_selected)} (WAIT ${show(a.cognition.scenario_selected_wait)} / MOVE ${show(a.cognition.scenario_selected_move)})`);
+    lines.push(`    Cognitive WAIT selections: ${show(a.cognition.cognitive_wait_selections)}  Fallback WAIT: ${show(a.cognition.fallback_wait_selections)}`);
+    lines.push(`    Action sources (tick-level when from timeline): ${show(a.cognition.selected_action_sources)}`);
     lines.push(`  MOVEMENT: distance ${show(a.movement.distance_travelled)}  net ${show(a.movement.net_displacement)}  mean_speed ${show(a.movement.mean_speed)}  max_speed ${show(a.movement.max_speed)}`);
     lines.push(`  Unique cells: ${show(a.movement.unique_cells)}  Rotation accum: ${show(a.movement.rotation_accumulated)}`);
     lines.push(`  BODY: deform_events ${show(a.body.deformation_events)}  work_limited ${show(a.body.work_limited_events)}`);
@@ -44,9 +81,6 @@ export function formatAnalysisLog(analysis: RunAnalysis): string {
     lines.push(`  RESOURCES B: ${show(a.resources.resource_B)}`);
     lines.push(`  WORK RESERVOIR: ${show(a.resources.work_reservoir)}`);
     lines.push(`  COGNITION: predictions ${show(a.cognition.prediction_count)}  error ${show(a.cognition.prediction_error)}  prospective ${show(a.cognition.prospective_compositions)}  novel ${show(a.cognition.novel_compositions)}`);
-    lines.push(`  SCENARIO_SELECTED: ${show(a.cognition.scenario_selected)} (WAIT ${show(a.cognition.scenario_selected_wait)} / MOVE ${show(a.cognition.scenario_selected_move)})`);
-    lines.push(`  Cognitive WAIT selections: ${show(a.cognition.cognitive_wait_selections)}  Fallback WAIT: ${show(a.cognition.fallback_wait_selections)}`);
-    lines.push(`  Action sources: ${show(a.cognition.selected_action_sources)}`);
     lines.push(`  SIGNALS: emit A/B ${a.signals.emissions_A}/${a.signals.emissions_B}  recv A/B ${a.signals.receptions_A}/${a.signals.receptions_B}`);
     lines.push(`  Contact emissions: ${a.signals.contact_triggered_emissions}  Motion emissions: ${a.signals.motion_triggered_emissions}`);
     lines.push(`  Reception attribution: mixed=${a.signals.reception_attribution.mixed} not_unique=${a.signals.reception_attribution.not_unique} unknown=${a.signals.reception_attribution.unknown}`);
@@ -129,7 +163,8 @@ export function formatAnalysisLog(analysis: RunAnalysis): string {
   lines.push(`  cognition: ${analysis.coverage.cognition}`);
   lines.push(`  signals: ${analysis.coverage.signals}`);
   lines.push(`  causal provenance: ${analysis.coverage.causal_provenance}`);
-  lines.push(`  timeline_samples: ${analysis.coverage.timeline_samples}`);
+  lines.push(`  timeline_samples (Observer): ${analysis.coverage.timeline_samples}`);
+  lines.push(`  unique_simulation_ticks: ${analysis.coverage.unique_simulation_ticks}`);
   lines.push(`  event_samples: ${analysis.coverage.event_samples}`);
   lines.push(`  telemetry_samples: ${analysis.coverage.telemetry_samples}`);
   lines.push('');

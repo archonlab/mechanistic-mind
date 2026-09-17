@@ -96,3 +96,36 @@ export async function setActionTrace(body: { enabled: boolean; mode?: string }) 
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
+
+export async function listRuns() {
+  const r = await fetch(`${API}/api/runs`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function getAnalysisEvidence(opts: {
+  source: 'current' | 'saved';
+  run_id?: string | null;
+  cutoff_tick?: number | null;
+}) {
+  const q = new URLSearchParams({ source: opts.source });
+  if (opts.run_id) q.set('run_id', opts.run_id);
+  if (opts.cutoff_tick != null) q.set('cutoff_tick', String(opts.cutoff_tick));
+  const r = await fetch(`${API}/api/analysis/evidence?${q}`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function saveAnalysisReport(body: {
+  run_id: string;
+  report_text: string;
+  report_json: Record<string, unknown>;
+}) {
+  const r = await fetch(`${API}/api/analysis/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}

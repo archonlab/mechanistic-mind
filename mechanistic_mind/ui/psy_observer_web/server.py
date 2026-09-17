@@ -528,6 +528,151 @@ def get_events(limit: int = 50) -> dict[str, Any]:
     }
 
 
+@app.get("/api/runs")
+def list_runs() -> dict[str, Any]:
+    """Catalog of finalized Psy Observer Web runs (scientific evidence aware)."""
+    from mechanistic_mind.ui.psy_observer_web.scientific_history import list_psyweb_runs
+    from mechanistic_mind.ui.psy_observer_web.run_finalize import default_results_root
+
+    sess = get_session()
+    root = Path(sess.config.results_root) if getattr(sess.config, "results_root", None) else default_results_root()
+    runs = list_psyweb_runs(root)
+    return {"runs": runs, "results_root": str(root), "count": len(runs)}
+
+
+@app.get("/api/analysis/evidence")
+def analysis_evidence(
+    source: str = "current",
+    run_id: str | None = None,
+    cutoff_tick: int | None = None,
+) -> dict[str, Any]:
+    """Read-only scientific evidence package for Analyzer.
+
+    source=current — live run evidence up to cutoff (default: current tick).
+    source=saved — finalized run directory evidence.
+    Never advances simulation or mutates evidence.
+    """
+    from mechanistic_mind.ui.psy_observer_web.scientific_history import (
+        load_evidence_package,
+        published_run_dir,
+    )
+    from mechanistic_mind.ui.psy_observer_web.run_finalize import default_results_root
+    import json
+
+    sess = get_session()
+    src = str(source or "current").lower()
+    if src == "current":
+        pkg = sess.scientific_evidence(cutoff_tick=cutoff_tick)
+        pkg["source"] = "current"
+        return pkg
+
+    if src != "saved":
+        return {"error": "invalid source", "accepted": False}
+
+    rid = str(run_id or "").strip()
+    if not rid or "/" in rid or ".." in rid or not rid.startswith("psyweb-"):
+        return {"error": "invalid run_id", "accepted": False}
+
+    root = Path(sess.config.results_root) if getattr(sess.config, "results_root", None) else default_results_root()
+    run_dir = published_run_dir(root, rid)
+    if not run_dir.is_dir():
+        return {"error": "run not found", "run_id": rid, "accepted": False}
+
+    identity: dict[str, Any] = {"run_id": rid}
+    manifest = {}
+    mj = run_dir / "run.json"
+    if mj.is_file():
+        try:
+            manifest = json.loads(mj.read_text(encoding="utf-8"))
+            identity.update({
+                "runtime_type": manifest.get("runtime_type"),
+                "seed": manifest.get("seed"),
+                "agent_count": manifest.get("agent_count"),
+                "runtime_generation": manifest.get("runtime_generation"),
+                "final_tick": manifest.get("final_tick"),
+            })
+        except Exception:
+            pass
+
+    ui_timeline = []
+    st = run_dir / "session_timeline.jsonl"
+    if st.is_file():
+        for line in st.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                ui_timeline.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+
+    ui_events = []
+    se = run_dir / "structured_events.json"
+    if se.is_file():
+        try:
+            payload = json.loads(se.read_text(encoding="utf-8"))
+            ui_events = list(payload.get("events") or [])
+        except Exception:
+            pass
+
+    cut = cutoff_tick
+    if cut is None and manifest.get("final_tick") is not None:
+        cut = int(manifest["final_tick"])
+
+    pkg = load_evidence_package(
+        evidence_dir=run_dir,
+        runtime=None,
+        ui_timeline=ui_timeline,
+        ui_events=ui_events,
+        cutoff_tick=cut,
+        runtime_status="STOPPED",
+        run_id=rid,
+        identity=identity,
+    )
+    pkg["source"] = "saved"
+    pkg["run_dir"] = str(run_dir)
+    pkg["manifest"] = {
+        "final_tick": manifest.get("final_tick"),
+        "seed": manifest.get("seed"),
+        "runtime_type": manifest.get("runtime_type"),
+        "termination_reason": manifest.get("termination_reason"),
+        "scientific_history": manifest.get("scientific_history"),
+    }
+    return pkg
+
+
+@app.post("/api/analysis/save")
+def analysis_save(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Persist a versioned analysis report under run_dir/analysis/<timestamp>/."""
+    from mechanistic_mind.ui.psy_observer_web.scientific_history import (
+        save_analysis_output,
+        published_run_dir,
+        ANALYZER_VERSION,
+    )
+    from mechanistic_mind.ui.psy_observer_web.run_finalize import default_results_root
+    from datetime import datetime, timezone
+
+    body = payload or {}
+    rid = str(body.get("run_id") or "").strip()
+    if not rid or "/" in rid or ".." in rid or not rid.startswith("psyweb-"):
+        return {"accepted": False, "error": "invalid run_id"}
+    sess = get_session()
+    root = Path(sess.config.results_root) if getattr(sess.config, "results_root", None) else default_results_root()
+    run_dir = published_run_dir(root, rid)
+    if not run_dir.is_dir():
+        return {"accepted": False, "error": "run not found", "run_id": rid}
+
+    report_text = str(body.get("report_text") or "")
+    report_json = body.get("report_json")
+    if not isinstance(report_json, dict):
+        report_json = {"report_text": report_text}
+    report_json.setdefault("analyzer_version", ANALYZER_VERSION)
+    report_json.setdefault("analysis_timestamp", datetime.now(timezone.utc).isoformat())
+    report_json.setdefault("run_id", rid)
+    out = save_analysis_output(run_dir, report_text=report_text, report_json=report_json)
+    return {"accepted": True, "analysis_dir": str(out), "run_id": rid}
+
+
 @app.get("/api/diagnostics/motion")
 def diagnostics_motion() -> dict[str, Any]:
     bundle = get_session().diagnostics()

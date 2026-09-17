@@ -7,6 +7,7 @@ import {
   ensureAgent,
   ingestAction,
   ingestXy,
+  claimTimelineAgentState,
   pushBounded,
   recordExtrema,
   recordFirst,
@@ -23,6 +24,15 @@ import { buildOverview } from './overviewNarrative.ts';
 import { formatAnalysisLog } from './analysisLog.ts';
 import type { AnalysisMode, RunAnalysis, RunIdentity } from './types.ts';
 import { buildCoverageBlock, buildLifecycle } from './lifecycle.ts';
+import {
+  episodesFromContactTicks,
+  rememberKey,
+  rememberNumber,
+  sanitizeContactEpisode,
+  structuredEventKey,
+  liveSummaryKey,
+  telemetryRowKey,
+} from './dedup.ts';
 
 export type AnalysisInput = {
   frame?: any;
@@ -31,6 +41,10 @@ export type AnalysisInput = {
   telemetry?: any[];
   mechanisms?: any[];
   mode?: AnalysisMode;
+  /** When true, prefer scientific evidence semantics (no cumulative→tick conflation). */
+  scientificEvidence?: boolean;
+  /** Skip folding runtime cumulative action_counts into tick aggregates. */
+  skipLiveCumulativeActions?: boolean;
 };
 
 /** Reset or create state; call when generation/seed/runtime identity changes. */
@@ -56,7 +70,8 @@ export function ingestAnalysisInput(state: AnalysisState, input: AnalysisInput):
   if (input.timeline?.length) ingestTimeline(state, input.timeline);
   if (input.events?.length) ingestEvents(state, input.events);
   if (input.telemetry?.length) ingestTelemetry(state, input.telemetry, frame);
-  if (frame) ingestLiveSummaries(state, frame);
+  if (frame && !input.skipLiveCumulativeActions) ingestLiveSummaries(state, frame);
+  else if (frame && input.scientificEvidence) ingestLiveSummariesScientific(state, frame);
   return state;
 }
 
@@ -98,7 +113,9 @@ function ingestTimeline(state: AnalysisState, timeline: any[]) {
   for (const ev of sorted) {
     const tick = Number(ev.tick);
     if (!Number.isFinite(tick)) continue;
+    // Diagnostic: every Observer sample, including duplicates.
     state.timeline_samples += 1;
+    rememberNumber(state.unique_simulation_ticks, tick);
     if (state.start_tick == null || tick < state.start_tick) state.start_tick = tick;
     if (state.end_tick == null || tick > state.end_tick) state.end_tick = tick;
 
@@ -109,9 +126,24 @@ function ingestTimeline(state: AnalysisState, timeline: any[]) {
     for (const b of bodies) {
       const aid = String(b.agent_id || 'agent_0');
       const agg = ensureAgent(state, aid, canonicalBody(aid));
-      if (b.action) ingestAction(agg, String(b.action), tick);
-      if (b.x != null && b.y != null) ingestXy(agg, Number(b.x), Number(b.y));
-      if (String(b.action || '').startsWith('MOVE')) {
+      // Scientific action/position once per (tick, agent).
+      if (!claimTimelineAgentState(state, tick, aid)) continue;
+      const applied = b.action ? ingestAction(agg, String(b.action), tick) : false;
+      if (applied && b.action_source) {
+        const src = String(b.action_source);
+        agg.selection_sources[src] = (agg.selection_sources[src] || 0) + 1;
+      } else if (applied && ev.action_source && bodies.length === 1) {
+        const src = String(ev.action_source);
+        agg.selection_sources[src] = (agg.selection_sources[src] || 0) + 1;
+      }
+      if (b.x != null && b.y != null) ingestXy(agg, Number(b.x), Number(b.y), b.speed != null ? Number(b.speed) : undefined, tick);
+      if (b.work != null) updateResourceSeries(agg.work, Number(b.work));
+      if (b.resource_A != null) updateResourceSeries(agg.resA, Number(b.resource_A));
+      if (b.resource_B != null) updateResourceSeries(agg.resB, Number(b.resource_B));
+      if (b.prediction_count != null) agg.prediction_count = Number(b.prediction_count);
+      if (b.prospective_compositions != null) agg.prospective = Number(b.prospective_compositions);
+      if (b.agent_seed != null && agg.seed == null) agg.seed = Number(b.agent_seed);
+      if (applied && String(b.action || '').startsWith('MOVE')) {
         if (recordFirst(state, `first_move_${aid}`, tick, { action: b.action })) {
           pushImportant(state, {
             tick,
@@ -127,51 +159,62 @@ function ingestTimeline(state: AnalysisState, timeline: any[]) {
       }
     }
 
-    if (ev.contact) {
-      state.contact_ticks += 1;
-      if (!state.contact_active) {
-        state.contact_active = true;
-        state.contact_episode_start = tick;
-        if (state.first_contact_tick == null) {
-          state.first_contact_tick = tick;
-          recordFirst(state, 'first_body_body_contact', tick);
-          pushImportant(state, {
-            tick,
-            category: 'FIRST',
-            kind: 'FIRST_BODY_BODY_CONTACT',
-            title: 'FIRST BODY-BODY CONTACT',
-            reason: 'First BODY_BODY_CONTACT / timeline.contact=true in this run.',
-            evidence_class: 'OBSERVED',
-            body_ids: ['body-0', 'body-1'],
-          });
-          maybeAddKeyframe(state, tick, 'first contact', frameAgentsFromTimeline(ev), true, state.map_w, state.map_h);
+    // Contact FSM advances once per unique simulation tick.
+    if (rememberKey(state.contact_fsm_ticks, String(tick))) {
+      if (ev.contact) {
+        if (rememberNumber(state.contact_tick_set, tick)) {
+          state.contact_ticks = state.contact_tick_set.size;
         }
+        if (!state.contact_active) {
+          state.contact_active = true;
+          state.contact_episode_start = tick;
+          if (state.first_contact_tick == null) {
+            state.first_contact_tick = tick;
+            recordFirst(state, 'first_body_body_contact', tick);
+            pushImportant(state, {
+              tick,
+              category: 'FIRST',
+              kind: 'FIRST_BODY_BODY_CONTACT',
+              title: 'FIRST BODY-BODY CONTACT',
+              reason: 'First BODY_BODY_CONTACT / timeline.contact=true in this run.',
+              evidence_class: 'OBSERVED',
+              body_ids: ['body-0', 'body-1'],
+            });
+            maybeAddKeyframe(state, tick, 'first contact', frameAgentsFromTimeline(ev), true, state.map_w, state.map_h);
+          }
+        }
+      } else if (state.contact_active) {
+        closeContactEpisode(state, tick - 1);
       }
-    } else if (state.contact_active) {
-      closeContactEpisode(state, tick - 1);
     }
 
-    // sustained WAIT / MOVE transitions (per agent via streaks already tracked)
+    // Sustained WAIT / MOVE: only after a newly applied action updates streaks.
     for (const aid of Object.keys(state.agents)) {
       const agg = state.agents[aid];
       if (agg.wait_streak === 20 && recordFirst(state, `long_wait_${aid}_${tick}`, tick)) {
+        const streakStart = tick - 19;
         pushImportant(state, {
-          tick: tick - 19,
+          tick: streakStart,
           category: 'TRANSITION',
           kind: 'SUSTAINED_WAIT',
           title: `SUSTAINED WAIT (${aid})`,
-          reason: `${aid} reached a WAIT streak of 20 consecutive selections.`,
+          reason:
+            `${aid} reached a WAIT streak of 20 consecutive simulation ticks `
+            + `(tick-level occupancy t${streakStart}–t${tick}).`,
           evidence_class: 'DERIVED',
           agent_ids: [aid],
         });
       }
       if (agg.move_streak === 10 && recordFirst(state, `sustained_move_${aid}_${tick}`, tick)) {
+        const streakStart = tick - 9;
         pushImportant(state, {
-          tick: tick - 9,
+          tick: streakStart,
           category: 'TRANSITION',
           kind: 'SUSTAINED_MOVE',
           title: `SUSTAINED MOVE (${aid})`,
-          reason: `${aid} reached a MOVE streak of 10 consecutive selections.`,
+          reason:
+            `${aid} reached a MOVE streak of 10 consecutive simulation ticks `
+            + `(tick-level occupancy t${streakStart}–t${tick}).`,
           evidence_class: 'DERIVED',
           agent_ids: [aid],
         });
@@ -179,16 +222,12 @@ function ingestTimeline(state: AnalysisState, timeline: any[]) {
     }
     state.last_processed_timeline_tick = Math.max(state.last_processed_timeline_tick, tick);
   }
-  if (state.contact_active && state.end_tick != null) {
-    // leave episode open for live; snapshot closed copy for analysis build
-  }
 }
 
 function closeContactEpisode(state: AnalysisState, endTick: number) {
   if (!state.contact_active || state.contact_episode_start == null) return;
-  const start = state.contact_episode_start;
-  const ticks = Math.max(1, endTick - start + 1);
-  pushBounded(state.contact_episodes, { start, end: endTick, ticks }, BOUNDS.contact_episodes);
+  const ep = sanitizeContactEpisode(state.contact_episode_start, endTick);
+  if (ep) pushBounded(state.contact_episodes, ep, BOUNDS.contact_episodes);
   state.contact_active = false;
   state.contact_episode_start = null;
 }
@@ -213,13 +252,8 @@ function ingestEvents(state: AnalysisState, events: any[]) {
     const tick = Number(ev.tick);
     const et = String(ev.type || ev.kind || '');
     const evidence = ev.evidence || {};
-    const key = `${tick}|${et}|${ev.emission_id || evidence.emission_id || ''}|${ev.agent_id || ''}|${ev.emitter_agent_id || ''}|${ev.receiver_agent_id || ''}`;
-    if (state.seen_event_keys.has(key)) continue;
-    // Bound seen keys
-    if (state.seen_event_keys.size > 4000) {
-      state.seen_event_keys = new Set([...state.seen_event_keys].slice(-2000));
-    }
-    state.seen_event_keys.add(key);
+    const key = structuredEventKey(ev);
+    if (!rememberKey(state.seen_event_keys, key)) continue;
     state.event_samples += 1;
 
     if (et.includes('SIGNAL_EMITTED')) {
@@ -387,6 +421,10 @@ function ingestTelemetry(state: AnalysisState, series: any[], frame?: any) {
   for (const row of series) {
     state.telemetry_samples += 1;
     const tick = Number(row.tick);
+    if (Number.isFinite(tick) && !rememberKey(state.seen_event_keys, telemetryRowKey(tick))) {
+      // Already applied scientific telemetry for this tick — skip resource/speed double-count.
+      continue;
+    }
     updateResourceSeries(primary.resA, row.resource_A);
     updateResourceSeries(primary.resB, row.resource_B);
     updateResourceSeries(primary.work, row.work_reservoir);
@@ -416,37 +454,39 @@ function ingestTelemetry(state: AnalysisState, series: any[], frame?: any) {
 }
 
 function ingestLiveSummaries(state: AnalysisState, frame: any) {
+  const tick = Number(frame?.header?.tick);
   const observers = frame.agents_observer || [];
+  const isNewLiveTick = Number.isFinite(tick)
+    ? rememberKey(state.seen_event_keys, liveSummaryKey(tick))
+    : true;
+  if (Number.isFinite(tick)) state.last_live_summary_tick = tick;
+
   if (observers.length) {
     state.agent_count = Math.max(state.agent_count, observers.length);
     for (const o of observers) {
       const aid = String(o.observer_id);
       const agg = ensureAgent(state, aid, canonicalBody(aid), o.agent_seed != null ? Number(o.agent_seed) : null);
-      // Prefer runtime cumulative stats when larger (authoritative)
       if (o.distance_travelled != null) agg.distance = Math.max(agg.distance, Number(o.distance_travelled));
       if (o.unique_cells_visited != null && Number(o.unique_cells_visited) > agg.unique_cells.size) {
-        // cannot reconstruct set; store via padding marker in unique_cells size by adding placeholders? better keep max in a field
         (agg as any)._unique_cells_runtime = Number(o.unique_cells_visited);
       }
       if (o.collision_count != null) agg.collision_ticks = Math.max(agg.collision_ticks, Number(o.collision_count));
       if (o.prediction_count != null) agg.prediction_count = Number(o.prediction_count);
       if (o.prospective_compositions != null) agg.prospective = Number(o.prospective_compositions);
+      // CRITICAL: runtime cumulative action_counts are a separate evidence class.
+      // Never Math.max them into tick-level occupancy (that produced WAIT+MOVE > ticks_observed).
       if (o.action_counts && typeof o.action_counts === 'object') {
-        for (const [k, v] of Object.entries(o.action_counts)) {
-          agg.action_counts[k] = Math.max(agg.action_counts[k] || 0, Number(v) || 0);
-        }
+        (agg as any)._cumulative_action_counts = { ...o.action_counts };
       }
-      if (o.selection_source) {
-        agg.selection_sources[String(o.selection_source)] =
-          (agg.selection_sources[String(o.selection_source)] || 0) + 1;
-      }
+      // selection_source for tick-level occupancy comes from scientific/timeline rows only.
+      // Do not increment selection_sources here (would double-count vs timeline).
       if (o.x != null && o.y != null) {
         if (!agg.start_xy) agg.start_xy = { x: Number(o.x), y: Number(o.y) };
         agg.last_xy = { x: Number(o.x), y: Number(o.y) };
       }
       const spd = Math.hypot(Number(o.vx || 0), Number(o.vy || 0));
       if (spd > agg.max_speed) agg.max_speed = spd;
-      if (o.theta != null) {
+      if (isNewLiveTick && o.theta != null) {
         if (agg.theta_start == null) agg.theta_start = Number(o.theta);
         if (agg.theta_last != null) {
           let d = Number(o.theta) - agg.theta_last;
@@ -455,16 +495,17 @@ function ingestLiveSummaries(state: AnalysisState, frame: any) {
           agg.rotation_accum += Math.abs(d);
         }
         agg.theta_last = Number(o.theta);
+      } else if (o.theta != null) {
+        if (agg.theta_start == null) agg.theta_start = Number(o.theta);
+        agg.theta_last = Number(o.theta);
       }
     }
   } else {
-    // single-agent fallback from mind/body
+    // single-agent fallback from mind/body — cognition metrics only, not tick occupancy
     const agg = ensureAgent(state, 'agent_0', frame.header?.selected_body_id || 'body-0', state.seed);
     const metrics = frame.mind?.metrics || {};
-    if (metrics.action_counts) {
-      for (const [k, v] of Object.entries(metrics.action_counts)) {
-        agg.action_counts[k] = Math.max(agg.action_counts[k] || 0, Number(v) || 0);
-      }
+    if (metrics.action_counts && typeof metrics.action_counts === 'object') {
+      (agg as any)._cumulative_action_counts = { ...metrics.action_counts };
     }
     if (metrics.prediction_count != null) agg.prediction_count = Number(metrics.prediction_count);
     if (metrics.prediction_error != null || metrics.last_prediction_error != null) {
@@ -473,8 +514,34 @@ function ingestLiveSummaries(state: AnalysisState, frame: any) {
     if (metrics.prospective_compositions != null) agg.prospective = Number(metrics.prospective_compositions);
     if (metrics.novel_compositions != null) agg.novel = Number(metrics.novel_compositions);
     if (frame.body?.x != null) {
-      ingestXy(agg, Number(frame.body.x), Number(frame.body.y),
-        Math.hypot(Number(frame.body.vx || 0), Number(frame.body.vy || 0)));
+      ingestXy(
+        agg,
+        Number(frame.body.x),
+        Number(frame.body.y),
+        Math.hypot(Number(frame.body.vx || 0), Number(frame.body.vy || 0)),
+        Number.isFinite(tick) ? tick : undefined,
+      );
+    }
+  }
+}
+
+/**
+ * Scientific re-analysis path: update cognition/pose hints from the frame
+ * without folding cumulative action_counts into tick-level aggregates.
+ */
+function ingestLiveSummariesScientific(state: AnalysisState, frame: any) {
+  const observers = frame.agents_observer || [];
+  if (observers.length) {
+    state.agent_count = Math.max(state.agent_count, observers.length);
+    for (const o of observers) {
+      const aid = String(o.observer_id);
+      const agg = ensureAgent(state, aid, canonicalBody(aid), o.agent_seed != null ? Number(o.agent_seed) : null);
+      if (o.prediction_count != null) agg.prediction_count = Number(o.prediction_count);
+      if (o.prospective_compositions != null) agg.prospective = Number(o.prospective_compositions);
+      // Store cumulative separately on agg for report exposure — never merge into action_counts.
+      if (o.action_counts && typeof o.action_counts === 'object') {
+        (agg as any)._cumulative_action_counts = { ...o.action_counts };
+      }
     }
   }
 }
@@ -484,15 +551,21 @@ function pushImportant(state: AnalysisState, ev: any) {
 }
 
 export function buildRunAnalysis(state: AnalysisState, mode: AnalysisMode = 'LIVE'): RunAnalysis {
-  // Close open contact episode snapshot for reporting
-  const episodes = [...state.contact_episodes];
-  if (state.contact_active && state.contact_episode_start != null && state.end_tick != null) {
-    episodes.push({
-      start: state.contact_episode_start,
-      end: state.end_tick,
-      ticks: Math.max(1, state.end_tick - state.contact_episode_start + 1),
-    });
+  // Prefer episodes rebuilt from unique contact simulation ticks (authoritative).
+  let episodes = episodesFromContactTicks(state.contact_tick_set, BOUNDS.contact_episodes);
+  if (!episodes.length && state.contact_episodes.length) {
+    episodes = state.contact_episodes
+      .map((e) => sanitizeContactEpisode(e.start, e.end))
+      .filter((e): e is { start: number; end: number; ticks: number } => !!e);
   }
+  if (state.contact_active && state.contact_episode_start != null && state.end_tick != null) {
+    const open = sanitizeContactEpisode(state.contact_episode_start, state.end_tick);
+    if (open) {
+      const last = episodes[episodes.length - 1];
+      if (!last || last.start !== open.start || last.end !== open.end) episodes.push(open);
+    }
+  }
+  state.contact_ticks = state.contact_tick_set.size;
 
   const identity = buildIdentity(state, mode);
   const lifecycle = buildLifecycle(state, mode, state.end_tick);

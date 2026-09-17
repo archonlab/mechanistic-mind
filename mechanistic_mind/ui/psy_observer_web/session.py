@@ -25,6 +25,11 @@ from mechanistic_mind.internal_medium.config import InternalMediumConfig, defaul
 from mechanistic_mind.planet.config import PlanetConfig, default_planet_config
 
 from .run_finalize import default_results_root, new_run_id, write_finalized_run
+from .scientific_history import (
+    ScientificHistoryWriter,
+    live_scientific_dir,
+    load_evidence_package,
+)
 from .serialize import compact_timeline_event, live_frame, collect_observer_events
 
 
@@ -107,6 +112,8 @@ class ObserverSession:
     _perf_sim_tps: float = 0.0
     _perf_obs_fps: float = 0.0
     _last_frame_tick: int | None = None
+    _sci_writer: ScientificHistoryWriter | None = None
+    _sci_live_dir: Path | None = None
 
     def __post_init__(self) -> None:
         self._perf_window_start = time.monotonic()
@@ -145,6 +152,7 @@ class ObserverSession:
                 self._last_finalize = prior_finalize
                 self._finalize_key = None
                 self._active_run_id = None
+                self._close_scientific_locked()
                 self._event_ring = deque(maxlen=EVENT_RING_MAX)
                 self._event_keys = set()
                 self._visual_dropped = 0
@@ -429,6 +437,7 @@ class ObserverSession:
         self.status = "RUNNING"
         self._stop_flag = False
         with self._lock:
+            self._ensure_scientific_locked()
             self._ensure_loop_locked()
         out = self._with_receipt(self._clone_published(status="RUNNING"), "PLAY", {}, before)
         self._maybe_push(out, force=True)
@@ -475,6 +484,93 @@ class ObserverSession:
         """
         self._active_run_id = None
         self._run_started_at = None
+        with self._lock:
+            self._close_scientific_locked()
+
+    def _results_root(self) -> Path:
+        return Path(self.config.results_root) if self.config.results_root else default_results_root()
+
+    def _ensure_scientific_locked(self) -> None:
+        """Open append-only scientific writer for the active run_id (idempotent)."""
+        if self._sci_writer is not None:
+            return
+        rid = self._active_run_id
+        if not rid:
+            return
+        live = live_scientific_dir(self._results_root(), rid)
+        slots = getattr(self.runtime, "slots", None)
+        writer = ScientificHistoryWriter(live)
+        writer.open({
+            "run_id": rid,
+            "runtime_type": type(self.runtime).__name__,
+            "seed": int(getattr(self.runtime, "seed", self.config.seed)),
+            "agent_count": len(slots) if slots else 1,
+            "runtime_generation": int(self._runtime_generation),
+            "started_at": self._run_started_at,
+        })
+        self._sci_writer = writer
+        self._sci_live_dir = live
+
+    def _close_scientific_locked(self, *, clear_live_dir: bool = True) -> None:
+        w = self._sci_writer
+        self._sci_writer = None
+        if w is not None:
+            try:
+                w.close()
+            except Exception:
+                pass
+        if clear_live_dir:
+            self._sci_live_dir = None
+
+    def _append_scientific_locked(self) -> None:
+        """Persist one scientific record set per new simulation tick (not per UI capture)."""
+        if self._active_run_id is None:
+            return
+        self._ensure_scientific_locked()
+        w = self._sci_writer
+        if w is None:
+            return
+        w.append_tick(self.runtime)
+        # Drain freshly accumulated structured events into the scientific archive
+        fresh = list(self._event_ring)[-40:]
+        if fresh:
+            w.append_events(fresh)
+
+    def scientific_evidence(
+        self,
+        *,
+        cutoff_tick: int | None = None,
+    ) -> dict[str, Any]:
+        """Read-only evidence package for Analyzer (tolerates appends beyond cutoff)."""
+        with self._lock:
+            if self._sci_writer is not None:
+                self._sci_writer.flush()
+            live_dir = self._sci_live_dir
+            timeline = list(self._timeline)
+            events = list(self._event_ring)
+            status = self.status
+            rid = self._active_run_id
+            slots = getattr(self.runtime, "slots", None)
+            identity = {
+                "runtime_type": type(self.runtime).__name__,
+                "seed": int(getattr(self.runtime, "seed", self.config.seed)),
+                "agent_count": len(slots) if slots else 1,
+                "runtime_generation": int(self._runtime_generation),
+            }
+            # Deterministic cutoff: caller value or current live tick snapshot
+            live_tick = int(self.runtime.tick)
+            cut = int(cutoff_tick) if cutoff_tick is not None else live_tick
+            runtime = self.runtime
+        return load_evidence_package(
+            evidence_dir=live_dir,
+            runtime=runtime,
+            ui_timeline=timeline,
+            ui_events=events,
+            cutoff_tick=cut,
+            runtime_status=status,
+            run_id=rid,
+            identity=identity,
+        )
 
     def finalize_run(self, *, reason: str = "USER_STOP_SAVED") -> dict[str, Any]:
         """Persist current run. Idempotent for the same generation+tick+reason."""
@@ -501,6 +597,12 @@ class ObserverSession:
                 "model": display_name(),
             }
             with self._lock:
+                self._ensure_scientific_locked()
+                # Flush+close writer so meta/jsonl are durable before promote;
+                # keep live dir path for copy_scientific_into.
+                if self._sci_writer is not None:
+                    self._close_scientific_locked(clear_live_dir=False)
+                sci_live = self._sci_live_dir
                 timeline = list(self._timeline)
                 telemetry = list(self._telemetry)
                 hist = {
@@ -511,6 +613,7 @@ class ObserverSession:
                     "timeline_len": len(timeline),
                     "telemetry_len": len(telemetry),
                     "runtime_generation": generation,
+                    "scientific_live_dir": str(sci_live) if sci_live else None,
                 }
             session_meta = {
                 "started_at": self._run_started_at,
@@ -528,6 +631,7 @@ class ObserverSession:
                     termination_reason=str(reason),
                     run_id=run_id,
                     identity=identity,
+                    scientific_live_dir=sci_live,
                 )
             except Exception as exc:
                 result = {
@@ -719,6 +823,8 @@ class ObserverSession:
         self.inspect_tick = None
         self.status = "PAUSED"
         with self._step_lock:
+            with self._lock:
+                self._ensure_scientific_locked()
             for _ in range(max(1, int(n))):
                 if self.config.target_tick is not None and self.runtime.tick >= int(self.config.target_tick):
                     break
@@ -726,6 +832,7 @@ class ObserverSession:
                 with self._lock:
                     self._accumulate_events_locked()
                     self._record_motion_locked()
+                    self._append_scientific_locked()
                     self._update_perf_locked(tick=True)
             with self._lock:
                 frame = self._capture_locked(detail="full")
@@ -1131,6 +1238,7 @@ class ObserverSession:
                 with self._lock:
                     self._accumulate_events_locked()
                     self._record_motion_locked()
+                    self._append_scientific_locked()
                     self._update_perf_locked(tick=True)
                 now = time.monotonic()
                 capture_period = observer_capture_period(speed, ui_hz)
@@ -1248,6 +1356,8 @@ class ObserverSession:
                 self._published = None
                 self._run_started_at = None
                 self._active_run_id = None
+                self._close_scientific_locked()
+                self._sci_live_dir = None
                 self._finalize_key = None
                 self._termination_reason = None
                 self._last_finalize = None

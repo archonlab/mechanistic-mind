@@ -8,7 +8,9 @@ const MIN_SAMPLES_FOR_ANALYSIS = 3;
 
 export function hasSufficientObservation(state: AnalysisState): boolean {
   const span = (state.end_tick ?? 0) - (state.start_tick ?? 0);
-  return state.timeline_samples >= MIN_SAMPLES_FOR_ANALYSIS
+  const uniqueTicks = state.unique_simulation_ticks?.size ?? 0;
+  return uniqueTicks >= MIN_SAMPLES_FOR_ANALYSIS
+    || state.timeline_samples >= MIN_SAMPLES_FOR_ANALYSIS
     || state.event_samples >= MIN_SAMPLES_FOR_ANALYSIS
     || span >= MIN_SAMPLES_FOR_ANALYSIS;
 }
@@ -25,12 +27,13 @@ export function deriveCoverage(
     };
   }
   const st = String(status || '').toUpperCase();
-  // Bounded buffers: if we have samples but start_tick > 0 after a long run, evidence may be truncated
-  const partial = state.timeline_samples > 0
+  const uniqueTicks = state.unique_simulation_ticks?.size ?? 0;
+  // Bounded buffers: if unique tick span >> retained unique ticks, evidence may be truncated
+  const partial = uniqueTicks > 0
     && state.start_tick != null
     && state.end_tick != null
-    && state.end_tick - state.start_tick + 1 > state.timeline_samples * 2
-    && state.timeline_samples < 50;
+    && state.end_tick - state.start_tick + 1 > Math.max(uniqueTicks, 1) * 2
+    && uniqueTicks < 50;
 
   if (st === 'STOPPED' || st === 'COMPLETE' || mode === 'FINAL') {
     if (partial) {
@@ -88,7 +91,7 @@ export function buildLifecycle(
     live_runtime_tick: liveRuntimeTick ?? state.end_tick,
     agents: Math.max(state.agent_count, Object.keys(state.agents).length || 1),
     events_observed: state.event_samples,
-    frames_sampled: state.timeline_samples,
+    frames_sampled: state.unique_simulation_ticks?.size ?? state.timeline_samples,
     coverage: level,
     coverage_reason: reason,
     insufficient,
@@ -97,17 +100,21 @@ export function buildLifecycle(
 
 export function buildCoverageBlock(state: AnalysisState, mode: AnalysisMode): DataCoverage {
   const { level, reason } = deriveCoverage(state, mode, state.status);
+  const uniqueTicks = state.unique_simulation_ticks?.size ?? 0;
   return {
     world: state.map_w && state.map_h ? `${state.map_w}×${state.map_h} ${state.boundary}` : 'PARTIAL / NOT AVAILABLE',
-    body: state.timeline_samples > 0 ? `timeline positions (${state.timeline_samples} samples)` : 'NOT AVAILABLE',
+    body: uniqueTicks > 0
+      ? `unique timeline ticks ${uniqueTicks} (${state.timeline_samples} Observer samples)`
+      : 'NOT AVAILABLE',
     cognition: Object.values(state.agents).some((a) => a.prediction_count != null || a.prospective != null)
       ? 'metrics / structured events (partial)'
       : 'NOT AVAILABLE / sparse',
-    signals: state.event_samples > 0 ? `structured signal events (${state.event_samples} ingested)` : 'NOT AVAILABLE',
+    signals: state.event_samples > 0 ? `structured signal events (${state.event_samples} unique ingested)` : 'NOT AVAILABLE',
     causal_provenance: state.causal_pairs.length
       ? `${state.causal_pairs.length} emission→reception parent refs`
       : 'NOT AVAILABLE / none observed',
     timeline_samples: state.timeline_samples,
+    unique_simulation_ticks: uniqueTicks,
     event_samples: state.event_samples,
     telemetry_samples: state.telemetry_samples,
     level,

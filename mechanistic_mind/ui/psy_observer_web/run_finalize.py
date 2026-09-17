@@ -225,6 +225,7 @@ def write_finalized_run(
     termination_reason: str,
     run_id: str | None = None,
     identity: dict[str, Any] | None = None,
+    scientific_live_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Atomically persist one run directory after integrity validation.
 
@@ -334,6 +335,12 @@ def write_finalized_run(
             "count": len(telemetry),
         })
 
+        # Promote append-only scientific evidence into the published run dir.
+        from .scientific_history import copy_scientific_into, read_jsonl_range
+
+        sci_info = copy_scientific_into(tmp_dir, scientific_live_dir)
+        phases.append("scientific_history_copied" if sci_info.get("copied") else "scientific_history_absent")
+
         phases.append("saving_results")
         model = {}
         if hasattr(runtime, "model_identity"):
@@ -346,10 +353,28 @@ def write_finalized_run(
         height = int(getattr(planet, "height", 0) or 0)
         agent_count = int(identity["agent_count"])
         caps = capabilities_for_snapshot(snapshot, has_timeline=bool(timeline))
+        sci_path = tmp_dir / "scientific_timeline.jsonl"
+        sci_min, sci_max, sci_n = read_jsonl_range(sci_path) if sci_path.is_file() else (None, None, 0)
+        if sci_n > 0:
+            caps = dict(caps)
+            caps["full_history_jsonl"] = True
+            caps["scientific_timeline"] = True
+            caps["inspectable_scope"] = "final_snapshot_plus_scientific_timeline_plus_bounded_session_buffers"
         started_at = session_meta.get("started_at")
         tl_ticks = _row_ticks(timeline)
         tel_ticks = _row_ticks(telemetry)
         ev_ticks = _row_ticks(events)
+        artifacts = {
+            "physical_system_snapshot": "physical_system_snapshot.json",
+            "session_timeline": "session_timeline.jsonl",
+            "session_telemetry": "session_telemetry.json",
+            "structured_events": "structured_events.json",
+            "run_manifest": "run.json",
+        }
+        if sci_n > 0:
+            artifacts["scientific_timeline"] = "scientific_timeline.jsonl"
+            artifacts["scientific_events"] = "scientific_events.jsonl"
+            artifacts["scientific_meta"] = "scientific_meta.json"
         manifest = {
             "schema": SCHEMA,
             "run_id": rid,
@@ -375,13 +400,7 @@ def write_finalized_run(
             },
             "snapshot": "physical_system_snapshot.json",
             "snapshot_schema": snapshot.get("schema"),
-            "artifacts": {
-                "physical_system_snapshot": "physical_system_snapshot.json",
-                "session_timeline": "session_timeline.jsonl",
-                "session_telemetry": "session_telemetry.json",
-                "structured_events": "structured_events.json",
-                "run_manifest": "run.json",
-            },
+            "artifacts": artifacts,
             "buffer": session_meta.get("buffer") or {},
             "buffer_bounds": {
                 "timeline_max_tick": max(tl_ticks) if tl_ticks else None,
@@ -391,6 +410,12 @@ def write_finalized_run(
                     "Bounded session buffers may end earlier than final_tick; "
                     "they must never exceed final_tick or mix generations."
                 ),
+            },
+            "scientific_history": {
+                "present": sci_n > 0,
+                "row_count": sci_n,
+                "tick_range": [sci_min, sci_max] if sci_n else None,
+                "files": sci_info.get("files") or [],
             },
             "capabilities": caps,
             "status": "STOPPED",
@@ -425,6 +450,12 @@ def write_finalized_run(
         # Atomic publish only after validation
         os.rename(tmp_dir, run_dir)
         phases.append("saved")
+        # Remove live staging after successful publish (evidence now in run_dir).
+        if scientific_live_dir is not None:
+            live = Path(scientific_live_dir)
+            if live.is_dir() and live.name.startswith(".live-"):
+                shutil.rmtree(live, ignore_errors=True)
+                phases.append("scientific_live_staging_removed")
         return {
             "accepted": True,
             "saved": True,
@@ -440,6 +471,7 @@ def write_finalized_run(
             "seed": int(getattr(runtime, "seed", 0)),
             "runtime_generation": identity.get("runtime_generation"),
             "agent_count": agent_count,
+            "scientific_history": manifest.get("scientific_history"),
             "integrity": {
                 "captured_live_tick": live_tick,
                 "snapshot_tick": live_tick,

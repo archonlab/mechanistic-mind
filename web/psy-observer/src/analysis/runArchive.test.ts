@@ -191,10 +191,11 @@ describe('analysis lifecycle + run archive', () => {
     assert.equal(empty.coverage.level, 'INSUFFICIENT');
 
     const state = createAnalysisState();
-    // Simulate long span with few samples → PARTIAL
+    // Simulate long span with few unique ticks retained → PARTIAL
     state.start_tick = 0;
     state.end_tick = 5000;
     state.timeline_samples = 10;
+    for (let t = 4990; t < 5000; t++) state.unique_simulation_ticks.add(t);
     state.status = 'STOPPED';
     state.event_samples = 5;
     const built = buildRunAnalysis(state, 'FINAL');
