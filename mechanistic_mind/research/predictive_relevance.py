@@ -11,7 +11,6 @@ Not: attention, salience, FIELD_A special-case, hand-authored ignore lists.
 """
 from __future__ import annotations
 
-from copy import deepcopy
 from typing import Any
 
 from mechanistic_mind.research.predictive_compression import _sig
@@ -19,6 +18,7 @@ from mechanistic_mind.research.predictive_equivalence import (
     CONTINUATION_LINF,
     MIN_CLASS_SUPPORT,
     _class_mean_c,
+    _copy_float_map,
     _floats,
     _in_aabb,
     _linf,
@@ -97,6 +97,13 @@ def refresh(eq_store: dict[str, Any], *, tick: int = 0, meta: dict[str, Any] | N
 def _relevance_for(cls: dict[str, Any], others: list[dict[str, Any]], *, tau: float, tick: int) -> dict[str, Any]:
     aabb = {k: (float(v[0]), float(v[1])) for k, v in (cls.get("aabb") or {}).items()}
     mean = _class_mean_c(cls)
+    # Continuation L-inf vs other class means does not depend on AABB key.
+    # Precompute the dissimilar-others list once (same membership / order as the
+    # former inner-loop continue-on-_linf path) so we do not re-run _linf per key.
+    distinct_others: list[dict[str, Any]] = []
+    for other in others:
+        if _linf(mean, _class_mean_c(other)) > tau:
+            distinct_others.append(other)
     allowed: list[str] = []
     tight: list[str] = []
     discriminative: list[str] = []
@@ -105,9 +112,7 @@ def _relevance_for(cls: dict[str, Any], others: list[dict[str, Any]], *, tau: fl
             allowed.append(k)
         else:
             tight.append(k)
-        for other in others:
-            if _linf(mean, _class_mean_c(other)) <= tau:
-                continue
+        for other in distinct_others:
             ospan = (other.get("aabb") or {}).get(k)
             if not ospan:
                 continue
@@ -254,7 +259,9 @@ def diagnostic(eq_store: dict[str, Any], fragment: dict[str, float], action: str
             "id": cid,
             "relevant": list(rel.get("relevant") or got.get("relevant") or []),
             "allowed_variation": list(rel.get("allowed_variation") or got.get("allowed_variation") or []),
-            "continuation": deepcopy(_class_mean_c((eq_store.get("classes") or {}).get(cid) or {}) if cid else {}),
+            "continuation": _copy_float_map(
+                _class_mean_c((eq_store.get("classes") or {}).get(cid) or {}) if cid else {}
+            ),
             "support": got.get("support"),
         },
         "full_aabb_audit": aabb_key_audit(aabb, fragment) if aabb else {},

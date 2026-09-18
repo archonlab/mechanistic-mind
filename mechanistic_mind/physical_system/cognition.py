@@ -28,6 +28,42 @@ from mechanistic_mind.research import multistep_action_prospection as mapr
 from .actions import available_actions
 from .observation import audit_cognition_payload
 from .unknown_action_probe import classify_unmodeled_actions, probe_receipt
+
+# Performance: retain tick-local last_selection payloads without deepcopy.
+# Set False to restore legacy deepcopy retention for A/B equivalence checks.
+_USE_TICK_LOCAL_RETAIN = True
+
+
+def set_tick_local_retain(enabled: bool) -> None:
+    global _USE_TICK_LOCAL_RETAIN
+    _USE_TICK_LOCAL_RETAIN = bool(enabled)
+
+
+def tick_local_retain_enabled() -> bool:
+    return bool(_USE_TICK_LOCAL_RETAIN)
+
+
+def _retain_tick_local(value: Any) -> Any:
+    """Retain a tick-local cognition object without deepcopy.
+
+    Only for structures constructed in the current cognition tick that are not
+    mutated after retention. ``last_selection`` is replaced each tick.
+    Historical isolation for receipts / public views is provided by their own
+    deepcopy on export (see diagnostics.build_action_decision_receipt,
+    cognition_public_view).
+    """
+    if not _USE_TICK_LOCAL_RETAIN:
+        return deepcopy(value)
+    return value
+
+
+def _retain_tick_local_list(rows: list[Any] | None, *, limit: int) -> list[Any]:
+    """New list container; element identity retained (tick-local, read-only after)."""
+    if not rows:
+        return []
+    if not _USE_TICK_LOCAL_RETAIN:
+        return deepcopy(rows[:limit])
+    return list(rows[:limit])
 from . import scenario_competition as sc
 
 
@@ -758,15 +794,20 @@ def run_cognition_before_action(
     if cfg.get("bounded_memory"):
         pc.purge_redundant_raw(state["compression"], keep_recent=True)
 
-    state["last_fragment"] = deepcopy(observation)
+    if isinstance(observation, dict):
+        state["last_fragment"] = (
+            dict(observation) if _USE_TICK_LOCAL_RETAIN else deepcopy(observation)
+        )
+    else:
+        state["last_fragment"] = observation
     state["last_action"] = selected
     state["last_selection"] = {
         "action": selected,
         "source": selected_source,
         "candidates": actions,
-        "prediction_matches": deepcopy(predictions[:8]),
-        "continuations": deepcopy(continuations[:8]),
-        "instrumental_prediction": deepcopy(instrumental_prediction),
+        "prediction_matches": _retain_tick_local_list(predictions, limit=8),
+        "continuations": _retain_tick_local_list(continuations, limit=8),
+        "instrumental_prediction": _retain_tick_local(instrumental_prediction),
         "action_event": action_event,
         "selection_rule": selection_rule,
         "composition_meta": {
@@ -776,22 +817,22 @@ def run_cognition_before_action(
         },
         "peer_evaluation": peer_evaluation,
         "prospective_selection_mode": selection_mode,
-        "scenario_groups": deepcopy(scenario_groups_public),
-        "competition": deepcopy(competition_result),
-        "unknown_action_probe": deepcopy(probe_info),
-        "equivalence_diagnostic": deepcopy(last_pe_diag),
-        "temporal_diagnostic": deepcopy(last_tps_diag),
-        "temporal_bridge_diagnostic": deepcopy(last_tpb_diag),
-        "temporal_entry_steps": deepcopy(entry_steps[:8]),
-        "predictive_conflict": deepcopy(conflict_org),
-        "conflict_diagnostic": deepcopy(last_conflict_diag),
-        "future_sensitive_action": deepcopy(last_fsa_diag),
-        "prediction_error_revision": deepcopy(last_per_diag),
-        "temporal_prediction_error": deepcopy(last_tpe_diag),
-        "predicted_context_prospection": deepcopy(last_pcp_diag),
-        "predicted_context_branches": deepcopy(pcp_branches[:8]),
-        "multistep_action_prospection": deepcopy(last_map_diag),
-        "multistep_action_branches": deepcopy(map_branches[:8]),
+        "scenario_groups": _retain_tick_local(scenario_groups_public),
+        "competition": _retain_tick_local(competition_result),
+        "unknown_action_probe": _retain_tick_local(probe_info),
+        "equivalence_diagnostic": _retain_tick_local(last_pe_diag),
+        "temporal_diagnostic": _retain_tick_local(last_tps_diag),
+        "temporal_bridge_diagnostic": _retain_tick_local(last_tpb_diag),
+        "temporal_entry_steps": _retain_tick_local_list(entry_steps, limit=8),
+        "predictive_conflict": _retain_tick_local(conflict_org),
+        "conflict_diagnostic": _retain_tick_local(last_conflict_diag),
+        "future_sensitive_action": _retain_tick_local(last_fsa_diag),
+        "prediction_error_revision": _retain_tick_local(last_per_diag),
+        "temporal_prediction_error": _retain_tick_local(last_tpe_diag),
+        "predicted_context_prospection": _retain_tick_local(last_pcp_diag),
+        "predicted_context_branches": _retain_tick_local_list(pcp_branches, limit=8),
+        "multistep_action_prospection": _retain_tick_local(last_map_diag),
+        "multistep_action_branches": _retain_tick_local_list(map_branches, limit=8),
     }
     return CognitionTickResult(
         observation=observation,

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Performance
+
+- Improved long-run cognition performance by caching repeated predictive-equivalence
+  class-mean calculations and removing unnecessary deep copies from hot cognition
+  paths. Internal development benchmarks on the two-agent full-experimental
+  configuration (with experimental physical signals) measured up to ~3.36× lower
+  late-run tick cost versus the pre-optimization baseline, with deterministic and
+  scientific-history equivalence preserved. This figure is configuration-specific
+  and is not a universal speedup claim.
+
+
 ### Update 4.76 — Acquired Transition Reinstatement
 
 - Current S contracts frozen 4.75 L into R_L (2×3). Outcome D.

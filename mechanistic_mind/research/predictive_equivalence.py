@@ -11,7 +11,6 @@ Not: global float rounding, FIELD_A bins, MATCH_TOL increase, or semantic labels
 """
 from __future__ import annotations
 
-from copy import deepcopy
 from typing import Any
 
 from mechanistic_mind.research.predictive_compression import _sig
@@ -24,6 +23,38 @@ MIN_CLASS_SUPPORT = 3
 # Internal tolerance for comparing *continuation* statistics only (L-inf
 # over consequent channels). Sensitivity-tested. Does not define observation identity.
 CONTINUATION_LINF = 0.10
+
+# Performance: flat float maps use dict() instead of deepcopy (exact for dict[str,float]).
+# Set False to restore legacy deepcopy for A/B equivalence checks.
+_USE_FLOAT_MAP_DICT_COPY = True
+
+
+def set_float_map_dict_copy(enabled: bool) -> None:
+    global _USE_FLOAT_MAP_DICT_COPY
+    _USE_FLOAT_MAP_DICT_COPY = bool(enabled)
+
+
+def float_map_dict_copy_enabled() -> bool:
+    return bool(_USE_FLOAT_MAP_DICT_COPY)
+
+# Lightweight cache diagnostics (test/bench). Not scientific state.
+_CACHE_STATS = {
+    "lookups": 0,
+    "hits": 0,
+    "misses": 0,
+    "invalidations": 0,
+    "recomputation": 0,
+}
+_USE_MEAN_CACHE = True
+
+
+def cache_stats() -> dict[str, int]:
+    return {k: int(v) for k, v in _CACHE_STATS.items()}
+
+
+def reset_cache_stats() -> None:
+    for k in _CACHE_STATS:
+        _CACHE_STATS[k] = 0
 
 
 def empty_store(*, continuation_linf: float | None = None, continuation_l1: float | None = None) -> dict[str, Any]:
@@ -90,6 +121,19 @@ def _floats(d: dict[str, Any] | None) -> dict[str, float]:
     return out
 
 
+def _copy_float_map(d: dict[str, float]) -> dict[str, float]:
+    """Independent copy of a flat float mapping (replaces deepcopy for dict[str, float]).
+
+    Values are immutable floats; a shallow ``dict`` copy matches deepcopy semantics
+    for these structures and avoids recursive copy dispatch.
+    """
+    if not _USE_FLOAT_MAP_DICT_COPY:
+        from copy import deepcopy as _dc
+
+        return _dc(d)
+    return dict(d)
+
+
 def _mean(rows: list[dict[str, float]]) -> dict[str, float]:
     if not rows:
         return {}
@@ -152,9 +196,73 @@ def _in_aabb(fragment: dict[str, float], aabb: dict[str, tuple[float, float]]) -
     return True
 
 
-def _class_mean_c(cls: dict[str, Any]) -> dict[str, float]:
+def set_class_mean_cache_enabled(enabled: bool) -> None:
+    """Test/bench switch. Production default is True. Does not alter formulas."""
+    global _USE_MEAN_CACHE
+    _USE_MEAN_CACHE = bool(enabled)
+
+
+def class_mean_cache_enabled() -> bool:
+    return bool(_USE_MEAN_CACHE)
+
+
+def _class_mean_c_uncached(cls: dict[str, Any]) -> dict[str, float]:
+    """Exact pre-cache aggregation (same formula / member iteration as baseline)."""
     cons = [m.get("mean_c") or {} for m in (cls.get("members") or {}).values() if m.get("mean_c")]
     return _mean(cons) if cons else dict(cls.get("mean_c") or {})
+
+
+def _invalidate_class_mean_c(cls: dict[str, Any]) -> None:
+    """Bump derivation generation after membership / member mean_c mutation."""
+    cls["_mean_c_gen"] = int(cls.get("_mean_c_gen") or 0) + 1
+    cls.pop("_mean_c_cached", None)
+    _CACHE_STATS["invalidations"] = int(_CACHE_STATS["invalidations"]) + 1
+
+
+def _class_mean_c(cls: dict[str, Any]) -> dict[str, float]:
+    """Aggregate member continuation means (identical formula to pre-cache baseline).
+
+    Caches the exact aggregation keyed by ``_mean_c_gen``. ``learn`` invalidates
+    before mid-update reads so recomputation sees the new members.
+    """
+    _CACHE_STATS["lookups"] = int(_CACHE_STATS["lookups"]) + 1
+    if not _USE_MEAN_CACHE:
+        _CACHE_STATS["misses"] = int(_CACHE_STATS["misses"]) + 1
+        _CACHE_STATS["recomputation"] = int(_CACHE_STATS["recomputation"]) + 1
+        return _class_mean_c_uncached(cls)
+    gen = int(cls.get("_mean_c_gen") or 0)
+    cached = cls.get("_mean_c_cached")
+    if cached is not None and cached[0] == gen:
+        _CACHE_STATS["hits"] = int(_CACHE_STATS["hits"]) + 1
+        # Cached mapping is treated as read-only by callers (same values as baseline).
+        return cached[1]
+    _CACHE_STATS["misses"] = int(_CACHE_STATS["misses"]) + 1
+    _CACHE_STATS["recomputation"] = int(_CACHE_STATS["recomputation"]) + 1
+    result = _class_mean_c_uncached(cls)
+    cls["_mean_c_cached"] = (gen, result)
+    return result
+
+
+def clear_derived_caches(store: dict[str, Any]) -> None:
+    """Drop derived mean caches after restore/rebuild. Scientific fields untouched."""
+    for cls in (store.get("classes") or {}).values():
+        if isinstance(cls, dict):
+            cls.pop("_mean_c_cached", None)
+            # Keep _mean_c_gen if present so a later mutate still invalidates;
+            # without a cached payload there is nothing stale to serve.
+
+
+def strip_derived_fields(obj: Any) -> Any:
+    """Deep-copy omitting cache-only keys for scientific structure compares."""
+    if isinstance(obj, dict):
+        return {
+            k: strip_derived_fields(v)
+            for k, v in obj.items()
+            if k not in ("_mean_c_cached", "_mean_c_gen")
+        }
+    if isinstance(obj, list):
+        return [strip_derived_fields(v) for v in obj]
+    return obj
 
 
 def learn(
@@ -200,9 +308,11 @@ def learn(
         for k, v in crep.items():
             mc[k] = float(mc.get(k, 0.0)) + (float(v) - float(mc.get(k, 0.0))) / n
         mem["mean_c"] = mc
-        mem["last_abs"] = deepcopy(cons)
+        mem["last_abs"] = _copy_float_map(cons)
         mem.setdefault("raw_ids", []).append(raw_id)
         mem["raw_ids"] = mem["raw_ids"][-8:]
+        # Member mean_c mutated: invalidate before mid-update class-mean read.
+        _invalidate_class_mean_c(host)
         class_c = _class_mean_c(host)
         if _linf(mc, class_c) > tau:
             mem["contra"] = int(mem.get("contra") or 0) + 1
@@ -210,6 +320,7 @@ def learn(
             mem["contra"] = 0
         if int(mem.get("contra") or 0) >= 2:
             host["members"].pop(sig, None)
+            _invalidate_class_mean_c(host)
             host["support"] = sum(int(m.get("support") or 0) for m in host["members"].values())
             host["aabb"] = _aabb(host["members"])
             host["mean_c"] = _class_mean_c(host)
@@ -220,6 +331,7 @@ def learn(
         else:
             host["support"] = sum(int(m.get("support") or 0) for m in host["members"].values())
             host["aabb"] = _aabb(host["members"])
+            # Same gen as mid-update recompute; reuse cached aggregation.
             host["mean_c"] = _class_mean_c(host)
             _add_prov(host, "support", sig, tick)
             return {"status": "UPDATED", "class_id": host.get("id")}
@@ -239,15 +351,16 @@ def learn(
             members.pop(weakest, None)
         members[sig] = {
             "sig": sig,
-            "fragment": deepcopy(frag),
-            "mean_c": deepcopy(crep),
-            "last_abs": deepcopy(cons),
+            "fragment": _copy_float_map(frag),
+            "mean_c": _copy_float_map(crep),
+            "last_abs": _copy_float_map(cons),
             "support": 1,
             "contra": 0,
             "first_tick": int(tick),
             "last_tick": int(tick),
             "raw_ids": [raw_id],
         }
+        _invalidate_class_mean_c(cls)
         cls["support"] = sum(int(m.get("support") or 0) for m in members.values())
         cls["aabb"] = _aabb(members)
         cls["mean_c"] = _class_mean_c(cls)
@@ -272,9 +385,9 @@ def learn(
         "members": {
             sig: {
                 "sig": sig,
-                "fragment": deepcopy(frag),
-                "mean_c": deepcopy(crep),
-                "last_abs": deepcopy(cons),
+                "fragment": _copy_float_map(frag),
+                "mean_c": _copy_float_map(crep),
+                "last_abs": _copy_float_map(cons),
                 "support": 1,
                 "contra": 0,
                 "first_tick": int(tick),
@@ -283,7 +396,7 @@ def learn(
             }
         },
         "aabb": {},
-        "mean_c": deepcopy(crep),
+        "mean_c": _copy_float_map(crep),
         "first_tick": int(tick),
         "revised_at": None,
         "provenance": [{"type": "formed", "target": sig, "tick": int(tick)}],

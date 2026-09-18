@@ -8,7 +8,6 @@ remain prospective; only first_action is eligible for present selection.
 """
 from __future__ import annotations
 
-from copy import deepcopy
 from typing import Any
 
 from mechanistic_mind.research import prospective_composition as pr
@@ -18,6 +17,23 @@ from mechanistic_mind.research.predictive_compression import _sig
 MAX_BRANCHES = 8
 MAX_DEPTH = 3
 MAX_SECOND = 4
+
+# Performance: ancestry antecedent/predicted are flat float maps.
+_USE_ANCESTRY_DICT_COPY = True
+
+
+def set_ancestry_dict_copy(enabled: bool) -> None:
+    global _USE_ANCESTRY_DICT_COPY
+    _USE_ANCESTRY_DICT_COPY = bool(enabled)
+
+
+def _copy_frag_map(d: dict[str, Any] | None) -> dict[str, Any]:
+    src = d or {}
+    if not _USE_ANCESTRY_DICT_COPY:
+        from copy import deepcopy as _dc
+
+        return _dc(src)
+    return dict(src)
 
 
 def empty_meta() -> dict[str, Any]:
@@ -74,8 +90,8 @@ def _edge_ancestry(store: dict[str, Any], edge: dict[str, Any]) -> dict[str, Any
         "support": int(edge.get("support") or (row or {}).get("support") or 0),
         "reliability": edge.get("reliability") if edge.get("reliability") is not None else (pr.reliability(row) if row else None),
         "evidence_ticks": ticks,
-        "antecedent": deepcopy((row or {}).get("antecedent") or {}),
-        "predicted": deepcopy(edge.get("predicted") or {}),
+        "antecedent": _copy_frag_map((row or {}).get("antecedent") or {}),
+        "predicted": _copy_frag_map(edge.get("predicted") or {}),
     }
 
 

@@ -65,6 +65,7 @@ from .cognition import (
     empty_cognitive_state,
     run_cognition_before_action,
 )
+from mechanistic_mind.research import predictive_equivalence as pe
 from .observation import accessible_observation, observation_bundle
 from .diagnostics import (
     DecisionTraceBuffer,
@@ -1615,6 +1616,9 @@ class PhysicalSystemRuntime:
         runtime.last_internal_flux = None
         if "cognition" in payload:
             runtime.cognition = deepcopy(payload["cognition"])
+            eq = runtime.cognition.get("equivalence")
+            if isinstance(eq, dict):
+                pe.clear_derived_caches(eq)
         else:
             runtime.cognition = empty_cognitive_state(runtime.config.cognition)
         runtime.last_agent_observation = deepcopy(payload.get("last_agent_observation"))

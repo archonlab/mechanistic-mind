@@ -10,7 +10,6 @@ Reuses continuation-class grouping on the window (not snapshot SHA).
 """
 from __future__ import annotations
 
-from copy import deepcopy
 from typing import Any
 
 from mechanistic_mind.research import predictive_equivalence as pe
@@ -22,6 +21,22 @@ WINDOW = 4
 LAGS = (1, 2, 3, 4)
 RING = 16
 MIN_WINDOW = 2  # at least one successive difference
+
+# Performance: window fragments are flat float maps — dict() equals deepcopy.
+_USE_FRAGMENT_DICT_COPY = True
+
+
+def set_fragment_dict_copy(enabled: bool) -> None:
+    global _USE_FRAGMENT_DICT_COPY
+    _USE_FRAGMENT_DICT_COPY = bool(enabled)
+
+
+def _copy_window_fragment(f: dict[str, float]) -> dict[str, float]:
+    if not _USE_FRAGMENT_DICT_COPY:
+        from copy import deepcopy as _dc
+
+        return _dc(f)
+    return dict(f)
 
 
 def empty_store() -> dict[str, Any]:
@@ -194,7 +209,7 @@ def retrieve(
             hits.append((int(L), got))
         elif got.get("status") in {"CONFLICT", "TEMPORAL_CONFLICT"}:
             conflicts.append((int(L), got))
-    recent = [{"index": i - len(window) + 1, "fragment": deepcopy(f)} for i, f in enumerate(window)]
+    recent = [{"index": i - len(window) + 1, "fragment": _copy_window_fragment(f)} for i, f in enumerate(window)]
     base = {
         "window_n": len(window),
         "delta_sig": _sig(dfrag),
@@ -256,7 +271,7 @@ def diagnostic(store: dict[str, Any], present: dict[str, float], action: str) ->
         "not_physical_ground_truth": True,
         "not_time_perception": True,
         "recent": got.get("recent") or [
-            {"index": i - len(window) + 1, "fragment": deepcopy(f)}
+            {"index": i - len(window) + 1, "fragment": _copy_window_fragment(f)}
             for i, f in enumerate(window)
         ],
         "retrieved": got,
