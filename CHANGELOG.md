@@ -4,6 +4,12 @@
 
 ### Performance
 
+- Improved Psy Observer Web LIVE performance by decoupling simulation ticks
+  from frame construction and transport. RUNNING now uses bounded compact
+  frames while scientific history continues to record canonical simulation
+  ticks independently.
+- Fixed intermittent LIVE frame stalls and compact pipeline stages becoming
+  unavailable during normal runs or speed changes.
 - Improved long-run cognition performance by caching repeated predictive-equivalence
   class-mean calculations and removing unnecessary deep copies from hot cognition
   paths. Internal development benchmarks on the two-agent full-experimental
