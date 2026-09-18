@@ -596,6 +596,152 @@ def mind_frame(
     }
 
 
+def causal_chain_compact_frame(
+    runtime: PhysicalSystemRuntime,
+    *,
+    previous_body: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Bounded live pipeline stages for RUNNING compact frames.
+
+    Intentionally avoids ``cognitive_view`` / ``cognition_public_view`` (the full
+    capture hotspot). Supplies only the fields the live pipeline cards read.
+    """
+    body_now = runtime.body.snapshot()
+    cog_on = bool(runtime.config.cognition.cognition_enabled)
+    sel = (runtime.cognition.get("last_selection") or {}) if isinstance(runtime.cognition, dict) else {}
+    metrics = (runtime.cognition.get("metrics") or {}) if isinstance(runtime.cognition, dict) else {}
+
+    # WORLD: UI shows T_mean + tick only.
+    try:
+        t_mean = float(runtime.world.T.mean())
+    except Exception:
+        t_mean = float("nan")
+    world_data = {"T_mean": t_mean, "tick": int(runtime.world.tick)}
+
+    # PERCEPTION: compact numeric summary (no full observation bundle grids).
+    perception_data: dict[str, float] = {
+        "x": float(body_now.get("x", 0.0)),
+        "y": float(body_now.get("y", 0.0)),
+        "T": float(body_now.get("T", 0.0)),
+        "mech": float(body_now.get("mech", 0.0)),
+        "vx": float(body_now.get("vx", 0.0)),
+        "vy": float(body_now.get("vy", 0.0)),
+    }
+
+    if previous_body is None:
+        consequence: dict[str, Any] = {
+            "status": "NOT AVAILABLE",
+            "reason": "no prior body snapshot in buffer",
+        }
+    else:
+        consequence = {
+            "status": "AVAILABLE",
+            "dx": float(body_now["x"] - previous_body["x"]),
+            "dy": float(body_now["y"] - previous_body["y"]),
+            "dT": float(body_now["T"] - previous_body["T"]),
+            "dvx": float(body_now["vx"] - previous_body["vx"]),
+            "dvy": float(body_now["vy"] - previous_body["vy"]),
+            "d_matter_in": float(body_now["matter_in"] - previous_body["matter_in"]),
+            "d_mech": float(body_now["mech"] - previous_body["mech"]),
+        }
+
+    internal_phys = internal_physical_frame(runtime)
+
+    return {
+        "tick": int(runtime.tick),
+        "detail": "compact",
+        "stages": {
+            "WORLD": {"status": "AVAILABLE", "data": world_data},
+            "PERCEPTION": {
+                "status": "AVAILABLE",
+                "data": perception_data,
+                "note": "compact numeric body/local summary; not full observation bundle",
+            },
+            "BODY": {"status": "AVAILABLE", "data": body_now},
+            "INTERNAL": {
+                "status": "AVAILABLE",
+                "physical": internal_phys,
+                "cognitive": {
+                    "status": "AVAILABLE" if cog_on else "NOT AVAILABLE",
+                    "summary": {
+                        "prediction_count": metrics.get("prediction_count"),
+                        "action_counts": dict(metrics.get("action_counts") or {}),
+                    }
+                    if cog_on
+                    else None,
+                },
+            },
+            "PREDICTION": {
+                "status": "AVAILABLE" if cog_on else "NOT AVAILABLE",
+                "prediction_matches": None,
+                "continuations": None,
+                "predictive_organization_keys": [],
+                "metrics": {
+                    "prediction_count": metrics.get("prediction_count"),
+                    "prospective_compositions": metrics.get("prospective_compositions"),
+                }
+                if cog_on
+                else None,
+                "note": "compact: counts only; full matches on PAUSED/INSPECT",
+            }
+            if cog_on
+            else {"status": "NOT AVAILABLE", "reason": "cognition_disabled"},
+            "ACTION": {
+                "status": "AVAILABLE" if cog_on else "NOT AVAILABLE",
+                "selected": runtime.last_selected_action,
+                "candidates": list(available_actions()) if cog_on else [],
+                "source": sel.get("source") if cog_on else None,
+                "last_apply": sel.get("last_apply") if cog_on else None,
+            },
+            "CONSEQUENCE": consequence,
+        },
+        "note": "COMPACT live pipeline. PAUSED/INSPECT publishes full causal_chain.",
+    }
+
+
+def cognition_pipeline_compact_frame(runtime: PhysicalSystemRuntime) -> dict[str, Any]:
+    """Config-flag pipeline rows without cognitive_view()."""
+    from mechanistic_mind.model.tiktaalik import promotion_class
+
+    cfg = runtime.config.cognition
+    stages: list[dict[str, Any]] = []
+
+    def add(stage: str, *, enabled: bool, mechanism_id: str) -> None:
+        pclass = promotion_class(mechanism_id)
+        stages.append({
+            "stage": stage,
+            "status": "ACTIVE" if enabled else "OFF",
+            "promotion_class": pclass,
+            "experimental": pclass == "EXPERIMENTAL",
+        })
+
+    add("OBSERVATION", enabled=True, mechanism_id="discrete_action_bridge")
+    add("HISTORY / INGEST", enabled=bool(cfg.bounded_memory), mechanism_id="bounded_memory")
+    add("RETRIEVAL", enabled=bool(cfg.retrieval), mechanism_id="retrieval")
+    add("PREDICTIVE COMPRESSION", enabled=bool(cfg.predictive_compression), mechanism_id="predictive_compression")
+    add("MULTISCALE PREDICTION", enabled=bool(cfg.multiscale_prediction), mechanism_id="multiscale_prediction")
+    add("TEMPORAL PREDICTION", enabled=bool(cfg.temporal_predictive_structure), mechanism_id="temporal_predictive_structure")
+    add("PREDICTED CONTEXT", enabled=bool(cfg.predicted_context_prospection), mechanism_id="predicted_context_prospection")
+    add("PROSPECTION", enabled=bool(cfg.prospective_composition), mechanism_id="prospective_composition")
+    add("MULTI-STEP PROSPECTION", enabled=bool(cfg.multistep_action_prospection), mechanism_id="multistep_action_prospection")
+    add("CONFLICT", enabled=bool(cfg.predictive_conflict), mechanism_id="predictive_conflict")
+    add(
+        "COMPETITION",
+        enabled=str(cfg.prospective_selection).upper() == "SCENARIO_COMPETITION",
+        mechanism_id="prospective_scenario_competition",
+    )
+    add("SELECTED ACTION", enabled=bool(cfg.cognition_enabled), mechanism_id="cognition")
+    add("REALIZED PHYSICS", enabled=True, mechanism_id="discrete_action_bridge")
+    add("ERROR / REVISION", enabled=bool(cfg.prediction_error_revision), mechanism_id="prediction_error_revision")
+    return {
+        "detail": "compact",
+        "stages": stages,
+        "selected_action": runtime.last_selected_action,
+        "branch_count": None,
+        "note": "COMPACT pipeline flags only; no cognitive_view.",
+    }
+
+
 def causal_chain_frame(runtime: PhysicalSystemRuntime, *, previous_body: dict[str, Any] | None = None) -> dict[str, Any]:
     """WORLD → PERCEPTION → BODY → INTERNAL → PREDICTION → ACTION → CONSEQUENCE."""
     views = runtime.observation_views()
@@ -879,11 +1025,13 @@ def agents_views_frame(
     runtime: PhysicalSystemRuntime,
     *,
     previous_body: dict[str, Any] | None,
+    previous_bodies: dict[str, dict[str, Any]] | None = None,
     detail: str = "full",
 ) -> dict[str, Any]:
     """Per-agent observer slices at the current tick. Selection does not omit peers."""
     compact = str(detail).lower() == "compact"
     slots = getattr(runtime, "slots", None)
+    prev_map = previous_bodies or {}
     if not slots:
         return {
             "agent_0": {
@@ -895,12 +1043,12 @@ def agents_views_frame(
                 "body": body_frame(runtime),
                 "physical": _physical_bundle(runtime),
                 "causal_chain": (
-                    {"status": "DEFERRED", "detail": "compact"}
+                    causal_chain_compact_frame(runtime, previous_body=previous_body)
                     if compact
                     else causal_chain_frame(runtime, previous_body=previous_body)
                 ),
                 "cognition_pipeline": (
-                    {"status": "DEFERRED", "detail": "compact"}
+                    cognition_pipeline_compact_frame(runtime)
                     if compact
                     else cognition_pipeline_frame(runtime)
                 ),
@@ -923,6 +1071,10 @@ def agents_views_frame(
             runtime.selected_index = i  # observer projection only; restored below
             aid = f"agent_{i}"
             mind = mind_compact_frame(slot, agent_id=aid, body_id=f"body-{i}") if compact else mind_frame(slot, agent_id=aid, body_id=f"body-{i}")
+            # Prefer per-agent previous body; fall back to selected-only buffer for compat.
+            slot_prev = prev_map.get(aid)
+            if slot_prev is None and i == prev_selected:
+                slot_prev = previous_body
             out[aid] = {
                 "agent_id": aid,
                 "body_id": f"body-{i}",
@@ -933,12 +1085,12 @@ def agents_views_frame(
                 "body": body_frame(slot, agent_id=aid, body_id=f"body-{i}"),
                 "physical": _physical_bundle(slot, agent_id=aid, body_id=f"body-{i}"),
                 "causal_chain": (
-                    {"status": "DEFERRED", "detail": "compact", "source_agent_id": aid}
+                    causal_chain_compact_frame(slot, previous_body=slot_prev)
                     if compact
-                    else causal_chain_frame(slot, previous_body=previous_body if i == prev_selected else None)
+                    else causal_chain_frame(slot, previous_body=slot_prev)
                 ),
                 "cognition_pipeline": (
-                    {"status": "DEFERRED", "detail": "compact", "source_agent_id": aid}
+                    cognition_pipeline_compact_frame(slot)
                     if compact
                     else cognition_pipeline_frame(slot)
                 ),
@@ -1145,6 +1297,7 @@ def live_frame(
     max_side: int = 64,
     detail: str = "full",
     structured_events: list[dict[str, Any]] | None = None,
+    previous_bodies: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     mechanisms = __import__(
         "mechanistic_mind.physical_system.mechanism_registry",
@@ -1158,7 +1311,12 @@ def live_frame(
     events = structured_events if structured_events is not None else collect_observer_events(runtime, limit=40)
     agent_id = observer_agent_id(runtime)
     body_id = observer_body_id(runtime)
-    views = agents_views_frame(runtime, previous_body=previous_body, detail=detail)
+    views = agents_views_frame(
+        runtime,
+        previous_body=previous_body,
+        previous_bodies=previous_bodies,
+        detail=detail,
+    )
     # Never fall back to another agent's view — that produces hybrid identity screens.
     selected_view = views.get(agent_id)
     if selected_view is None:

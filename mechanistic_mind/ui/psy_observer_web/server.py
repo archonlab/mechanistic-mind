@@ -773,11 +773,21 @@ async def _startup() -> None:
     def _on_frame(frame: dict[str, Any]) -> None:
         if _loop is None:
             return
-        try:
-            text = json.dumps({"type": "frame", "data": frame}, default=str)
-        except TypeError:
+        # Prefer pre-serialized JSON produced on the capture worker (not SIM).
+        cached = sess.published_json()
+        if cached is not None:
+            hub.offer_text('{"type":"frame","data":' + cached + "}", _loop)
             return
-        hub.offer_text(text, _loop)
+
+        def _serialize_and_offer() -> None:
+            try:
+                text = json.dumps({"type": "frame", "data": frame}, default=str)
+            except TypeError:
+                return
+            if _loop is not None:
+                hub.offer_text(text, _loop)
+
+        _loop.run_in_executor(None, _serialize_and_offer)
 
     sess.subscribe(_on_frame)
 

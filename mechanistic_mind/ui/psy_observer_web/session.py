@@ -1,9 +1,15 @@
 """In-process Current MM session for Psy Observer Web.
 
 Owns the run loop. Simulation tick rate is independent of UI render rate.
+
+BETA2-OBS-02: Play advances simulation without waiting for Observer frame
+construction. A dedicated capture worker builds frames from a coherent
+step-lock snapshot (latest-request-wins). RUNNING publishes compact/bounded
+frames; PAUSED/INSPECT/step use full detail.
 """
 from __future__ import annotations
 
+import json
 import threading
 import time
 from datetime import datetime, timezone
@@ -12,6 +18,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
+import gc
 
 from mechanistic_mind.model.tiktaalik import display_name, tiktaalik_config
 from mechanistic_mind.physical_system import (
@@ -88,6 +95,7 @@ class ObserverSession:
     _step_lock: threading.Lock = field(default_factory=threading.Lock)
     _published: dict[str, Any] | None = None
     _prev_body: dict[str, Any] | None = None
+    _prev_bodies: dict[str, dict[str, Any]] = field(default_factory=dict)
     _subscribers: list[Callable[[dict[str, Any]], None]] = field(default_factory=list)
     _last_push: float = 0.0
     _thread: threading.Thread | None = None
@@ -114,10 +122,34 @@ class ObserverSession:
     _last_frame_tick: int | None = None
     _sci_writer: ScientificHistoryWriter | None = None
     _sci_live_dir: Path | None = None
+    # Async Observer capture (BETA2-OBS-02) — never block SIM on live_frame.
+    _capture_thread: threading.Thread | None = None
+    _capture_stop: bool = False
+    _capture_cond: threading.Condition = field(default_factory=threading.Condition)
+    _capture_pending: dict[str, Any] | None = None
+    _capture_inflight: bool = False
+    _capture_queue_drops: int = 0
+    _capture_test_delay_s: float = 0.0  # test hook: sleep before taking step_lock
+    _published_json: str | None = None
+    _observer_lag_ticks: int = 0
+    # Capture scheduling / diagnostics (BETA2-OBS-02.1)
+    _capture_wants_lock: bool = False
+    _capture_coop_yield: bool = True  # SIM yields step_lock to capture worker
+    _capture_timing_enabled: bool = True
+    _capture_timings: deque[dict[str, Any]] = field(
+        default_factory=lambda: deque(maxlen=2048)
+    )
+    _sim_lock_waits_ms: deque[float] = field(default_factory=lambda: deque(maxlen=4096))
+    _last_publish_mono: float = 0.0
+    _publish_intervals_ms: deque[float] = field(default_factory=lambda: deque(maxlen=2048))
+    _capture_detail_counts: dict[str, int] = field(
+        default_factory=lambda: {"compact": 0, "full": 0, "other": 0}
+    )
 
     def __post_init__(self) -> None:
         self._perf_window_start = time.monotonic()
         self.reset(seed=self.config.seed)
+        self._ensure_capture_worker()
 
     def reset(self, *, seed: int | None = None, cognition_enabled: bool | None = None) -> dict[str, Any]:
         prior_finalize = None
@@ -143,6 +175,7 @@ class ObserverSession:
                 self._buffer = deque(maxlen=int(self.config.buffer_capacity))
                 self._timeline = deque(maxlen=max(1024, int(self.config.buffer_capacity) * 8))
                 self._prev_body = None
+                self._prev_bodies = {}
                 self._trajectory = deque(maxlen=max(256, int(self.config.buffer_capacity) * 4))
                 self._telemetry = deque(maxlen=max(256, int(self.config.buffer_capacity) * 4))
                 self._historical_compat = None
@@ -162,6 +195,10 @@ class ObserverSession:
                 self._perf_sim_tps = 0.0
                 self._perf_obs_fps = 0.0
                 self._last_frame_tick = None
+                self._published_json = None
+                self._observer_lag_ticks = 0
+                self._invalidate_pending_captures_locked()
+                self._record_motion_locked()
                 frame = self._capture_locked(detail="full")
                 out = self._with_receipt(
                     frame, "RESET", {"seed": seed, "cognition_enabled": cognition_enabled},
@@ -170,6 +207,11 @@ class ObserverSession:
                 if prior_finalize is not None:
                     out["finalize"] = prior_finalize
                 return out
+
+    def _invalidate_pending_captures_locked(self) -> None:
+        """Drop any async capture belonging to a prior run/generation."""
+        with self._capture_cond:
+            self._capture_pending = None
 
     def subscribe(self, fn: Callable[[dict[str, Any]], None]) -> None:
         with self._lock:
@@ -219,7 +261,11 @@ class ObserverSession:
         return items[-max(1, int(limit)):]
 
     def _frame_detail_for_speed(self) -> str:
-        if float(self.config.speed) > 1.0 and self.status == "RUNNING":
+        """RUNNING always uses compact/bounded frames so capture cannot stall SIM.
+
+        Full detail is available on PAUSED / INSPECT / explicit step captures.
+        """
+        if self.status == "RUNNING":
             return "compact"
         return "full"
 
@@ -239,7 +285,174 @@ class ObserverSession:
             self._perf_ticks = 0
             self._perf_captures = 0
 
-    def _capture_locked(self, *, detail: str | None = None) -> dict[str, Any]:
+    def _ensure_capture_worker(self) -> None:
+        with self._capture_cond:
+            if self._capture_thread is not None and self._capture_thread.is_alive():
+                return
+            self._capture_stop = False
+            self._capture_thread = threading.Thread(
+                target=self._capture_worker_loop,
+                name="psy-observer-capture",
+                daemon=True,
+            )
+            self._capture_thread.start()
+
+    def _request_observer_capture(self, *, detail: str | None = None) -> None:
+        """Latest-wins capture request. Never queues more than one pending job."""
+        self._ensure_capture_worker()
+        with self._capture_cond:
+            if self._capture_pending is not None or self._capture_inflight:
+                self._capture_queue_drops += 1
+                self._visual_dropped += 1
+            self._capture_pending = {
+                "generation": int(self._runtime_generation),
+                "detail": detail,
+                "requested_tick": int(self.runtime.tick),
+                "requested_at": time.monotonic(),
+            }
+            # Ask SIM to defer step_lock so this request is not starved.
+            self._capture_wants_lock = True
+            self._capture_cond.notify()
+
+    def _yield_step_lock_to_capture(self) -> None:
+        """Prevent SIM from starving the capture worker of `_step_lock`.
+
+        At high SIM rates (especially MAX with no intentional sleep) the play
+        thread can re-acquire `_step_lock` so quickly that the capture worker
+        waits seconds for a turn — OBS stalls / STALE while SIM keeps running.
+        When the capture worker signals `_capture_wants_lock`, SIM briefly
+        defers taking the lock (bounded wait).
+        """
+        if not self._capture_coop_yield:
+            return
+        if not self._capture_wants_lock:
+            return
+        deadline = time.monotonic() + 0.05  # max 50ms cooperative deferral
+        while self._capture_wants_lock and time.monotonic() < deadline:
+            time.sleep(0.0002)
+
+    def _capture_worker_loop(self) -> None:
+        while True:
+            with self._capture_cond:
+                while self._capture_pending is None and not self._capture_stop:
+                    self._capture_cond.wait(timeout=0.05)
+                if self._capture_stop and self._capture_pending is None:
+                    break
+                req = self._capture_pending
+                self._capture_pending = None
+                if req is None:
+                    continue
+                self._capture_inflight = True
+            delay = float(self._capture_test_delay_s or 0.0)
+            if delay > 0:
+                time.sleep(delay)
+            gen = int(req.get("generation") or -1)
+            if gen != int(self._runtime_generation):
+                with self._capture_cond:
+                    self._capture_inflight = False
+                    if self._capture_pending is None:
+                        self._capture_wants_lock = False
+                    self._capture_cond.notify_all()
+                continue
+            detail = req.get("detail")
+            requested_tick = int(req.get("requested_tick") or -1)
+            requested_at = float(req.get("requested_at") or time.monotonic())
+            frame = None
+            timing: dict[str, Any] = {
+                "requested_tick": requested_tick,
+                "requested_at": requested_at,
+                "wakeup_lag_ms": (time.monotonic() - requested_at) * 1000.0,
+                "detail_requested": detail,
+            }
+            wall0 = time.perf_counter()
+            try:
+                # Signal SIM to defer re-acquiring step_lock (anti-starvation).
+                self._capture_wants_lock = True
+                t_lock0 = time.perf_counter()
+                acquired = self._step_lock.acquire(timeout=5.0)
+                lock_wait_ms = (time.perf_counter() - t_lock0) * 1000.0
+                timing["lock_wait_ms"] = lock_wait_ms
+                timing["lock_acquired"] = bool(acquired)
+                if not acquired:
+                    timing["discarded"] = "lock_timeout"
+                    continue
+                timing["capture_start_tick"] = int(getattr(self.runtime, "tick", -1))
+                try:
+                    if gen != int(self._runtime_generation):
+                        timing["discarded"] = "generation_mismatch"
+                        continue
+                    with self._lock:
+                        if self.status == "STOPPED":
+                            timing["discarded"] = "stopped"
+                            continue
+                        detail_s = detail or self._frame_detail_for_speed()
+                        timing["detail_used"] = detail_s
+                        t_build0 = time.perf_counter()
+                        # Build frame under lock; JSON serialize OUTSIDE step_lock.
+                        frame = self._capture_locked(detail=detail_s, serialize=False)
+                        timing["frame_build_ms"] = (time.perf_counter() - t_build0) * 1000.0
+                        timing["lock_hold_ms"] = (time.perf_counter() - t_lock0) * 1000.0
+                finally:
+                    self._step_lock.release()
+                    # Allow SIM to proceed while we serialize/publish.
+                    with self._capture_cond:
+                        if self._capture_pending is None:
+                            self._capture_wants_lock = False
+                if frame is not None:
+                    t_ser0 = time.perf_counter()
+                    self._serialize_published(frame)
+                    timing["serialization_ms"] = (time.perf_counter() - t_ser0) * 1000.0
+                    t_pub0 = time.perf_counter()
+                    self._maybe_push(frame)
+                    timing["publish_ms"] = (time.perf_counter() - t_pub0) * 1000.0
+                    timing["completed_frame_tick"] = int(
+                        (frame.get("header") or {}).get("frame_tick")
+                        or (frame.get("header") or {}).get("tick")
+                        or -1
+                    )
+                    now_m = time.monotonic()
+                    if self._last_publish_mono > 0:
+                        self._publish_intervals_ms.append(
+                            (now_m - self._last_publish_mono) * 1000.0
+                        )
+                    self._last_publish_mono = now_m
+                    key = str(timing.get("detail_used") or "other")
+                    if key not in ("compact", "full"):
+                        key = "other"
+                    self._capture_detail_counts[key] = int(
+                        self._capture_detail_counts.get(key, 0)
+                    ) + 1
+            finally:
+                timing["total_capture_ms"] = (time.perf_counter() - wall0) * 1000.0
+                timing["queue_drops"] = int(self._capture_queue_drops)
+                if self._capture_timing_enabled:
+                    self._capture_timings.append(timing)
+                with self._capture_cond:
+                    self._capture_inflight = False
+                    if self._capture_pending is None:
+                        self._capture_wants_lock = False
+                    else:
+                        self._capture_wants_lock = True
+                    self._capture_cond.notify_all()
+
+    def capture_timing_snapshot(self) -> list[dict[str, Any]]:
+        return list(self._capture_timings)
+
+    def capture_queue_depth(self) -> int:
+        with self._capture_cond:
+            return (1 if self._capture_pending else 0) + (1 if self._capture_inflight else 0)
+
+    def wait_capture_idle(self, timeout: float = 2.0) -> bool:
+        deadline = time.monotonic() + max(0.0, float(timeout))
+        with self._capture_cond:
+            while self._capture_pending is not None or self._capture_inflight:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return False
+                self._capture_cond.wait(timeout=remaining)
+            return True
+
+    def _capture_locked(self, *, detail: str | None = None, serialize: bool = True) -> dict[str, Any]:
         try:
             setattr(self.runtime, "_observer_runtime_generation", self._runtime_generation)
         except Exception:
@@ -247,15 +460,24 @@ class ObserverSession:
         detail_s = detail or self._frame_detail_for_speed()
         self._accumulate_events_locked()
         events_payload = list(self._event_ring)[-80:]
-        frame = live_frame(
-            self.runtime,
-            status=self.status,
-            mode=self.mode if self.mode != "INSPECT" else "INSPECT",
-            target_tick=self.config.target_tick,
-            previous_body=self._prev_body,
-            detail=detail_s,
-            structured_events=events_payload,
-        )
+        # Avoid multi-hundred-ms GC pauses mid-frame (can trip STALE even with coop yield).
+        _gc_was = gc.isenabled()
+        if _gc_was:
+            gc.disable()
+        try:
+            frame = live_frame(
+                self.runtime,
+                status=self.status,
+                mode=self.mode if self.mode != "INSPECT" else "INSPECT",
+                target_tick=self.config.target_tick,
+                previous_body=self._prev_body,
+                previous_bodies=dict(self._prev_bodies),
+                detail=detail_s,
+                structured_events=events_payload,
+            )
+        finally:
+            if _gc_was:
+                gc.enable()
         views = frame.get("agents_views") or {}
         for _aid, view in views.items():
             if isinstance(view, dict) and view.get("generation") is None:
@@ -317,27 +539,20 @@ class ObserverSession:
             "selected_body_id": (frame.get("header") or {}).get("selected_body_id"),
             "agent_seed": (frame.get("header") or {}).get("inspected_agent_seed"),
         }
+        # Motion series are recorded every scientific tick via _record_motion_locked.
+        # Capture only embeds (does not append) to avoid double-counting and to keep
+        # SIM-path recording independent of Observer sampling.
+        if not self._trajectory or int(self._trajectory[-1].get("tick", -1)) != live_tick:
+            self._record_motion_locked()
         self._prev_body = deepcopy(self.runtime.body.snapshot())
-        self._trajectory.append({
-            "tick": live_tick,
-            "x": float(self.runtime.body.x),
-            "y": float(self.runtime.body.y),
-        })
-        work = getattr(self.runtime, "last_work_allocation", None) or {}
-        self._telemetry.append({
-            "tick": live_tick,
-            "work_reservoir": float(getattr(self.runtime.body, "mechanical_work_reservoir", 0.0) or 0.0),
-            "resource_A": float(getattr(self.runtime.body, "R_A_site", []).sum()) if getattr(self.runtime.body, "R_A_site", None) is not None else 0.0,
-            "resource_B": float(getattr(self.runtime.body, "R_B_site", []).sum()) if getattr(self.runtime.body, "R_B_site", None) is not None else 0.0,
-            "speed": float((self.runtime.body.vx ** 2 + self.runtime.body.vy ** 2) ** 0.5),
-            "omega": float(getattr(self.runtime.body, "omega", 0.0)),
-            "action_requested": float(work.get("requested_action") or 0.0),
-            "action_allocated": float(work.get("allocated_action") or 0.0),
-            "motor_requested": float(work.get("requested_motor") or 0.0),
-            "motor_allocated": float(work.get("allocated_motor") or 0.0),
-            "deformation_requested": float(work.get("requested_deformation") or 0.0),
-            "deformation_allocated": float(work.get("allocated_deformation") or 0.0),
-        })
+        slots_now = getattr(self.runtime, "slots", None)
+        if slots_now:
+            self._prev_bodies = {
+                f"agent_{i}": deepcopy(slot.body.snapshot())
+                for i, slot in enumerate(slots_now)
+            }
+        else:
+            self._prev_bodies = {"agent_0": deepcopy(self._prev_body)}
         traj_points = list(self._trajectory)
         telem_series = list(self._telemetry)
         if detail_s == "compact":
@@ -364,12 +579,33 @@ class ObserverSession:
             "target_tick": self.config.target_tick,
             "base_tick_period_1x": BASE_TICK_PERIOD_1X,
             "capture_period_s": observer_capture_period(self.config.speed, self.config.ui_hz),
+            "async_capture": True,
+            "capture_queue_drops": int(self._capture_queue_drops),
         }
+        sim_tick_now = int(self.runtime.tick)
+        lag = max(0, sim_tick_now - live_tick)
+        self._observer_lag_ticks = lag
+        frame.setdefault("header", {}).update({
+            "observer_lag_ticks": lag,
+            "sim_tick": sim_tick_now,
+            "frame_tick": live_tick,
+        })
         self._buffer.append(frame)
         self._timeline.append(compact_timeline_event(frame))
         self._published = frame
+        if serialize:
+            self._serialize_published(frame)
         self._update_perf_locked(capture=True)
         return frame
+
+    def _serialize_published(self, frame: dict[str, Any]) -> None:
+        """JSON-cache the published frame (safe outside `_step_lock`)."""
+        t_ser0 = time.perf_counter()
+        try:
+            self._published_json = json.dumps(frame, default=str, separators=(",", ":"))
+        except TypeError:
+            self._published_json = None
+        self._last_publish_serialize_ms = (time.perf_counter() - t_ser0) * 1000.0
 
     def _control_state(self) -> dict[str, Any]:
         rt = getattr(self, "runtime", None)
@@ -436,6 +672,7 @@ class ObserverSession:
         self.inspect_tick = None
         self.status = "RUNNING"
         self._stop_flag = False
+        self._ensure_capture_worker()
         with self._lock:
             self._ensure_scientific_locked()
             self._ensure_loop_locked()
@@ -451,6 +688,8 @@ class ObserverSession:
                 accepted=False, reason="finalization in progress",
             )
         self.status = "PAUSED"
+        self._invalidate_pending_captures_locked()
+        self.wait_capture_idle(timeout=1.0)
         with self._step_lock:
             with self._lock:
                 self._perf_sim_tps = 0.0
@@ -843,16 +1082,19 @@ class ObserverSession:
         before = self._control_state()
         # Speed change must not reset the run or skip ticks.
         self.config.speed = float(max(0.05, min(MAX_SPEED, speed)))
-        # Recapture so header.simulation_speed matches config immediately
-        # (UI select + meta must not desync from a stale published frame).
+        # Recapture so header.simulation_speed matches config immediately.
+        # While RUNNING, use the same compact detail as async capture so SET_SPEED
+        # does not temporarily publish a richer schema that disappears on the next
+        # ordinary compact frame (pipeline NOT AVAILABLE flicker).
+        detail = self._frame_detail_for_speed()
         with self._step_lock:
             with self._lock:
-                frame = self._capture_locked(detail="full")
+                frame = self._capture_locked(detail=detail)
         out = self._with_receipt(
             frame, "SET_SPEED", {"speed": float(self.config.speed)}, before,
             reason=(
                 f"wall-clock throttle only; 1x period={BASE_TICK_PERIOD_1X}s; "
-                f"MAX={MAX_SPEED}; scientific ticks never skipped"
+                f"MAX={MAX_SPEED}; scientific ticks never skipped; frame_detail={detail}"
             ),
         )
         self._maybe_push(out, force=True)
@@ -1026,6 +1268,7 @@ class ObserverSession:
                 self.mode = "LIVE"
                 self.inspect_tick = None
                 self._prev_body = None
+                self._prev_bodies = {}
                 self._trajectory.clear()
                 self._telemetry.clear()
                 self._buffer.clear()
@@ -1123,7 +1366,94 @@ class ObserverSession:
             return self.runtime.diagnostic_bundle()
 
     def current_frame(self) -> dict[str, Any]:
-        return self._clone_published()
+        """Return published Observer frame without deep-copying the payload.
+
+        Nested frame content is treated as immutable. Only the top-level dict and
+        header are shallow-copied so live tick / lag metrics can be annotated
+        without a multi-megabyte deepcopy (HTTP polling must not stall SIM via GIL).
+        """
+        frame = self._published
+        if frame is None:
+            with self._step_lock:
+                with self._lock:
+                    if self._published is None:
+                        self._capture_locked(detail="full")
+                    frame = self._published
+        assert frame is not None
+        hdr = dict(frame.get("header") or {})
+        sim_tick = int(self.runtime.tick)
+        frame_tick = int(hdr.get("frame_tick") or hdr.get("tick") or sim_tick)
+        hdr["live_runtime_tick"] = sim_tick
+        hdr["sim_tick"] = sim_tick
+        hdr["observer_lag_ticks"] = max(0, sim_tick - frame_tick)
+        if self.status == "RUNNING":
+            hdr["sim_ticks_per_sec"] = round(float(self._perf_sim_tps), 1)
+            hdr["observer_fps"] = round(float(self._perf_obs_fps), 1)
+        else:
+            hdr["sim_ticks_per_sec"] = 0.0
+        return {**frame, "header": hdr}
+
+    def published_json(self) -> str | None:
+        """Cached JSON of the last published frame body (no live-tick overlay)."""
+        return self._published_json
+
+    def _clone_published(self, status: str | None = None) -> dict[str, Any]:
+        """Deep copy for control receipts that mutate the returned dict."""
+        frame = self._published
+        if frame is None:
+            with self._step_lock:
+                with self._lock:
+                    if self._published is None:
+                        self._capture_locked(detail="full")
+                    frame = self._published
+        out = deepcopy(frame)
+        if status:
+            out.setdefault("header", {})["status"] = status
+        return out
+
+    def _loop(self) -> None:
+        last_capture = 0.0
+        while True:
+            if self._stop_flag or self.status == "STOPPED":
+                break
+            if self.status != "RUNNING":
+                time.sleep(0.02)
+                continue
+            speed = float(self.config.speed)
+            ui_hz = float(self.config.ui_hz)
+            target = self.config.target_tick
+            request_capture = False
+            tick_t0 = time.perf_counter()
+            # Cooperative yield so capture worker is not starved of step_lock.
+            self._yield_step_lock_to_capture()
+            t_lock0 = time.perf_counter()
+            with self._step_lock:
+                if self._capture_timing_enabled:
+                    self._sim_lock_waits_ms.append((time.perf_counter() - t_lock0) * 1000.0)
+                if self._stop_flag or self.status != "RUNNING":
+                    continue
+                if target is not None and self.runtime.tick >= int(target):
+                    self.status = "PAUSED"
+                    continue
+                self.runtime.step(1)
+                with self._lock:
+                    self._accumulate_events_locked()
+                    self._record_motion_locked()
+                    self._append_scientific_locked()
+                    self._update_perf_locked(tick=True)
+                now = time.monotonic()
+                capture_period = observer_capture_period(speed, ui_hz)
+                if now - last_capture >= capture_period:
+                    request_capture = True
+                    last_capture = now
+            # Observer capture is asynchronous — SIM must not wait for live_frame.
+            if request_capture:
+                self._request_observer_capture(detail=self._frame_detail_for_speed())
+            sleep_s = tick_sleep_seconds(speed)
+            spent = time.perf_counter() - tick_t0
+            remain = sleep_s - spent
+            if remain > 0:
+                time.sleep(remain)
 
     def replay_frame(self, tick: int) -> dict[str, Any]:
         """Read-only bounded replay. Never changes session/runtime."""
@@ -1160,18 +1490,6 @@ class ObserverSession:
                 frame.setdefault("header", {})["status"] = status
             return frame
         return self._capture_locked()
-
-    def _clone_published(self, status: str | None = None) -> dict[str, Any]:
-        frame = self._published
-        if frame is None:
-            with self._lock:
-                if self._published is None:
-                    self._capture_locked()
-                frame = self._published
-        out = deepcopy(frame)
-        if status:
-            out.setdefault("header", {})["status"] = status
-        return out
 
     def _record_motion_locked(self) -> None:
         self._trajectory.append({
@@ -1215,54 +1533,10 @@ class ObserverSession:
         self._thread = threading.Thread(target=self._loop, name="psy-observer-sim", daemon=True)
         self._thread.start()
 
-    def _loop(self) -> None:
-        last_capture = 0.0
-        while True:
-            if self._stop_flag or self.status == "STOPPED":
-                break
-            if self.status != "RUNNING":
-                time.sleep(0.02)
-                continue
-            speed = float(self.config.speed)
-            ui_hz = float(self.config.ui_hz)
-            target = self.config.target_tick
-            do_capture = False
-            tick_t0 = time.perf_counter()
-            with self._step_lock:
-                if self._stop_flag or self.status != "RUNNING":
-                    continue
-                if target is not None and self.runtime.tick >= int(target):
-                    self.status = "PAUSED"
-                    continue
-                self.runtime.step(1)
-                with self._lock:
-                    self._accumulate_events_locked()
-                    self._record_motion_locked()
-                    self._append_scientific_locked()
-                    self._update_perf_locked(tick=True)
-                now = time.monotonic()
-                capture_period = observer_capture_period(speed, ui_hz)
-                if now - last_capture >= capture_period:
-                    do_capture = True
-                    last_capture = now
-            # Capture outside step_lock so serialization does not stall scientific ticks.
-            frame = None
-            if do_capture:
-                with self._lock:
-                    if self.status in {"RUNNING", "PAUSED"}:
-                        frame = self._capture_locked(detail=self._frame_detail_for_speed())
-            if frame is not None:
-                self._maybe_push(frame)
-            # Speed throttle: intentional wall-clock wait only (never skips ticks).
-            sleep_s = tick_sleep_seconds(speed)
-            spent = time.perf_counter() - tick_t0
-            remain = sleep_s - spent
-            if remain > 0:
-                time.sleep(remain)
-
     def apply_experiment(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Apply only supported config keys, then reset."""
         self._halt_runner("PAUSED")
+        self._invalidate_pending_captures_locked()
         with self._step_lock:
             with self._lock:
                 before = self._control_state()
@@ -1350,10 +1624,12 @@ class ObserverSession:
                 self._buffer = deque(maxlen=int(self.config.buffer_capacity))
                 self._timeline = deque(maxlen=max(1024, int(self.config.buffer_capacity) * 8))
                 self._prev_body = None
+                self._prev_bodies = {}
                 self._trajectory = deque(maxlen=max(256, int(self.config.buffer_capacity) * 4))
                 self._telemetry = deque(maxlen=max(256, int(self.config.buffer_capacity) * 4))
                 self._historical_compat = None
                 self._published = None
+                self._published_json = None
                 self._run_started_at = None
                 self._active_run_id = None
                 self._close_scientific_locked()
@@ -1364,9 +1640,11 @@ class ObserverSession:
                 self._event_ring = deque(maxlen=EVENT_RING_MAX)
                 self._event_keys = set()
                 self._visual_dropped = 0
+                self._capture_queue_drops = 0
                 self._perf_window_start = time.monotonic()
                 self._perf_ticks = 0
                 self._perf_captures = 0
+                self._record_motion_locked()
                 frame = self._capture_locked(detail="full")
         self._maybe_push(frame, force=True)
         return self._with_receipt(
