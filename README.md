@@ -199,6 +199,18 @@ Ensure Python 3.11+ is installed with “Add to PATH” enabled.
 9. Click **Analyze Current**.  
 10. Compare physical exposure, actions, contacts, and signals — without assuming recognition or communication.
 
+11. > [!IMPORTANT]
+> ### Recommended setup order
+>
+> When creating a new experiment, configure it in this order:
+>
+> **1. Select/configure the agents → 2. Select/configure the world → 3. Adjust the remaining settings**
+>
+> Applying the world configuration also applies the currently selected agent configuration.  
+> Therefore, choose your agents **before** pressing **Apply** in the world settings.
+>
+> Changing the order may result in a different agent configuration being applied than intended.
+
 ---
 
 ## Scientific Boundaries
