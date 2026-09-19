@@ -22,7 +22,7 @@ LAGS = (1, 2, 3, 4)
 RING = 16
 MIN_WINDOW = 2  # at least one successive difference
 
-# Performance: window fragments are flat float maps — dict() equals deepcopy.
+# BETA2-03: window fragments are flat float maps — dict() equals deepcopy.
 _USE_FRAGMENT_DICT_COPY = True
 
 

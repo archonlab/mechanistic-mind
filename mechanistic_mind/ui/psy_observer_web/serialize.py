@@ -54,6 +54,71 @@ def discover_world_fields(runtime: "PhysicalSystemRuntime") -> list[dict[str, An
         fields.append({"id": "FIELD_A", "kind": "scalar", "source": "world.FIELD_A", "label": "SIGNAL A"})
     if getattr(w, "FIELD_B", None) is not None:
         fields.append({"id": "FIELD_B", "kind": "scalar", "source": "world.FIELD_B", "label": "SIGNAL B"})
+    if getattr(w, "terrain_potential", None) is not None:
+        fields.append({
+            "id": "terrain_potential",
+            "kind": "scalar",
+            "source": "world.terrain_potential",
+            "label": "POTENTIAL",
+            "observer_ground_truth": True,
+        })
+    if getattr(w, "terrain_drag", None) is not None:
+        fields.append({
+            "id": "terrain_drag",
+            "kind": "scalar",
+            "source": "world.terrain_drag",
+            "label": "DRAG",
+            "observer_ground_truth": True,
+        })
+    if getattr(w, "terrain_grad_x", None) is not None and getattr(w, "terrain_grad_y", None) is not None:
+        fields.append({
+            "id": "terrain_grad_mag",
+            "kind": "scalar",
+            "source": "world.terrain_grad_*",
+            "label": "GRADIENT",
+            "observer_ground_truth": True,
+            "derived": True,
+        })
+    if getattr(w, "resource_geo_suit_A", None) is not None:
+        fields.append({
+            "id": "resource_geo_suit_A",
+            "kind": "scalar",
+            "source": "world.resource_geo_suit_A",
+            "label": "R_A GEO SUIT",
+            "observer_ground_truth": True,
+        })
+    if getattr(w, "resource_geo_suit_B", None) is not None:
+        fields.append({
+            "id": "resource_geo_suit_B",
+            "kind": "scalar",
+            "source": "world.resource_geo_suit_B",
+            "label": "R_B GEO SUIT",
+            "observer_ground_truth": True,
+        })
+    if getattr(w, "ambient_fx", None) is not None and getattr(w, "ambient_fy", None) is not None:
+        fields.append({
+            "id": "ambient_force",
+            "kind": "vector",
+            "source": "world.ambient_fx/fy",
+            "label": "AMBIENT FORCE",
+            "observer_ground_truth": True,
+        })
+        fields.append({
+            "id": "ambient_magnitude",
+            "kind": "scalar",
+            "source": "world.ambient_fx/fy",
+            "label": "AMBIENT MAGNITUDE",
+            "observer_ground_truth": True,
+            "derived": True,
+        })
+    if getattr(w, "surface_response", None) is not None:
+        fields.append({
+            "id": "surface_response",
+            "kind": "scalar",
+            "source": "world.surface_response",
+            "label": "SURFACE OBSERVABLE",
+            "observer_ground_truth": True,
+        })
     return fields
 
 
@@ -75,14 +140,143 @@ def boundary_metadata(runtime: "PhysicalSystemRuntime") -> dict[str, Any]:
 
 
 
+def _ecology_observer_ground_truth(runtime: "PhysicalSystemRuntime") -> dict[str, Any]:
+    """Observer-only ecology preset + optional ACTION AUTHORITY (physical)."""
+    from mechanistic_mind.physical_system.ecology_presets import ecology_metadata
+
+    cfg = getattr(runtime, "config", None)
+    meta = ecology_metadata(cfg)
+    # Prefer session-attached authority if present
+    auth = getattr(runtime, "_observer_action_authority", None)
+    if isinstance(auth, dict):
+        meta["action_authority"] = {
+            "move_alignment_median": auth.get("move_alignment_median"),
+            "opposing_rate": auth.get("opposing_rate"),
+            "wait_disp_median": auth.get("wait_disp_median"),
+            "strong_deflection_rate": auth.get("strong_deflection_rate"),
+            "coupling_label": auth.get("coupling_label"),
+            "note": auth.get("note"),
+        }
+    return meta
+
+
+def _terrain_observer_block(runtime: "PhysicalSystemRuntime") -> dict[str, Any]:
+    import numpy as np
+
+    tmeta = getattr(runtime.world, "terrain_meta", None) or {}
+    te = getattr(runtime.config.planet, "terrain", None)
+    pot = getattr(runtime.world, "terrain_potential", None)
+    drag = getattr(runtime.world, "terrain_drag", None)
+    gx = getattr(runtime.world, "terrain_grad_x", None)
+    gy = getattr(runtime.world, "terrain_grad_y", None)
+    stats: dict[str, Any] = {}
+    if pot is not None:
+        pa = np.asarray(pot, dtype=np.float64)
+        stats["potential_min"] = float(np.min(pa))
+        stats["potential_max"] = float(np.max(pa))
+    if drag is not None:
+        da = np.asarray(drag, dtype=np.float64)
+        stats["drag_min"] = float(np.min(da))
+        stats["drag_max"] = float(np.max(da))
+    if gx is not None and gy is not None:
+        mag = np.hypot(np.asarray(gx, dtype=np.float64), np.asarray(gy, dtype=np.float64))
+        stats["gradient_mag_min"] = float(np.min(mag))
+        stats["gradient_mag_max"] = float(np.max(mag))
+    return {
+        "enabled": bool(getattr(te, "enabled", False)) if te is not None else False,
+        "mode": str(getattr(te, "mode", "FLAT")) if te is not None else "FLAT",
+        "experiment_seed": tmeta.get("experiment_seed"),
+        "terrain_seed": tmeta.get("terrain_seed"),
+        "terrain_seed_source": tmeta.get("terrain_seed_source"),
+        "generator_version": tmeta.get("generator_version"),
+        "generation_attempt": tmeta.get("generation_attempt"),
+        "generation_accepted": tmeta.get("generation_accepted"),
+        "generation_fallback": tmeta.get("generation_fallback"),
+        "checksum": tmeta.get("checksum"),
+        "config": tmeta.get("config") or (te.to_dict() if te is not None and hasattr(te, "to_dict") else None),
+        "traversability_audit": tmeta.get("traversability_audit"),
+        "largest_connected_traversable_frac": (tmeta.get("traversability_audit") or {}).get(
+            "largest_component_frac"
+        ),
+        "extreme_gradient_frac": (tmeta.get("traversability_audit") or {}).get(
+            "extreme_gradient_frac"
+        ),
+        "static": True,
+        "observer_only": True,
+        "panel": "OBSERVER_GROUND_TRUTH",
+        "note": (
+            "POTENTIAL / DRAG / GRADIENT are Observer ground truth. "
+            "Not agent observation. Not semantic OBSTACLE/MOUNTAIN/TRAP."
+        ),
+        **stats,
+    }
+
+
+def _ambient_observer_block(runtime: "PhysicalSystemRuntime") -> dict[str, Any]:
+    ameta = getattr(runtime.world, "ambient_meta", None) or {}
+    ae = getattr(runtime.config.planet, "ambient", None)
+    fx = getattr(runtime.world, "ambient_fx", None)
+    fy = getattr(runtime.world, "ambient_fy", None)
+    stats: dict[str, Any] = {}
+    if fx is not None and fy is not None:
+        import numpy as np
+
+        fa = np.asarray(fx, dtype=np.float64)
+        fb = np.asarray(fy, dtype=np.float64)
+        mag = np.hypot(fa, fb)
+        stats = {
+            "fx_min": float(np.min(fa)),
+            "fx_max": float(np.max(fa)),
+            "fy_min": float(np.min(fb)),
+            "fy_max": float(np.max(fb)),
+            "magnitude_min": float(np.min(mag)),
+            "magnitude_max": float(np.max(mag)),
+            "magnitude_mean": float(np.mean(mag)),
+        }
+    return {
+        "enabled": bool(getattr(ae, "enabled", False)) if ae is not None else False,
+        "experiment_seed": ameta.get("experiment_seed"),
+        "ambient_seed": ameta.get("ambient_seed"),
+        "ambient_seed_source": ameta.get("ambient_seed_source"),
+        "generator_version": ameta.get("generator_version"),
+        "checksum": ameta.get("checksum"),
+        "config": ameta.get("config") or (ae.to_dict() if ae is not None and hasattr(ae, "to_dict") else None),
+        "static": True,
+        "observer_only": True,
+        "panel": "OBSERVER_GROUND_TRUTH",
+        "note": (
+            "AMBIENT FORCE is Observer ground truth. Physical vector field only. "
+            "Not agent observation. Not semantic WIND/CURRENT/ROUTE."
+        ),
+        **stats,
+    }
+
+
 def _climate_observer_ground_truth(runtime: "PhysicalSystemRuntime") -> dict[str, Any]:
     """Experimenter-only cycle phase. Never copied into agent_observation."""
     from mechanistic_mind.planet.climate_ecology import observer_climate_ground_truth
 
     ce = getattr(runtime.config.planet, "climate_ecology", None)
+    ecology = _ecology_observer_ground_truth(runtime)
+    terrain = _terrain_observer_block(runtime)
+    ambient = _ambient_observer_block(runtime)
     if ce is None:
-        return {"enabled": False, "panel": "OBSERVER_GROUND_TRUTH_EXPERIMENT"}
-    return observer_climate_ground_truth(
+        return {
+            "enabled": False,
+            "panel": "OBSERVER_GROUND_TRUTH_EXPERIMENT",
+            "ecology_preset": ecology.get("ecology_preset"),
+            "ecology_ui_label": ecology.get("ui_label"),
+            "action_authority": ecology.get("action_authority"),
+            "climate_ecology_enabled": False,
+            "resource_ecology_A_enabled": False,
+            "resource_ecology_B_enabled": False,
+            "passive_reservoir_trickle": ecology.get("passive_reservoir_trickle"),
+            "body_orientation_force_scale": ecology.get("body_orientation_force_scale"),
+            "ecology": ecology,
+            "terrain": terrain,
+            "ambient": ambient,
+        }
+    out = observer_climate_ground_truth(
         ce,
         int(runtime.world.tick),
         seed=int(runtime.seed),
@@ -90,6 +284,53 @@ def _climate_observer_ground_truth(runtime: "PhysicalSystemRuntime") -> dict[str
         R_A=getattr(runtime.world, "R_A", None),
         R_B=getattr(runtime.world, "R_B", None),
     )
+    out["ecology_preset"] = ecology.get("ecology_preset")
+    out["ecology_ui_label"] = ecology.get("ui_label")
+    out["action_authority"] = ecology.get("action_authority")
+    out["climate_ecology_enabled"] = bool(getattr(ce, "enabled", False))
+    out["resource_ecology_A_enabled"] = bool(getattr(ce, "resource_ecology_A_enabled", True))
+    out["resource_ecology_B_enabled"] = bool(getattr(ce, "resource_ecology_B_enabled", True))
+    out["passive_reservoir_trickle"] = ecology.get("passive_reservoir_trickle")
+    out["body_orientation_force_scale"] = ecology.get("body_orientation_force_scale")
+    out["ecology"] = ecology
+    out["terrain"] = terrain
+    out["ambient"] = ambient
+    # EFFECTIVE WORLD (CLIMATE_AUTHORITY_AUDIT_01) — Observer GT only.
+    try:
+        from mechanistic_mind.research.climate_authority import (
+            effective_world_configuration,
+            effective_world_fingerprint,
+        )
+        eff = effective_world_configuration(runtime)
+        out["effective_world"] = {
+            **{k: eff[k] for k in (
+                "requested_preset", "normalized_preset",
+                "climate_package_implies_climate", "climate_ablated",
+                "subsystems", "overrides", "authority",
+            ) if k in eff},
+            "world_fingerprint": effective_world_fingerprint(eff),
+            "panel": "EFFECTIVE_WORLD_OBSERVER_GT",
+        }
+    except Exception as exc:  # noqa: BLE001 — Observer must not crash on GT helper
+        out["effective_world"] = {"error": str(exc), "panel": "EFFECTIVE_WORLD_OBSERVER_GT"}
+    # Lightweight temporal calibration panel (Observer GT only).
+    period = int(out.get("environmental_cycle_period") or getattr(ce, "season_period", 0) or 0)
+    vx = float(np.mean(np.abs(runtime.world.vx))) if getattr(runtime.world, "vx", None) is not None else 0.0
+    vy = float(np.mean(np.abs(runtime.world.vy))) if getattr(runtime.world, "vy", None) is not None else 0.0
+    out["thermal_flow_mean_abs"] = float((vx ** 2 + vy ** 2) ** 0.5)
+    out["body_climate_timescale_ratio_proxy"] = (
+        float(period) / 6.0 if period else None
+    )  # T_cell≈6 from WORLD_TIMESCALE_CALIBRATION_01; diagnostic only
+    out["temporal_panel"] = {
+        "season_period": period,
+        "phase": out.get("environmental_cycle_phase"),
+        "phase_velocity_per_tick": out.get("phase_velocity_per_tick"),
+        "ticks_per_full_cycle": out.get("ticks_per_full_cycle"),
+        "F_fast_period": int(getattr(runtime.config.planet, "F_fast_period", 0) or 0),
+        "F_slow_period": int(getattr(runtime.config.planet, "F_slow_period", 0) or 0),
+        "note": "Observer temporal diagnostics — never copied into cognition.",
+    }
+    return out
 
 
 def _grid(arr: np.ndarray, *, max_side: int = 64) -> list[list[float]]:
@@ -105,30 +346,49 @@ def _grid(arr: np.ndarray, *, max_side: int = 64) -> list[list[float]]:
     return [[float(v) for v in row] for row in a.tolist()]
 
 
+def _flat_grid(arr: np.ndarray, *, max_side: int = 64) -> dict[str, Any]:
+    """Compact JSON-friendly row-major grid (OBS-05)."""
+    nested = _grid(arr, max_side=max_side)
+    h = len(nested)
+    w = len(nested[0]) if nested else 0
+    data: list[float] = []
+    for row in nested:
+        data.extend(float(v) for v in row)
+    return {"h": h, "w": w, "data": data}
+
+
 def _mat3(m: np.ndarray, *, max_side: int = 64) -> list[list[list[float]]]:
     m = np.asarray(m, dtype=np.float64)
     return [_grid(m[i], max_side=max_side) for i in range(int(m.shape[0]))]
 
 
 def observer_agent_id(runtime: PhysicalSystemRuntime) -> str:
-    """Canonical observer identity: agent_0 | agent_1 (never a body id)."""
+    """Canonical observer identity: agent_N | undercover (never a body id)."""
+    from mechanistic_mind.ui.psy_observer_web.undercover_identity import slot_agent_body_ids
+
     slots = getattr(runtime, "slots", None)
     if slots:
         idx = int(getattr(runtime, "selected_index", 0) or 0) % len(slots)
-        return f"agent_{idx}"
+        aid, _ = slot_agent_body_ids(idx, experimenter_slot=getattr(runtime, "experimenter_slot", None))
+        return aid
     return "agent_0"
 
 
 def observer_body_id(runtime: PhysicalSystemRuntime) -> str:
     """Body identity mapped from selected agent — distinct from agent_id."""
+    from mechanistic_mind.ui.psy_observer_web.undercover_identity import slot_agent_body_ids
+
     slots = getattr(runtime, "slots", None)
     if slots:
         idx = int(getattr(runtime, "selected_index", 0) or 0) % len(slots)
-        return f"body-{idx}"
+        _, bid = slot_agent_body_ids(idx, experimenter_slot=getattr(runtime, "experimenter_slot", None))
+        return bid
     return "body-0"
 
 
 def agent_body_mapping(runtime: PhysicalSystemRuntime) -> list[dict[str, Any]]:
+    from mechanistic_mind.ui.psy_observer_web.undercover_identity import slot_agent_body_ids
+
     slots = getattr(runtime, "slots", None)
     if not slots:
         return [{
@@ -136,14 +396,21 @@ def agent_body_mapping(runtime: PhysicalSystemRuntime) -> list[dict[str, Any]]:
             "body_id": "body-0",
             "agent_seed": int(getattr(runtime, "seed", 0)),
         }]
-    return [
-        {
-            "agent_id": f"agent_{i}",
-            "body_id": f"body-{i}",
+    exp_slot = getattr(runtime, "experimenter_slot", None)
+    out = []
+    for i, slot in enumerate(slots):
+        aid, bid = slot_agent_body_ids(i, experimenter_slot=exp_slot)
+        out.append({
+            "agent_id": aid,
+            "body_id": bid,
             "agent_seed": int(getattr(slot, "seed", runtime.seed)),
-        }
-        for i, slot in enumerate(slots)
-    ]
+            "experimenter_controlled": bool(exp_slot is not None and i == int(exp_slot)),
+            "cognition_attached": bool(
+                getattr(getattr(slot, "config", None), "cognition", None)
+                and getattr(slot.config.cognition, "cognition_enabled", False)
+            ),
+        })
+    return out
 
 
 def header_info(runtime: PhysicalSystemRuntime, *, status: str, mode: str, target_tick: int | None) -> dict[str, Any]:
@@ -184,45 +451,145 @@ def header_info(runtime: PhysicalSystemRuntime, *, status: str, mode: str, targe
         "boundary_topology": "WRAP_PERIODIC",
         "world_size": {"width": int(runtime.config.planet.width), "height": int(runtime.config.planet.height)},
         "snapshot_compatibility": "TIKTAALIK",
+        "ecology_preset": getattr(runtime.config, "ecology_preset", "CURRENT") or "CURRENT",
     }
 
 
-def world_frame(runtime: PhysicalSystemRuntime, *, max_side: int = 64) -> dict[str, Any]:
+def world_frame(
+    runtime: PhysicalSystemRuntime,
+    *,
+    max_side: int = 64,
+    detail: str = "full",
+) -> dict[str, Any]:
+    """Serialize planet fields.
+
+    compact RUNNING keeps only visualization-critical scalars (T, flow, FIELD_*),
+    omitting M*/u/R* planes that dominate JSON size. Full detail remains on PAUSE/INSPECT.
+    Compact also uses flat grid encoding and avoids duplicating planes across
+    top-level / scalars / vectors (OBS-05).
+    """
     w = runtime.world
     cfg = runtime.config.planet
     fields = discover_world_fields(runtime)
+    compact = str(detail).lower() == "compact"
     # full-resolution transport for small worlds; downsample only when above max_side
-    T = _grid(w.T, max_side=max_side)
-    M = _mat3(w.M, max_side=max_side)
-    vx = _grid(w.vx, max_side=max_side)
-    vy = _grid(w.vy, max_side=max_side)
-    flow_mag = [
-        [float((vx[y][x] ** 2 + vy[y][x] ** 2) ** 0.5) for x in range(len(vx[0]))]
-        for y in range(len(vx))
-    ]
-    u = _grid(w.u, max_side=max_side) if hasattr(w, "u") else None
-    scalars: dict[str, Any] = {"T": T, "vx": vx, "vy": vy, "flow_mag": flow_mag}
-    for i, plane in enumerate(M):
-        scalars[f"M{i}"] = plane
-    if u is not None:
-        scalars["u"] = u
-    Rgrid = None
-    if getattr(w, "R", None) is not None:
-        Rgrid = _grid(w.R, max_side=max_side)
-        scalars["R"] = Rgrid
-    if getattr(w, "R_A", None) is not None:
-        scalars["R_A"] = _grid(w.R_A, max_side=max_side)
-    if getattr(w, "R_B", None) is not None:
-        scalars["R_B"] = _grid(w.R_B, max_side=max_side)
-        if "R_A" in scalars:
-            scalars["R_A_plus_R_B"] = [
-                [float(scalars["R_A"][y][x] + scalars["R_B"][y][x]) for x in range(len(scalars["R_B"][0]))]
-                for y in range(len(scalars["R_B"]))
+    if compact:
+        T_enc: Any = _flat_grid(w.T, max_side=max_side)
+        vx_enc: Any = _flat_grid(w.vx, max_side=max_side)
+        vy_enc: Any = _flat_grid(w.vy, max_side=max_side)
+        # flow_mag derived client-side from vx/vy when flat — omit duplicate plane
+        scalars: dict[str, Any] = {
+            "T": T_enc,
+            "vx": vx_enc,
+            "vy": vy_enc,
+            "grids_encoding": "flat",
+        }
+        if getattr(w, "FIELD_A", None) is not None:
+            scalars["FIELD_A"] = _flat_grid(w.FIELD_A, max_side=max_side)
+        if getattr(w, "FIELD_B", None) is not None:
+            scalars["FIELD_B"] = _flat_grid(w.FIELD_B, max_side=max_side)
+        if getattr(w, "terrain_potential", None) is not None:
+            scalars["terrain_potential"] = _flat_grid(w.terrain_potential, max_side=max_side)
+        if getattr(w, "terrain_drag", None) is not None:
+            scalars["terrain_drag"] = _flat_grid(w.terrain_drag, max_side=max_side)
+        if getattr(w, "terrain_grad_x", None) is not None and getattr(w, "terrain_grad_y", None) is not None:
+            gx = _flat_grid(w.terrain_grad_x, max_side=max_side)
+            gy = _flat_grid(w.terrain_grad_y, max_side=max_side)
+            # derived magnitude for Observer layer GRADIENT
+            data = []
+            for i, v in enumerate(gx["data"]):
+                data.append(float((v ** 2 + gy["data"][i] ** 2) ** 0.5))
+            scalars["terrain_grad_mag"] = {**gx, "data": data}
+        if getattr(w, "resource_geo_suit_A", None) is not None:
+            scalars["resource_geo_suit_A"] = _flat_grid(w.resource_geo_suit_A, max_side=max_side)
+        if getattr(w, "resource_geo_suit_B", None) is not None:
+            scalars["resource_geo_suit_B"] = _flat_grid(w.resource_geo_suit_B, max_side=max_side)
+        if getattr(w, "surface_response", None) is not None:
+            scalars["surface_response"] = _flat_grid(w.surface_response, max_side=max_side)
+        T = None
+        vx = None
+        vy = None
+        M = None
+        u = None
+        Rgrid = None
+        vectors: Any = {"flow": {"encoding": "scalars_ref", "vx": "vx", "vy": "vy"}}
+        if getattr(w, "ambient_fx", None) is not None and getattr(w, "ambient_fy", None) is not None:
+            scalars["ambient_fx"] = _flat_grid(w.ambient_fx, max_side=max_side)
+            scalars["ambient_fy"] = _flat_grid(w.ambient_fy, max_side=max_side)
+            data = []
+            for i, v in enumerate(scalars["ambient_fx"]["data"]):
+                data.append(float((v ** 2 + scalars["ambient_fy"]["data"][i] ** 2) ** 0.5))
+            scalars["ambient_magnitude"] = {**scalars["ambient_fx"], "data": data}
+            vectors["ambient"] = {
+                "encoding": "scalars_ref",
+                "vx": "ambient_fx",
+                "vy": "ambient_fy",
+                "observer_ground_truth": True,
+            }
+        transported_h = int(T_enc["h"])
+        transported_w = int(T_enc["w"])
+    else:
+        T = _grid(w.T, max_side=max_side)
+        vx = _grid(w.vx, max_side=max_side)
+        vy = _grid(w.vy, max_side=max_side)
+        flow_mag = [
+            [float((vx[y][x] ** 2 + vy[y][x] ** 2) ** 0.5) for x in range(len(vx[0]))]
+            for y in range(len(vx))
+        ]
+        scalars = {"T": T, "vx": vx, "vy": vy, "flow_mag": flow_mag}
+        M = _mat3(w.M, max_side=max_side)
+        for i, plane in enumerate(M):
+            scalars[f"M{i}"] = plane
+        u = _grid(w.u, max_side=max_side) if hasattr(w, "u") else None
+        if u is not None:
+            scalars["u"] = u
+        Rgrid = None
+        if getattr(w, "R", None) is not None:
+            Rgrid = _grid(w.R, max_side=max_side)
+            scalars["R"] = Rgrid
+        if getattr(w, "R_A", None) is not None:
+            scalars["R_A"] = _grid(w.R_A, max_side=max_side)
+        if getattr(w, "R_B", None) is not None:
+            scalars["R_B"] = _grid(w.R_B, max_side=max_side)
+            if "R_A" in scalars:
+                scalars["R_A_plus_R_B"] = [
+                    [float(scalars["R_A"][y][x] + scalars["R_B"][y][x]) for x in range(len(scalars["R_B"][0]))]
+                    for y in range(len(scalars["R_B"]))
+                ]
+        if getattr(w, "FIELD_A", None) is not None:
+            scalars["FIELD_A"] = _grid(w.FIELD_A, max_side=max_side)
+        if getattr(w, "FIELD_B", None) is not None:
+            scalars["FIELD_B"] = _grid(w.FIELD_B, max_side=max_side)
+        if getattr(w, "terrain_potential", None) is not None:
+            scalars["terrain_potential"] = _grid(w.terrain_potential, max_side=max_side)
+        if getattr(w, "terrain_drag", None) is not None:
+            scalars["terrain_drag"] = _grid(w.terrain_drag, max_side=max_side)
+        if getattr(w, "terrain_grad_x", None) is not None and getattr(w, "terrain_grad_y", None) is not None:
+            gx = _grid(w.terrain_grad_x, max_side=max_side)
+            gy = _grid(w.terrain_grad_y, max_side=max_side)
+            scalars["terrain_grad_mag"] = [
+                [float((gx[y][x] ** 2 + gy[y][x] ** 2) ** 0.5) for x in range(len(gx[0]))]
+                for y in range(len(gx))
             ]
-    if getattr(w, "FIELD_A", None) is not None:
-        scalars["FIELD_A"] = _grid(w.FIELD_A, max_side=max_side)
-    if getattr(w, "FIELD_B", None) is not None:
-        scalars["FIELD_B"] = _grid(w.FIELD_B, max_side=max_side)
+        if getattr(w, "resource_geo_suit_A", None) is not None:
+            scalars["resource_geo_suit_A"] = _grid(w.resource_geo_suit_A, max_side=max_side)
+        if getattr(w, "resource_geo_suit_B", None) is not None:
+            scalars["resource_geo_suit_B"] = _grid(w.resource_geo_suit_B, max_side=max_side)
+        if getattr(w, "surface_response", None) is not None:
+            scalars["surface_response"] = _grid(w.surface_response, max_side=max_side)
+        vectors = {"flow": {"vx": vx, "vy": vy}}
+        if getattr(w, "ambient_fx", None) is not None and getattr(w, "ambient_fy", None) is not None:
+            afx = _grid(w.ambient_fx, max_side=max_side)
+            afy = _grid(w.ambient_fy, max_side=max_side)
+            scalars["ambient_fx"] = afx
+            scalars["ambient_fy"] = afy
+            scalars["ambient_magnitude"] = [
+                [float((afx[y][x] ** 2 + afy[y][x] ** 2) ** 0.5) for x in range(len(afx[0]))]
+                for y in range(len(afx))
+            ]
+            vectors["ambient"] = {"vx": afx, "vy": afy, "observer_ground_truth": True}
+        transported_h = len(T)
+        transported_w = len(T[0]) if T else 0
     return {
         "kind": "WORLD_TRUTH",
         "tick": int(w.tick),
@@ -231,8 +598,9 @@ def world_frame(runtime: PhysicalSystemRuntime, *, max_side: int = 64) -> dict[s
         "aspect": float(cfg.width) / max(1, int(cfg.height)),
         "resolution": {"width": int(cfg.width), "height": int(cfg.height)},
         "runtime_resolution": {"width": int(cfg.width), "height": int(cfg.height)},
-        "transported_resolution": {"height": len(T), "width": len(T[0]) if T else 0},
-        "grid_shape_transported": {"height": len(T), "width": len(T[0]) if T else 0},
+        "transported_resolution": {"height": transported_h, "width": transported_w},
+        "grid_shape_transported": {"height": transported_h, "width": transported_w},
+        "frame_detail": "compact" if compact else "full",
         "T": T,
         "M": M,
         "vx": vx,
@@ -242,13 +610,13 @@ def world_frame(runtime: PhysicalSystemRuntime, *, max_side: int = 64) -> dict[s
         "R_A": scalars.get("R_A"),
         "R_B": scalars.get("R_B"),
         "scalars": scalars,
-        "vectors": {"flow": {"vx": vx, "vy": vy}},
+        "vectors": vectors,
         "fields_available": fields,
         "boundary": boundary_metadata(runtime),
         "summary": {
             "T_mean": float(np.mean(w.T)),
             "T_std": float(np.std(w.T)),
-            "M_sum": [float(np.sum(w.M[i])) for i in range(w.M.shape[0])],
+            "M_sum": [float(np.sum(w.M[i])) for i in range(w.M.shape[0])] if not compact else "DEFERRED",
             "R_sum": float(np.sum(w.R)) if getattr(w, "R", None) is not None else 0.0,
             "R_A_sum": float(np.sum(w.R_A)) if getattr(w, "R_A", None) is not None else 0.0,
             "R_B_sum": float(np.sum(w.R_B)) if getattr(w, "R_B", None) is not None else 0.0,
@@ -378,8 +746,12 @@ def internal_physical_frame(runtime: PhysicalSystemRuntime) -> dict[str, Any]:
     }
 
 
-def perception_frame(runtime: PhysicalSystemRuntime) -> dict[str, Any]:
-    views = runtime.observation_views()
+def perception_frame(
+    runtime: PhysicalSystemRuntime,
+    *,
+    foreign_bodies: list | None = None,
+) -> dict[str, Any]:
+    views = runtime.observation_views(foreign_bodies=foreign_bodies)
     return {
         "agent_observation": views["agent_observation"],
         "boundary": views["boundary"],
@@ -873,8 +1245,15 @@ def _why_this_action(runtime: PhysicalSystemRuntime, cog: dict[str, Any]) -> dic
 def experiment_config_frame(runtime: PhysicalSystemRuntime) -> dict[str, Any]:
     cfg = runtime.config
     planet = cfg.planet.to_dict() if hasattr(cfg.planet, "to_dict") else {}
+    from mechanistic_mind.physical_system.ecology_presets import ecology_metadata
+
+    eco = ecology_metadata(cfg)
     return {
         "seed": int(runtime.seed),
+        "ecology_preset": eco.get("ecology_preset"),
+        "ecology_ui_label": eco.get("ui_label"),
+        "body_orientation_force_scale": eco.get("body_orientation_force_scale"),
+        "passive_reservoir_trickle": eco.get("passive_reservoir_trickle"),
         "runtime": {
             "type": "TwoAgentRuntime" if getattr(runtime, "slots", None) else "PhysicalSystemRuntime",
             "cognition_enabled": cfg.cognition.cognition_enabled,
@@ -883,7 +1262,12 @@ def experiment_config_frame(runtime: PhysicalSystemRuntime) -> dict[str, Any]:
             "selected_agent_id": observer_agent_id(runtime),
             "selected_body_id": observer_body_id(runtime),
             "agent_body_mapping": agent_body_mapping(runtime),
-            "observer_agent_ids": ["agent_0", "agent_1"] if getattr(runtime, "slots", None) else ["agent_0"],
+            "observer_agent_ids": (
+                [f"agent_{i}" for i in range(len(runtime.slots))]
+                if getattr(runtime, "slots", None)
+                else ["agent_0"]
+            ),
+            "ecology_preset": eco.get("ecology_preset"),
             "note": "Technical observer IDs. Not present in agent observation.",
         },
         "world": {
@@ -893,6 +1277,7 @@ def experiment_config_frame(runtime: PhysicalSystemRuntime) -> dict[str, Any]:
             "boundary": boundary_metadata(runtime),
             "fields_available": discover_world_fields(runtime),
             "supported_size_notes": "width/height are PlanetConfig integers; renderer adapts to aspect ratio. Changing size requires a new run.",
+            "ecology_preset": eco.get("ecology_preset"),
         },
         "agent_body": cfg.body.to_dict() if hasattr(cfg.body, "to_dict") else {},
         "internal": cfg.internal.to_dict() if hasattr(cfg.internal, "to_dict") else {},
@@ -985,6 +1370,7 @@ def _physical_bundle(
     *,
     agent_id: str | None = None,
     body_id: str | None = None,
+    foreign_bodies: list | None = None,
 ) -> dict[str, Any]:
     action_work = getattr(runtime, "last_action_work_ledger", None) or {}
     motor_work = getattr(runtime, "last_motor_work_ledger", None) or {}
@@ -993,6 +1379,27 @@ def _physical_bundle(
     resources = getattr(runtime, "last_complementary_ledger", None) or {}
     agent_id = agent_id or observer_agent_id(runtime)
     body_id = body_id or observer_body_id(runtime)
+    near_field_gt = None
+    nfe = getattr(runtime.config, "near_field_exteroception", None)
+    if nfe is not None and getattr(nfe, "enabled", False):
+        from mechanistic_mind.physical_system.near_field_exteroception import (
+            ACTIVE_SENSOR_ORIENTATION,
+            sample_near_field,
+        )
+        near_field_gt = sample_near_field(
+            world=runtime.world,
+            body=runtime.body,
+            cfg=nfe,
+            foreign_bodies=foreign_bodies,
+        )
+        near_field_gt = {
+            **near_field_gt,
+            "ACTIVE_SENSOR_ORIENTATION": ACTIVE_SENSOR_ORIENTATION,
+            "perception_enabled": bool(nfe.perception_enabled),
+            "body_optical_enabled": bool(getattr(nfe, "body_optical_enabled", True)),
+            "illumination_intensity_world": getattr(runtime.world, "illumination_intensity", None),
+            "surface_checksum": (getattr(runtime.world, "surface_meta", None) or {}).get("checksum"),
+        }
     return {
         "selected_action": runtime.last_selected_action,
         "action": action_work,
@@ -1007,6 +1414,7 @@ def _physical_bundle(
             "motor_torque": 0.0,
             "receipt": getattr(runtime, "last_orientation_meta", None),
         },
+        "near_field_exteroception": near_field_gt,
         "resources": {
             "generic": getattr(runtime, "last_resource_ledger", None),
             "complementary": resources,
@@ -1042,6 +1450,7 @@ def agents_views_frame(
                 "mind": mind_compact_frame(runtime) if compact else mind_frame(runtime),
                 "body": body_frame(runtime),
                 "physical": _physical_bundle(runtime),
+                "agent_observation": runtime.agent_observation(),
                 "causal_chain": (
                     causal_chain_compact_frame(runtime, previous_body=previous_body)
                     if compact
@@ -1067,23 +1476,71 @@ def agents_views_frame(
     # unless the runtime exposes an observer generation attribute.
     generation = getattr(runtime, "_observer_runtime_generation", None)
     try:
+        from mechanistic_mind.ui.psy_observer_web.undercover_identity import slot_agent_body_ids
+        exp_slot = getattr(runtime, "experimenter_slot", None)
         for i, slot in enumerate(slots):
             runtime.selected_index = i  # observer projection only; restored below
-            aid = f"agent_{i}"
-            mind = mind_compact_frame(slot, agent_id=aid, body_id=f"body-{i}") if compact else mind_frame(slot, agent_id=aid, body_id=f"body-{i}")
+            aid, bid = slot_agent_body_ids(i, experimenter_slot=exp_slot)
+            mind = mind_compact_frame(slot, agent_id=aid, body_id=bid) if compact else mind_frame(slot, agent_id=aid, body_id=bid)
             # Prefer per-agent previous body; fall back to selected-only buffer for compat.
-            slot_prev = prev_map.get(aid)
+            slot_prev = prev_map.get(aid) or prev_map.get(f"agent_{i}")
             if slot_prev is None and i == prev_selected:
                 slot_prev = previous_body
+            foreign = [
+                (slots[j].body, slots[j].config.body)
+                for j in range(len(slots))
+                if j != i
+            ]
+            phys = _physical_bundle(slot, agent_id=aid, body_id=bid, foreign_bodies=foreign)
+            # Agent-accessible observation with the same foreign_bodies as cognition tick path.
+            agent_obs = slot.agent_observation(foreign_bodies=foreign)
+            if compact and i != prev_selected and isinstance(phys, dict):
+                # Peer agents: drop bulky ledgers on RUNNING compact frames, but keep
+                # a vision stub so COMPARE / re-projection is not structurally blind.
+                nf = phys.get("near_field_exteroception")
+                nf_stub = None
+                if isinstance(nf, dict):
+                    nf_stub = {
+                        "vision_contributes": nf.get("vision_contributes"),
+                        "perception_enabled": nf.get("perception_enabled"),
+                        "body_optical_enabled": nf.get("body_optical_enabled"),
+                        "illumination": nf.get("illumination"),
+                        "fragments": nf.get("fragments"),
+                        "n_body_optical_cells": nf.get("n_body_optical_cells"),
+                        "n_detectable": nf.get("n_detectable"),
+                        "body_theta": nf.get("body_theta"),
+                        "fov_deg": nf.get("fov_deg"),
+                        "vision_radius": nf.get("vision_radius") or nf.get("radius"),
+                        "radius": nf.get("radius") or nf.get("vision_radius"),
+                        "max_candidates": nf.get("max_candidates"),
+                        "n_candidates": nf.get("n_candidates"),
+                        "detail": "compact",
+                    }
+                phys = {
+                    "selected_action": phys.get("selected_action"),
+                    "orientation": {
+                        "theta": (phys.get("orientation") or {}).get("theta")
+                        if isinstance(phys.get("orientation"), dict)
+                        else None,
+                        "status": "COMPACT",
+                    },
+                    "resources": phys.get("resources"),
+                    "near_field_exteroception": nf_stub,
+                    "source_agent_id": phys.get("source_agent_id"),
+                    "body_id": phys.get("body_id"),
+                    "detail": "compact",
+                    "note": "Full physical/work ledgers on PAUSE/INSPECT or selected agent.",
+                }
             out[aid] = {
                 "agent_id": aid,
-                "body_id": f"body-{i}",
+                "body_id": bid,
                 "agent_seed": int(slot.seed),
                 "tick": int(slot.tick),
                 "generation": generation,
                 "mind": mind,
-                "body": body_frame(slot, agent_id=aid, body_id=f"body-{i}"),
-                "physical": _physical_bundle(slot, agent_id=aid, body_id=f"body-{i}"),
+                "body": body_frame(slot, agent_id=aid, body_id=bid),
+                "physical": phys,
+                "agent_observation": agent_obs,
                 "causal_chain": (
                     causal_chain_compact_frame(slot, previous_body=slot_prev)
                     if compact
@@ -1099,7 +1556,7 @@ def agents_views_frame(
                     if compact
                     else prospection_frame(slot)
                 ),
-                "perception": perception_frame(slot),
+                "perception": perception_frame(slot, foreign_bodies=foreign),
             }
             # Hard guard: never cross-serve
             if out[aid]["mind"].get("source_agent_id") not in (None, aid):
@@ -1108,8 +1565,8 @@ def agents_views_frame(
                 raise RuntimeError(f"body cross-serve: expected {aid}, got {out[aid]['body'].get('agent_id')}")
             if int(out[aid]["agent_seed"]) != int(slot.seed):
                 raise RuntimeError(f"seed mismatch for {aid}")
-            if out[aid]["body_id"] != f"body-{i}":
-                raise RuntimeError(f"body_id mismatch for {aid}")
+            if out[aid]["body_id"] != bid:
+                raise RuntimeError(f"body_id mismatch for {aid}: expected {bid}")
     finally:
         runtime.selected_index = prev_selected
     return out
@@ -1287,6 +1744,19 @@ def collect_observer_events(runtime: PhysicalSystemRuntime, *, limit: int = 200)
     ]
 
 
+def _physical_body_inventory_frame(runtime: PhysicalSystemRuntime) -> dict[str, Any]:
+    """Observer/developer diagnostic — never cognition input."""
+    from mechanistic_mind.ui.psy_observer_web.undercover_identity import (
+        detect_legacy_duplicate_undercover_ids,
+        physical_body_inventory,
+    )
+
+    inv = physical_body_inventory(runtime)
+    aids = [str(b.get("agent_id") or "") for b in inv.get("bodies") or []]
+    inv["legacy"] = detect_legacy_duplicate_undercover_ids(aids)
+    return inv
+
+
 def live_frame(
     runtime: PhysicalSystemRuntime,
     *,
@@ -1298,6 +1768,7 @@ def live_frame(
     detail: str = "full",
     structured_events: list[dict[str, Any]] | None = None,
     previous_bodies: dict[str, dict[str, Any]] | None = None,
+    geometry_traversability: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     mechanisms = __import__(
         "mechanistic_mind.physical_system.mechanism_registry",
@@ -1316,6 +1787,18 @@ def live_frame(
         previous_body=previous_body,
         previous_bodies=previous_bodies,
         detail=detail,
+    )
+    from mechanistic_mind.ui.psy_observer_web.geometry.live_summary import (
+        geometry_live_compact_summary,
+    )
+
+    geometry_interp = geometry_live_compact_summary(
+        runtime,
+        previous_body=previous_body,
+        previous_bodies=previous_bodies,
+        traversability_overlay=geometry_traversability,
+        include_flow_overlay=not compact,
+        flow_stride=2,
     )
     # Never fall back to another agent's view — that produces hybrid identity screens.
     selected_view = views.get(agent_id)
@@ -1346,6 +1829,46 @@ def live_frame(
             "perception": {"status": "NOT AVAILABLE"},
         }
     header = header_info(runtime, status=status, mode=mode, target_tick=target_tick)
+    if compact:
+        mech_summary = {
+            "detail": "compact",
+            "enabled_ids": sorted(
+                k for k, v in (mechanisms or {}).items()
+                if isinstance(v, dict) and v.get("enabled")
+            ) if isinstance(mechanisms, dict) else [],
+            "note": "Full mechanism snapshot on PAUSE/INSPECT.",
+        }
+        # Prefer list-of-id form when mechanisms is a plain enable map
+        if isinstance(mechanisms, dict) and mechanisms and not any(
+            isinstance(v, dict) for v in mechanisms.values()
+        ):
+            mech_summary["enabled_ids"] = sorted(k for k, v in mechanisms.items() if v)
+        model_banner = {
+            **(runtime.model_identity() if hasattr(runtime, "model_identity") else {}),
+            "model": (
+                runtime.model_identity().get("display_name")
+                if hasattr(runtime, "model_identity")
+                else "MM 1.0 — Tiktaalik"
+            ),
+            "runtime_version": getattr(runtime.config, "runtime_version", "MM_1_0_TIKTAALIK"),
+            "mechanisms": mech_summary,
+            "force_contributions": "DEFERRED",
+            "frame_detail": "compact",
+        }
+        events_out = events[-16:] if isinstance(events, list) else events
+    else:
+        model_banner = {
+            **(runtime.model_identity() if hasattr(runtime, "model_identity") else {}),
+            "model": (
+                runtime.model_identity().get("display_name")
+                if hasattr(runtime, "model_identity")
+                else "MM 1.0 — Tiktaalik"
+            ),
+            "runtime_version": getattr(runtime.config, "runtime_version", "MM_1_0_TIKTAALIK"),
+            "mechanisms": mechanisms,
+            "force_contributions": getattr(runtime, "last_force_contributions", None),
+        }
+        events_out = events
     return {
         "header": header,
         "observer": {
@@ -1363,7 +1886,7 @@ def live_frame(
             "frame_detail": "compact" if compact else "full",
             "note": "Observer-only selection. Does not alter cognition, RNG, or physics.",
         },
-        "world": world_frame(runtime, max_side=max_side),
+        "world": world_frame(runtime, max_side=max_side, detail=detail),
         # Top-level fields are convenience projections of the SAME agents_views entry only.
         "perception": selected_view.get("perception"),
         "body": selected_view.get("body"),
@@ -1371,27 +1894,21 @@ def live_frame(
         "mind": selected_view.get("mind"),
         "causal_chain": selected_view.get("causal_chain"),
         "physical": selected_view.get("physical"),
+        "agent_observation": selected_view.get("agent_observation")
+        or ((selected_view.get("perception") or {}).get("agent_observation")),
         "agents_views": views,
-        "model_banner": {
-            **(runtime.model_identity() if hasattr(runtime, "model_identity") else {}),
-            "model": (
-                runtime.model_identity().get("display_name")
-                if hasattr(runtime, "model_identity")
-                else "MM 1.0 — Tiktaalik"
-            ),
-            "runtime_version": getattr(runtime.config, "runtime_version", "MM_1_0_TIKTAALIK"),
-            "mechanisms": mechanisms,
-            "force_contributions": getattr(runtime, "last_force_contributions", None),
-        },
+        "model_banner": model_banner,
         "cognition_pipeline": selected_view.get("cognition_pipeline"),
         "prospection_view": selected_view.get("prospection_view"),
-        "structured_events": events,
-        "signal_forensics": signal_forensics_frame(runtime, events),
+        "geometry_interpretation": geometry_interp,
+        "structured_events": events_out,
+        "signal_forensics": signal_forensics_frame(runtime, events_out if compact else events),
         "agents_observer": (
             runtime.observer_agent_summaries()
             if hasattr(runtime, "observer_agent_summaries")
             else None
         ),
+        "physical_body_inventory": _physical_body_inventory_frame(runtime),
         "contact": getattr(runtime, "last_contact", None),
         "physical_signal": getattr(runtime, "last_signal_receipt", None),
         "experiment": experiment_config_frame(runtime),

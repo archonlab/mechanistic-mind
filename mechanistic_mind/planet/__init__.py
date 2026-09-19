@@ -20,6 +20,13 @@ from mechanistic_mind.planet.runtime import (
     snapshot_stats,
 )
 from mechanistic_mind.planet.state import PlanetState, initialize_planet
+from mechanistic_mind.planet.terrain import (
+    TERRAIN_GENERATOR_VERSION,
+    TerrainConfig,
+    deterministic_namespace_seed,
+    install_terrain_on_planet,
+    resolve_terrain_seed,
+)
 from mechanistic_mind.planet.topology import (
     laplacian,
     toroidal_delta,
@@ -31,6 +38,11 @@ __all__ = [
     "PlanetConfig",
     "PlanetState",
     "ClimateEcologyConfig",
+    "TerrainConfig",
+    "TERRAIN_GENERATOR_VERSION",
+    "deterministic_namespace_seed",
+    "resolve_terrain_seed",
+    "install_terrain_on_planet",
     "default_planet_config",
     "initialize_planet",
     "step_planet",

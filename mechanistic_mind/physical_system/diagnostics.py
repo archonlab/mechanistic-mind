@@ -5,11 +5,11 @@ Does NOT alter selection behavior. Receipts record what the runtime already did.
 from __future__ import annotations
 
 from collections import Counter, deque
-from copy import deepcopy
 from typing import Any
 
 import numpy as np
 
+from mechanistic_mind.integrated.copy_opt import jsonish_copy
 from mechanistic_mind.research import prospective_composition as pr
 from mechanistic_mind.research import predictive_compression as pc
 
@@ -43,8 +43,8 @@ def build_action_decision_receipt(
     last_selection = last_selection or {}
     pred_by_action = {str(p["action"]): p for p in predictions}
     cont_first_actions = [str((c.get("actions") or ["?"])[0]) for c in continuations]
-    scenario_groups = deepcopy(last_selection.get("scenario_groups") or {})
-    competition = deepcopy(last_selection.get("competition") or {})
+    scenario_groups = jsonish_copy(last_selection.get("scenario_groups") or {})
+    competition = jsonish_copy(last_selection.get("competition") or {})
     mode = str(last_selection.get("prospective_selection_mode") or competition.get("mode") or "UNKNOWN")
     peer_evaluation = last_selection.get("peer_evaluation") or "NONE"
 
@@ -113,7 +113,7 @@ def build_action_decision_receipt(
     outcome = competition.get("outcome_class")
     if outcome in {"EXACT_TIE", "PARTIAL_ORDER_TIE", "INCOMPARABLE"}:
         tie_state = str(outcome)
-        tie_break = deepcopy(competition.get("tie_resolution") or _na())
+        tie_break = jsonish_copy(competition.get("tie_resolution") or _na())
     elif outcome == "SINGLE_SUPPORTED":
         tie_state = "SINGLE_SUPPORTED"
         tie_break = "only one first-action had supported prospective scenario"
@@ -171,9 +171,9 @@ def build_action_decision_receipt(
         "selected_action": selected,
         "selection_source": selection_source,
         "prospective_selection_mode": mode,
-        "observation": deepcopy(observation),
+        "observation": dict(observation),  # float map: shallow container is sufficient
         "retrieved_structures": {
-            "compression_predictions": deepcopy(predictions),
+            "compression_predictions": jsonish_copy(predictions),
             "note": "Structures listed are those returned by pc.predict for current observation×action; empty if prediction matches=0",
         },
         "prospective_continuations": {
@@ -183,7 +183,7 @@ def build_action_decision_receipt(
                 "max_depth_reached": composition.get("max_depth_reached"),
                 "composition_enabled": composition.get("composition_enabled"),
             },
-            "top": deepcopy(continuations[:8]),
+            "top": jsonish_copy(continuations[:8]),
             "top_first_actions": cont_first_actions[:8],
         },
         "scenario_groups": scenario_groups,
@@ -213,9 +213,9 @@ def build_action_decision_receipt(
         "bridge": {
             "cognitive_selection": selected,
             "cognitive_action": selected,
-            "emitted_impulse": deepcopy((last_apply or {}).get("impulse") if isinstance(last_apply, dict) else _na()),
-            "physical_action_received": deepcopy((last_apply or {}).get("action") if isinstance(last_apply, dict) else selected),
-            "apply": deepcopy(last_apply),
+            "emitted_impulse": jsonish_copy((last_apply or {}).get("impulse") if isinstance(last_apply, dict) else _na()),
+            "physical_action_received": jsonish_copy((last_apply or {}).get("action") if isinstance(last_apply, dict) else selected),
+            "apply": jsonish_copy(last_apply),
         },
         "consequence": consequence,
     }

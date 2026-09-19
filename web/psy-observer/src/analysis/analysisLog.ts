@@ -1,4 +1,6 @@
 import type { RunAnalysis } from './types.ts';
+import { formatConfigurationHistoryLog } from './configurationHistory.ts';
+import { formatVisualForensicsSection } from './visionForensics.ts';
 
 function show(v: any): string {
   if (v == null) return 'NOT AVAILABLE';
@@ -57,34 +59,77 @@ export function formatAnalysisLog(analysis: RunAnalysis): string {
   lines.push(`Experimental overrides: ${JSON.stringify(id.experimental_overrides || {})}`);
   lines.push('');
 
+  if (analysis.configuration_history) {
+    lines.push(...formatConfigurationHistoryLog(analysis.configuration_history));
+    lines.push('');
+  }
+
   for (const a of analysis.agents) {
     lines.push(a.agent_id.toUpperCase());
     lines.push(`  Seed: ${show(a.seed)}  Body: ${a.body_id}  Ticks observed (canonical action ticks): ${a.ticks_observed}`);
     lines.push(`  TICK-LEVEL ACTION OCCUPANCY (one canonical action per simulation tick):`);
     lines.push(`    WAIT ticks: ${show(a.actions.wait_count)} (${show(a.actions.wait_pct)}%)  MOVE ticks: ${show(a.actions.move_count)} (${show(a.actions.move_pct)}%)`);
-    lines.push(`    Occupancy total: ${a.actions.occupancy_total}  (must be ≤ ticks observed)`);
+    lines.push(`    Occupancy total: ${a.actions.occupancy_total}  (must be ≤ ticks observed; OBSERVED-TICK STATISTIC)`);
     lines.push(`    MOVE distribution: ${show(a.actions.move_distribution)}`);
-    lines.push(`    Longest WAIT streak: ${show(a.actions.longest_wait_streak)}  Longest MOVE streak: ${show(a.actions.longest_move_streak)}`);
+    const cov = (a.actions as any).sequence_coverage || (a.movement as any).sequence_coverage || '';
+    lines.push(`    Longest observed contiguous WAIT streak: ${show(a.actions.longest_wait_streak)}  MOVE: ${show(a.actions.longest_move_streak)}`);
+    lines.push(`    True longest WAIT streak: ${show((a.actions as any).true_longest_wait_streak)}  MOVE: ${show((a.actions as any).true_longest_move_streak)}${cov ? `  [${cov}]` : ''}`);
     lines.push(`    Transitions (ordered unique ticks): ${show(a.actions.action_transitions)}`);
     if (a.cumulative_runtime_action_counts !== 'NOT AVAILABLE') {
       lines.push(`  CUMULATIVE RUNTIME ACTION COUNTS (cognition metrics; not tick-level occupancy merge):`);
       lines.push(`    ${JSON.stringify(a.cumulative_runtime_action_counts)}`);
     }
-    lines.push(`  ACTION / SCENARIO SELECTION EVENTS (structured; may exceed tick occupancy):`);
+    lines.push(`  STRUCTURED COGNITIVE EVENTS (independent of runtime aggregates):`);
     lines.push(`    SCENARIO_SELECTED: ${show(a.cognition.scenario_selected)} (WAIT ${show(a.cognition.scenario_selected_wait)} / MOVE ${show(a.cognition.scenario_selected_move)})`);
     lines.push(`    Cognitive WAIT selections: ${show(a.cognition.cognitive_wait_selections)}  Fallback WAIT: ${show(a.cognition.fallback_wait_selections)}`);
     lines.push(`    Action sources (tick-level when from timeline): ${show(a.cognition.selected_action_sources)}`);
-    lines.push(`  MOVEMENT: distance ${show(a.movement.distance_travelled)}  net ${show(a.movement.net_displacement)}  mean_speed ${show(a.movement.mean_speed)}  max_speed ${show(a.movement.max_speed)}`);
-    lines.push(`  Unique cells: ${show(a.movement.unique_cells)}  Rotation accum: ${show(a.movement.rotation_accumulated)}`);
+    lines.push(`  MOVEMENT: distance(${show((a.movement as any).distance_metric)}) ${show(a.movement.distance_travelled)}  path_euclid ${show((a.movement as any).path_length_euclidean)}  net_wrap_observed ${show(a.movement.net_displacement)}  unwrapped_net ${show((a.movement as any).unwrapped_net_displacement)}  unwrappedΔ (${show((a.movement as any).unwrapped_dx)}, ${show((a.movement as any).unwrapped_dy)})  max_exc ${show((a.movement as any).max_excursion_from_start)}  mean_speed ${show(a.movement.mean_speed)}  max_speed ${show(a.movement.max_speed)}`);
+    lines.push(`  TRAJECTORY: unique_pos_ticks ${show((a.movement as any).unique_position_ticks)}  dup_ignored ${show((a.movement as any).duplicate_observer_samples_ignored)}  gaps_skipped ${show((a.movement as any).trajectory_gaps_skipped)}  wraps x/y ${show((a.movement as any).boundary_crossings_x)}/${show((a.movement as any).boundary_crossings_y)}  cell_cross_com ${show((a.movement as any).cell_boundary_crossings)}  nbhd_repl ${show((a.movement as any).neighborhood_replacements)}`);
+    lines.push(`  Physical during WAIT/MOVE: path ${show((a.movement as any).path_during_requested_WAIT)}/${show((a.movement as any).path_during_requested_MOVE)}  unwrapped_net ${show((a.movement as any).unwrapped_displacement_during_WAIT)}/${show((a.movement as any).unwrapped_displacement_during_MOVE)}`);
+    const pvc = (a.movement as any).path_vs_velocity_consistency;
+    if (pvc === 'INCONSISTENT' || pvc === 'FLAG') {
+      lines.push(`  WARNING: trajectory metrics inconsistent with runtime speed (ratio ${show((a.movement as any).path_vs_velocity_ratio)})`);
+    } else if (pvc === 'NOT_COMPARABLE_DUE_TO_COVERAGE') {
+      lines.push(`  path_vs_velocity: NOT COMPARABLE DUE TO COVERAGE (sparse/partial LIVE sampling)`);
+    } else {
+      lines.push(`  path_vs_velocity: ${show(pvc)} ratio ${show((a.movement as any).path_vs_velocity_ratio)}`);
+    }
+    lines.push(`  Unique cells (observed trajectory): ${show(a.movement.unique_cells)}  current_cell ${show((a.movement as any).current_cell)}  Rotation accum: ${show(a.movement.rotation_accumulated)}`);
     lines.push(`  BODY: deform_events ${show(a.body.deformation_events)}  work_limited ${show(a.body.work_limited_events)}`);
     lines.push(`  RESOURCES A: ${show(a.resources.resource_A)}`);
     lines.push(`  RESOURCES B: ${show(a.resources.resource_B)}`);
     lines.push(`  WORK RESERVOIR: ${show(a.resources.work_reservoir)}`);
-    lines.push(`  COGNITION: predictions ${show(a.cognition.prediction_count)}  error ${show(a.cognition.prediction_error)}  prospective ${show(a.cognition.prospective_compositions)}  novel ${show(a.cognition.novel_compositions)}`);
+    lines.push(`  COGNITION AGGREGATES (runtime metrics; NOT inferred from structured events):`);
+    lines.push(`    Prediction count: ${show(a.cognition.prediction_count)}  error ${show(a.cognition.prediction_error)}  prospective ${show(a.cognition.prospective_compositions)}  novel ${show(a.cognition.novel_compositions)}`);
     lines.push(`  SIGNALS: emit A/B ${a.signals.emissions_A}/${a.signals.emissions_B}  recv A/B ${a.signals.receptions_A}/${a.signals.receptions_B}`);
     lines.push(`  Contact emissions: ${a.signals.contact_triggered_emissions}  Motion emissions: ${a.signals.motion_triggered_emissions}`);
     lines.push(`  Reception attribution: mixed=${a.signals.reception_attribution.mixed} not_unique=${a.signals.reception_attribution.not_unique} unknown=${a.signals.reception_attribution.unknown}`);
     lines.push(`  INTERACTION: contacts ${show(a.interaction.body_body_contacts)}  cross-agent contributions ${a.interaction.cross_agent_signal_contributions}`);
+    if (a.vision) {
+      const v: any = a.vision;
+      lines.push('  VISION:');
+      lines.push(`    foreign-body exposure ticks: ${show(v.foreign_body_exposure_ticks)}`);
+      lines.push(`    observed exposure episodes: ${show(v.observed_exposure_episodes)}`);
+      lines.push(`    vision-only episodes: ${show(v.vision_only_episodes)}`);
+      if (v.first_observed_exposure != null) {
+        lines.push(`    first observed exposure: t${v.first_observed_exposure}`);
+      }
+      lines.push(`    peak body optical contribution: ${show(v.peak_body_optical_contribution)}`);
+      const peaks = v.body_derived_exo_peaks || v.exo_body_derived_delta;
+      if (peaks && typeof peaks === 'object') {
+        lines.push('    body-derived exo:');
+        lines.push(`      L peak: ${show(peaks.exo_0)}`);
+        lines.push(`      F peak: ${show(peaks.exo_1)}`);
+        lines.push(`      R peak: ${show(peaks.exo_2)}`);
+      } else {
+        lines.push(`    exo body-derived delta: ${show(v.exo_body_derived_delta)}`);
+      }
+      if (v.exposure_without_contact_episodes != null) {
+        lines.push(`    exposure without contact episodes: ${show(v.exposure_without_contact_episodes)}`);
+      }
+      lines.push(`    next-action observations: ${show(v.next_action_observations)}`);
+      lines.push(`    cognition linkage: ${v.cognition_linkage}`);
+    }
     lines.push('');
   }
 
@@ -150,6 +195,10 @@ export function formatAnalysisLog(analysis: RunAnalysis): string {
   lines.push(`  Causal provenance: ${analysis.coverage.causal_provenance}`);
   lines.push('');
 
+  const vfLines = formatVisualForensicsSection(analysis.vision_forensics);
+  lines.push(...vfLines);
+  lines.push('');
+
   lines.push('SCIENTIFIC BOUNDARY');
   lines.push('  This report is Observer/analysis only. It does not modify runtime dynamics.');
   lines.push('  Statements are tagged OBSERVED / DERIVED / CAUSALLY_LINKED / TEMPORALLY_ASSOCIATED / NOT_AVAILABLE.');
@@ -158,13 +207,22 @@ export function formatAnalysisLog(analysis: RunAnalysis): string {
   lines.push('DATA COVERAGE:');
   lines.push(`  level: ${analysis.coverage.level}`);
   lines.push(`  reason: ${analysis.coverage.reason}`);
+  const covAny = analysis.coverage as any;
+  if (covAny.runtime_span) lines.push(`  Runtime span: ${covAny.runtime_span}`);
+  lines.push(`  Unique simulation ticks observed: ${analysis.coverage.unique_simulation_ticks}`);
+  if (covAny.sequence_coverage) lines.push(`  Sequence coverage: ${covAny.sequence_coverage}`);
+  if (covAny.gap_count_agents_max != null) lines.push(`  Max trajectory gaps skipped (per agent): ${covAny.gap_count_agents_max}`);
+  if (covAny.action_occupancy_semantics) lines.push(`  Action occupancy: ${covAny.action_occupancy_semantics}`);
+  if (covAny.continuous_streaks) lines.push(`  Continuous streaks: ${covAny.continuous_streaks}`);
   lines.push(`  world: ${analysis.coverage.world}`);
-  lines.push(`  body: ${analysis.coverage.body}`);
-  lines.push(`  cognition: ${analysis.coverage.cognition}`);
+  lines.push(`  body trajectory: ${analysis.coverage.body}`);
+  lines.push(`  cognition aggregates: ${analysis.coverage.cognition}`);
+  if (covAny.structured_cognition_events) {
+    lines.push(`  structured cognition events: ${covAny.structured_cognition_events}`);
+  }
   lines.push(`  signals: ${analysis.coverage.signals}`);
   lines.push(`  causal provenance: ${analysis.coverage.causal_provenance}`);
   lines.push(`  timeline_samples (Observer): ${analysis.coverage.timeline_samples}`);
-  lines.push(`  unique_simulation_ticks: ${analysis.coverage.unique_simulation_ticks}`);
   lines.push(`  event_samples: ${analysis.coverage.event_samples}`);
   lines.push(`  telemetry_samples: ${analysis.coverage.telemetry_samples}`);
   lines.push('');

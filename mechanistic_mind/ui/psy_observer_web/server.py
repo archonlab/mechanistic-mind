@@ -66,11 +66,14 @@ class ExperimentBody(BaseModel):
     world: dict[str, Any] | None = None
     agent_body: dict[str, Any] | None = None
     agent_count: int | None = None
+    ecology_preset: str | None = None
+    # Matched-control override when terrain is enabled by ecology preset (Advanced / Raw).
+    terrain_seed: int | None = None
 
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    from mechanistic_mind.model.tiktaalik import display_name, model_metadata
+    from mechanistic_mind.model.tiktaalik import display_name, model_metadata, release_display_name
 
     session = get_session()
     meta = session.runtime.model_identity() if hasattr(session.runtime, "model_identity") else model_metadata()
@@ -78,6 +81,7 @@ def health() -> dict[str, Any]:
         "ok": True,
         "app": "Psy Observer",
         "model": display_name(),
+        "release": release_display_name(),
         "model_metadata": meta,
         "version": __version__,
         "runtime": "TwoAgentRuntime" if getattr(session.runtime, "slots", None) else "PhysicalSystemRuntime",
@@ -258,6 +262,33 @@ def apply_experiment(body: ExperimentBody) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+class LiveInterventionBody(BaseModel):
+    ecology_preset: str | None = None
+    cognition_enabled: bool | None = None
+    mechanisms: dict[str, Any] | None = None
+    category: str | None = None
+    source: str | None = None
+    target_tick: int | None = None
+    ui_hz: float | None = None
+    buffer_capacity: int | None = None
+    # Present for UI convenience; changing these is rejected as WORLD-STRUCTURAL.
+    seed: int | None = None
+    world: dict[str, Any] | None = None
+    agent_count: int | None = None
+    agent_body: dict[str, Any] | None = None
+
+
+@app.post("/api/experiment/live")
+def apply_live_intervention(body: LiveInterventionBody) -> dict[str, Any]:
+    """LIVE ecology/mechanism mutation — does not rebuild runtime or reset agents."""
+    return get_session().apply_live_intervention(body.model_dump(exclude_none=True))
+
+
+@app.get("/api/interventions")
+def list_interventions() -> dict[str, Any]:
+    return get_session().list_world_interventions()
+
+
 @app.get("/api/snapshot")
 def snapshot() -> dict[str, Any]:
     return get_session().snapshot()
@@ -432,6 +463,45 @@ class MechanismToggleBody(BaseModel):
 @app.post("/api/mechanisms/{mechanism_id}")
 def post_mechanism(mechanism_id: str, body: MechanismToggleBody) -> dict[str, Any]:
     return get_session().set_mechanism(mechanism_id, bool(body.enabled))
+
+
+class VisionRadiusBody(BaseModel):
+    radius: int
+
+
+@app.post("/api/vision/radius")
+def post_vision_radius(body: VisionRadiusBody) -> dict[str, Any]:
+    """LIVE Moore candidate radius R∈{1,2,3}. Sensor geometry only — no reset."""
+    return get_session().set_vision_radius(int(body.radius))
+
+
+@app.get("/api/vision/radius")
+def get_vision_radius() -> dict[str, Any]:
+    from mechanistic_mind.physical_system.near_field_exteroception import (
+        DEFAULT_VISION_RADIUS,
+        clamp_vision_radius,
+        moore_max_candidates,
+    )
+
+    sess = get_session()
+    rt = sess.runtime
+    nfe = None
+    slots = getattr(rt, "slots", None)
+    if slots:
+        nfe = getattr(slots[0].config, "near_field_exteroception", None)
+    else:
+        nfe = getattr(getattr(rt, "config", None), "near_field_exteroception", None)
+    r = clamp_vision_radius(getattr(nfe, "radius", DEFAULT_VISION_RADIUS) if nfe else DEFAULT_VISION_RADIUS)
+    return {
+        "radius": r,
+        "max_candidates": moore_max_candidates(r),
+        "options": [
+            {"radius": 1, "max_candidates": 8, "label": "R=1 · max 8 cells"},
+            {"radius": 2, "max_candidates": 24, "label": "R=2 · max 24 cells"},
+            {"radius": 3, "max_candidates": 48, "label": "R=3 · max 48 cells"},
+        ],
+        "note": "Moore candidate neighborhood only; FOV/distance/illumination filters unchanged.",
+    }
 
 
 @app.get("/api/evidence/gearbox")
@@ -706,6 +776,348 @@ def diagnostics_occupancy() -> dict[str, Any]:
     return get_session().diagnostics().get("occupancy") or {}
 
 
+@app.get("/api/geometry/live")
+def geometry_live() -> dict[str, Any]:
+    """Bounded LIVE geometry interpretation from current published frame / runtime."""
+    sess = get_session()
+    frame = sess.current_frame()
+    geo = (frame or {}).get("geometry_interpretation")
+    if isinstance(geo, dict):
+        return geo
+    from mechanistic_mind.ui.psy_observer_web.geometry.live_summary import (
+        geometry_live_compact_summary,
+    )
+    with sess._step_lock:
+        overlay = sess._geo_overlay_locked(detail="compact")
+        return geometry_live_compact_summary(
+            sess.runtime,
+            previous_body=getattr(sess, "_prev_body", None),
+            previous_bodies=getattr(sess, "_prev_bodies", None) or {},
+            traversability_overlay=overlay,
+        )
+
+
+@app.get("/api/geometry/empirical")
+def geometry_empirical_payload() -> dict[str, Any]:
+    """Full empirical overlay snapshot for reconnect / version miss (Observer-only)."""
+    sess = get_session()
+    source = str(getattr(sess, "_geo_overlay_source", "LIVE") or "LIVE").upper()
+    if source == "SAVED" and isinstance(getattr(sess, "_geo_saved_overlay", None), dict):
+        saved = sess._geo_saved_overlay
+        return {
+            "accepted": True,
+            "static_version": int(getattr(sess, "_geo_static_version", 1) or 1),
+            "empirical_version": int((saved or {}).get("empirical_version") or 0),
+            "runtime_generation": int(getattr(sess, "_runtime_generation", 0) or 0),
+            "geo_source": "SAVED",
+            "provenance": getattr(sess, "_geo_saved_provenance", None),
+            "traversability": saved,
+        }
+    published = getattr(sess, "_geo_overlay_published", None)
+    if isinstance(published, dict) and published.get("status") in {"AVAILABLE", "LIVE_GEO_UNAVAILABLE"}:
+        with sess._lock:
+            prov = sess._geo_world_provenance_locked()
+        return {
+            "accepted": True,
+            "static_version": int(getattr(sess, "_geo_static_version", 1) or 1),
+            "empirical_version": int(published.get("empirical_version") or 0),
+            "runtime_generation": int(getattr(sess, "_runtime_generation", 0) or 0),
+            "geo_source": "LIVE",
+            "provenance": published.get("provenance") or prov,
+            "traversability": published,
+        }
+    # Force rebuild outside step lock
+    payload = sess._refresh_geo_overlay_outside_lock(detail="full")
+    with sess._lock:
+        prov = sess._geo_world_provenance_locked()
+    if isinstance(payload, dict):
+        payload = dict(payload)
+        payload["provenance"] = prov
+        payload["geo_source"] = "LIVE"
+        if int(payload.get("n_observations") or 0) <= 0:
+            payload["status"] = "LIVE_GEO_UNAVAILABLE"
+    return {
+        "accepted": bool(payload),
+        "static_version": int(getattr(sess, "_geo_static_version", 1) or 1),
+        "empirical_version": int((payload or {}).get("empirical_version") or 0),
+        "runtime_generation": int(getattr(sess, "_runtime_generation", 0) or 0),
+        "geo_source": "LIVE",
+        "provenance": prov,
+        "traversability": payload,
+    }
+
+
+@app.get("/api/geometry/flow-overlay")
+def geometry_flow_overlay(stride: int = 2) -> dict[str, Any]:
+    """Observer-only downsampled planet flow vectors (ground truth)."""
+    from mechanistic_mind.ui.psy_observer_web.geometry.ground_truth import flow_vector_grid
+
+    sess = get_session()
+    with sess._step_lock:
+        return flow_vector_grid(sess.runtime, stride=max(1, min(8, int(stride))))
+
+
+class GeometryFilterBody(BaseModel):
+    agent_filter: str = "ALL"
+
+
+class LiveInterpretersBody(BaseModel):
+    geometry: bool | None = None
+    signal_context: bool | None = None
+
+
+@app.post("/api/geometry/agent-filter")
+def geometry_agent_filter(body: GeometryFilterBody) -> dict[str, Any]:
+    """Set Observer-only empirical overlay agent filter (does not affect cognition)."""
+    return get_session().set_geometry_agent_filter(body.agent_filter)
+
+
+@app.post("/api/observer/live-interpreters")
+def observer_live_interpreters(body: LiveInterpretersBody) -> dict[str, Any]:
+    """Enable/disable LIVE GEO/SIGINT processing for performance isolation."""
+    return get_session().set_live_interpreters(
+        geometry=body.geometry,
+        signal_context=body.signal_context,
+    )
+
+
+@app.post("/api/geometry/hydrate/{run_id}")
+def geometry_hydrate(run_id: str, max_rows: int | None = 80000) -> dict[str, Any]:
+    """Load SAVED GEO overlay from a run timeline (does not replace LIVE accumulators)."""
+    return get_session().geometry_hydrate_from_run(run_id, max_rows=max_rows)
+
+
+@app.post("/api/geometry/use-live")
+def geometry_use_live() -> dict[str, Any]:
+    """Switch WORLD empirical display to current LIVE runtime GEO."""
+    return get_session().geometry_use_live()
+
+
+@app.post("/api/geometry/clear-saved")
+def geometry_clear_saved() -> dict[str, Any]:
+    """Clear SAVED GEO overlay and return to LIVE."""
+    return get_session().geometry_clear_saved()
+
+
+@app.get("/api/geometry/cell")
+def geometry_cell(ix: int, iy: int, agent_filter: str | None = None) -> dict[str, Any]:
+    """Ground-truth + empirical directional detail for one cell."""
+    return get_session().geometry_cell_detail(ix, iy, agent_filter=agent_filter)
+
+
+@app.get("/api/geometry/run/{run_id}")
+def geometry_run_analysis(run_id: str, max_rows: int | None = None) -> dict[str, Any]:
+    """Retrospective geometry analysis from a saved run's scientific history."""
+    from mechanistic_mind.ui.psy_observer_web.geometry.analyze_run import analyze_scientific_run
+    from mechanistic_mind.ui.psy_observer_web.run_finalize import default_results_root
+    from mechanistic_mind.ui.psy_observer_web.scientific_history import published_run_dir
+
+    sess = get_session()
+    root = Path(sess.config.results_root) if getattr(sess.config, "results_root", None) else default_results_root()
+    run_dir = published_run_dir(root, run_id)
+    if not run_dir.is_dir():
+        return {"accepted": False, "error": "run not found", "run_id": run_id}
+    try:
+        # Cap default analysis to keep API responsive.
+        cap = int(max_rows) if max_rows is not None else 50_000
+        return {
+            "accepted": True,
+            **analyze_scientific_run(run_dir, run_id=run_id, max_timeline_rows=cap),
+        }
+    except FileNotFoundError as exc:
+        return {"accepted": False, "error": str(exc), "run_id": run_id}
+
+
+@app.get("/api/signal-context/live")
+def signal_context_live() -> dict[str, Any]:
+    """Bounded LIVE signal-episode summary (Observer-only)."""
+    frame = get_session().current_frame()
+    sci = (frame or {}).get("signal_context_interpretation")
+    if isinstance(sci, dict):
+        return sci
+    return get_session().signal_context_live_summary()
+
+
+@app.get("/api/signal-context/episode/{episode_id}")
+def signal_context_episode(episode_id: str) -> dict[str, Any]:
+    return get_session().signal_episode_inspect(episode_id)
+
+
+@app.get("/api/signal-context/run/{run_id}")
+def signal_context_run_analysis(
+    run_id: str,
+    max_timeline_rows: int | None = 20000,
+    max_events: int | None = 120000,
+    max_episode_details: int = 40,
+) -> dict[str, Any]:
+    """Retrospective signal-context analysis (matched controls — expensive)."""
+    from mechanistic_mind.ui.psy_observer_web.run_finalize import default_results_root
+    from mechanistic_mind.ui.psy_observer_web.scientific_history import published_run_dir
+    from mechanistic_mind.ui.psy_observer_web.signal_context.analyze_run import analyze_signal_run
+
+    sess = get_session()
+    root = Path(sess.config.results_root) if getattr(sess.config, "results_root", None) else default_results_root()
+    run_dir = published_run_dir(root, run_id)
+    if not run_dir.is_dir():
+        return {"accepted": False, "error": "run not found", "run_id": run_id}
+    try:
+        result = analyze_signal_run(
+            run_dir,
+            run_id=run_id,
+            max_timeline_rows=max_timeline_rows,
+            max_events=max_events,
+            max_episode_details=int(max_episode_details),
+            focus_ticks=[680, 1200, 2000, 3000, 4500],
+        )
+        return {"accepted": True, **result}
+    except FileNotFoundError as exc:
+        return {"accepted": False, "error": str(exc), "run_id": run_id}
+
+
+@app.get("/api/signal-context/interventions")
+def signal_context_interventions_list() -> dict[str, Any]:
+    """List completed SIGINT-02 offline intervention experiment dirs (Observer-only)."""
+    from mechanistic_mind.ui.psy_observer_web.run_finalize import default_results_root
+
+    sess = get_session()
+    root = Path(sess.config.results_root) if getattr(sess.config, "results_root", None) else default_results_root()
+    base = root / "signal_context_interpreter"
+    if not base.is_dir():
+        # also check repo results/
+        base = Path(__file__).resolve().parents[3] / "results" / "signal_context_interpreter"
+    items = []
+    if base.is_dir():
+        for d in sorted(base.glob("beta2_sigint_02_*"), reverse=True):
+            if not d.is_dir():
+                continue
+            report = d / "report.json"
+            meta = {"id": d.name, "path": str(d)}
+            if report.is_file():
+                try:
+                    meta["report"] = json.loads(report.read_text(encoding="utf-8"))
+                except Exception:
+                    meta["report"] = None
+            items.append(meta)
+    return {"accepted": True, "experiments": items, "note": "Offline artifacts only — not live injection."}
+
+
+@app.get("/api/signal-context/interventions/{experiment_id}")
+def signal_context_intervention_detail(experiment_id: str) -> dict[str, Any]:
+    """Load one SIGINT-02 experiment summary for Observer inspection."""
+    from mechanistic_mind.ui.psy_observer_web.run_finalize import default_results_root
+
+    sess = get_session()
+    root = Path(sess.config.results_root) if getattr(sess.config, "results_root", None) else default_results_root()
+    candidates = [
+        root / "signal_context_interpreter" / experiment_id,
+        Path(__file__).resolve().parents[3] / "results" / "signal_context_interpreter" / experiment_id,
+    ]
+    d = next((p for p in candidates if p.is_dir()), None)
+    if d is None:
+        return {"accepted": False, "error": "experiment not found", "experiment_id": experiment_id}
+
+    def _load(name: str):
+        p = d / name
+        if not p.is_file():
+            return None
+        if name.endswith(".jsonl"):
+            rows = []
+            with p.open(encoding="utf-8") as f:
+                for i, line in enumerate(f):
+                    if i >= 200:
+                        break
+                    if line.strip():
+                        rows.append(json.loads(line))
+            return rows
+        return json.loads(p.read_text(encoding="utf-8"))
+
+    return {
+        "accepted": True,
+        "experiment_id": experiment_id,
+        "report": _load("report.json"),
+        "replication": _load("replication.json"),
+        "dose_response": _load("dose_response.json"),
+        "channel_specificity": _load("channel_specificity.json"),
+        "temporal_specificity": _load("temporal_specificity.json"),
+        "context_dependence": _load("context_dependence.json"),
+        "first_divergence": _load("first_divergence.jsonl"),
+        "branch_results_sample": _load("branch_results.jsonl"),
+        "candidate_patterns_md": (d / "candidate_patterns.md").read_text(encoding="utf-8")
+        if (d / "candidate_patterns.md").is_file()
+        else None,
+        "honesty": {
+            "not_live_injection": True,
+            "not_communication": True,
+            "observer_only": True,
+        },
+    }
+
+
+class SpecimenSaveBody(BaseModel):
+    event: dict[str, Any] = Field(default_factory=dict)
+
+
+class SpecimenReplayBody(BaseModel):
+    specimen_id: str
+    target: str = "PEER"  # SELF | PEER | LOCATION
+    mode: str = "EXACT"  # EXACT | ALTER_AMPLITUDE | ALTER_CHANNEL | DELAY
+    amplitude_scale: float = 1.0
+
+
+@app.get("/api/signal-context/specimens")
+def signal_specimens_list(channel: str | None = None, limit: int = 64) -> dict[str, Any]:
+    """Bounded natural signal specimen library (Observer-only)."""
+    return get_session().list_signal_specimens(channel=channel, limit=max(1, min(256, int(limit))))
+
+
+@app.post("/api/signal-context/specimens/save")
+def signal_specimen_save(body: SpecimenSaveBody) -> dict[str, Any]:
+    """SAVE AS SIGNAL SPECIMEN from an emission event."""
+    return get_session().save_signal_specimen_from_event(body.event)
+
+
+@app.post("/api/signal-context/specimens/replay")
+def signal_specimen_replay(body: SpecimenReplayBody) -> dict[str, Any]:
+    """↻ REPLAY SIGNAL — LIVE uncontrolled; causal claims require matched branching."""
+    return get_session().replay_signal_specimen_live(
+        body.specimen_id,
+        target=body.target,
+        mode=body.mode,
+        amplitude_scale=body.amplitude_scale,
+    )
+
+
+@app.get("/api/signal-context/repertoire")
+def signal_repertoire_list(filter: str = "ALL", limit: int = 64) -> dict[str, Any]:
+    """SIGINT-04 natural signal repertoire browser (on-demand, bounded)."""
+    return get_session().list_signal_repertoire(
+        filter_name=filter, limit=max(1, min(256, int(limit))),
+    )
+
+
+class EpisodeReplayBody(BaseModel):
+    episode: dict[str, Any] = Field(default_factory=dict)
+    mode: str = "FULL"  # FULL | A_TO_B_ONLY | B_TO_A_ONLY | SHUFFLED | REVERSED
+
+
+@app.get("/api/signal-context/episodes")
+def signal_interaction_episodes(limit: int = 32) -> dict[str, Any]:
+    """SIGINT-05 interaction episode browser (on-demand)."""
+    return get_session().list_interaction_episodes(limit=max(1, min(64, int(limit))))
+
+
+@app.post("/api/signal-context/episodes/replay")
+def signal_interaction_episode_replay(body: EpisodeReplayBody) -> dict[str, Any]:
+    """LIVE uncontrolled episode replay — matched branching required for causal claims."""
+    return get_session().replay_interaction_episode_live(body.episode, mode=body.mode)
+
+
+@app.get("/api/signal-context/forensics")
+def signal_cognitive_forensics(limit: int = 8) -> dict[str, Any]:
+    """SIGINT-06 cognitive divergence forensics (on-demand)."""
+    return get_session().list_cognitive_forensics(limit=max(1, min(16, int(limit))))
+
+
 @app.post("/api/diagnostics/action-trace")
 def diagnostics_action_trace(body: ActionTraceBody) -> dict[str, Any]:
     return get_session().set_action_trace(enabled=body.enabled, mode=body.mode)
@@ -830,6 +1242,119 @@ async def ws_live(ws: WebSocket) -> None:
         hub.disconnect(ws)
     except Exception:
         hub.disconnect(ws)
+
+
+@app.get("/api/action-realization/live")
+def action_realization_live() -> dict[str, Any]:
+    frame = get_session().current_frame()
+    return frame.get("action_realization") or {"status": "EMPTY"}
+
+
+@app.get("/api/action-realization/history")
+def action_realization_history(agent_id: str | None = None, limit: int = 48) -> dict[str, Any]:
+    return get_session().action_realization_history(agent_id=agent_id, limit=limit)
+
+
+@app.get("/api/work-ecology/live")
+def work_ecology_live() -> dict[str, Any]:
+    frame = get_session().current_frame()
+    return frame.get("work_ecology") or {"status": "EMPTY"}
+
+
+@app.get("/api/work-ecology/history")
+def work_ecology_history(agent_id: str | None = None, limit: int = 48) -> dict[str, Any]:
+    return get_session().work_ecology_history(agent_id=agent_id, limit=limit)
+
+
+class ExperimenterMobilityBody(BaseModel):
+    mode: str = "ORDINARY_WORK"
+
+
+@app.post("/api/experimenter/mobility")
+def experimenter_mobility(body: ExperimenterMobilityBody) -> dict[str, Any]:
+    return get_session().experimenter_set_mobility(body.mode)
+
+
+class ExperimenterSpawnBody(BaseModel):
+    x: float | None = None
+    y: float | None = None
+    theta: float = 0.0
+    near_agent: int | None = None
+    run_id: str | None = None
+
+
+class ExperimenterCommandBody(BaseModel):
+    kind: str = "ACTION"
+    action: str | None = None
+    amplitude: float | None = None
+    specimen_id: str | None = None
+    run_id: str | None = None
+
+
+class ExperimenterTargetBody(BaseModel):
+    agent_id: str | None = None
+
+
+class ExperimenterTestBody(BaseModel):
+    capture_id: str
+    horizon: int = 40
+
+
+@app.get("/api/experimenter/status")
+def experimenter_status() -> dict[str, Any]:
+    return get_session().experimenter_status()
+
+
+@app.post("/api/experimenter/spawn")
+def experimenter_spawn(body: ExperimenterSpawnBody | None = None) -> dict[str, Any]:
+    b = body or ExperimenterSpawnBody()
+    return get_session().experimenter_spawn(
+        x=b.x,
+        y=b.y,
+        theta=float(b.theta or 0.0),
+        near_agent=b.near_agent,
+        run_id=b.run_id,
+    )
+
+
+@app.post("/api/experimenter/remove")
+def experimenter_remove() -> dict[str, Any]:
+    return get_session().experimenter_remove()
+
+
+@app.post("/api/experimenter/command")
+def experimenter_command(body: ExperimenterCommandBody) -> dict[str, Any]:
+    return get_session().experimenter_command(
+        kind=str(body.kind or "ACTION"),
+        action=body.action,
+        amplitude=body.amplitude,
+        specimen_id=body.specimen_id,
+        run_id=body.run_id,
+    )
+
+
+@app.post("/api/experimenter/target")
+def experimenter_target(body: ExperimenterTargetBody | None = None) -> dict[str, Any]:
+    b = body or ExperimenterTargetBody()
+    return get_session().experimenter_set_target(b.agent_id)
+
+
+@app.post("/api/experimenter/capture")
+def experimenter_capture() -> dict[str, Any]:
+    return get_session().experimenter_capture()
+
+
+@app.get("/api/experimenter/captures")
+def experimenter_captures() -> dict[str, Any]:
+    return get_session().experimenter_list_captures()
+
+
+@app.post("/api/experimenter/test")
+def experimenter_test(body: ExperimenterTestBody) -> dict[str, Any]:
+    return get_session().experimenter_test_capture(
+        str(body.capture_id or ""),
+        horizon=int(body.horizon or 40),
+    )
 
 
 if WEB_DIST.is_dir():

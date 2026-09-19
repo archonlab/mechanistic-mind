@@ -1,5 +1,5 @@
-# Psy Observer Web (Beta 1) — Python dependencies
-# Install into a fresh venv: pip install -r requirements-observer.txt
+# Mechanistic Mind 2.0 — Tiktaalik: Undercover — Public Beta 1
+# Psy Observer Web runtime dependencies
 fastapi>=0.110
 uvicorn[standard]>=0.27
 numpy>=1.26

@@ -5,6 +5,18 @@ from dataclasses import dataclass, asdict, field
 from typing import Any
 
 from mechanistic_mind.planet.climate_ecology import ClimateEcologyConfig
+from mechanistic_mind.planet.terrain import TerrainConfig
+from mechanistic_mind.planet.ambient import AmbientConfig
+
+
+def _default_climate_ecology() -> ClimateEcologyConfig:
+    """Factory planet: climate OFF and no environmental R_A/R_B (historical empty world)."""
+    return ClimateEcologyConfig(
+        enabled=False,
+        resources_enabled=False,
+        resource_ecology_A_enabled=False,
+        resource_ecology_B_enabled=False,
+    )
 
 
 @dataclass
@@ -77,7 +89,14 @@ class PlanetConfig:
 
     # Experimental spatiotemporal climate / resource ecology. Default OFF.
     # Missing/legacy config => ClimateEcologyConfig() with enabled=False.
-    climate_ecology: ClimateEcologyConfig = field(default_factory=ClimateEcologyConfig)
+    climate_ecology: ClimateEcologyConfig = field(default_factory=_default_climate_ecology)
+
+    # Spatial terrain drag + potential. Default OFF (baseline unchanged).
+    # Static for a run unless fields are explicitly overwritten by experiments.
+    terrain: TerrainConfig = field(default_factory=TerrainConfig)
+
+    # Static ambient horizontal force (Fx, Fy). Default OFF — baseline unchanged.
+    ambient: AmbientConfig = field(default_factory=AmbientConfig)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -91,6 +110,16 @@ class PlanetConfig:
             fields["climate_ecology"] = ClimateEcologyConfig.from_dict(ce)
         elif ce is None:
             fields.pop("climate_ecology", None)
+        te = fields.get("terrain")
+        if isinstance(te, dict):
+            fields["terrain"] = TerrainConfig.from_dict(te)
+        elif te is None:
+            fields.pop("terrain", None)
+        ae = fields.get("ambient")
+        if isinstance(ae, dict):
+            fields["ambient"] = AmbientConfig.from_dict(ae)
+        elif ae is None:
+            fields.pop("ambient", None)
         return cls(**fields)
 
 

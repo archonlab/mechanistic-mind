@@ -33,6 +33,17 @@ from mechanistic_mind.planet.dynamics import step_planet
 TECHNICAL_IDS = ("agent_0", "agent_1")
 
 
+def _wrap_delta_1d(a: float, b: float, size: int) -> float:
+    """Periodic minimum-image displacement on one axis."""
+    d = float(b) - float(a)
+    half = float(size) / 2.0
+    if d > half:
+        d -= float(size)
+    elif d < -half:
+        d += float(size)
+    return d
+
+
 def agent_seed(base_seed: int, slot_index: int) -> int:
     """Independent endogenous RNG stream per slot. World dynamics keep base_seed."""
     return int(base_seed) + int(slot_index)
@@ -84,18 +95,22 @@ class TwoAgentRuntime:
         self.independent_agent_seeds = bool(independent_agent_seeds)
         self.selected_index = 0
         self.last_contact: dict[str, Any] | None = None
+        self.last_contacts: list[dict[str, Any]] = []
         self.last_resource_sim: list[dict[str, Any]] | None = None
         self.last_signal_receipt: dict[str, Any] | None = None
         self._pending_sources: list[dict[str, Any]] = []
         self.slots: list[PhysicalSystemRuntime] = []
         self._agent_stats: list[dict[str, Any]] = []
         self._prev_xy: list[tuple[float, float] | None] = [None, None]
+        self.experimenter_slot: int | None = None
         self.reset()
 
     def reset(self) -> None:
         self.slots = []
         self._agent_stats = [_empty_agent_stats(), _empty_agent_stats()]
         self._prev_xy = [None, None]
+        self.experimenter_slot = None
+        self.last_contacts = []
         for i, (x, y) in enumerate(self.starts):
             cfg = _cfg_with_start(self.base_config, x, y)
             if not self.field_coupling_enabled:
@@ -178,7 +193,7 @@ class TwoAgentRuntime:
 
     def decision_diagnostics(self, slot: int | None = None) -> dict[str, Any]:
         """Read-only WAIT/competition explanation for one or both agents."""
-        indices = [int(slot)] if slot is not None else [0, 1]
+        indices = [int(slot)] if slot is not None else list(range(min(2, len(self.slots))))
         out: dict[str, Any] = {}
         for i in indices:
             rt = self.slots[i]
@@ -189,7 +204,8 @@ class TwoAgentRuntime:
             wait_n = int(counts.get("WAIT") or 0)
             move_n = sum(int(v) for k, v in counts.items() if str(k).startswith("MOVE"))
             total = max(1, wait_n + move_n)
-            out[TECHNICAL_IDS[i]] = {
+            oid = TECHNICAL_IDS[i] if i < len(TECHNICAL_IDS) else f"agent_{i}"
+            out[oid] = {
                 "selected_action": rt.last_selected_action,
                 "selection_source": sel.get("source"),
                 "selection_reason": comp.get("selection_reason") or sel.get("selection_rule"),
@@ -220,8 +236,18 @@ class TwoAgentRuntime:
             move_n = sum(int(v) for k, v in counts.items() if str(k).startswith("MOVE"))
             st = self._agent_stats[i] if i < len(self._agent_stats) else _empty_agent_stats()
             unique = st.get("unique_cells") or set()
-            out.append({
-                "observer_id": TECHNICAL_IDS[i] if i < len(TECHNICAL_IDS) else f"agent_{i}",
+            is_exp = (
+                self.experimenter_slot is not None
+                and i == int(self.experimenter_slot)
+            )
+            from mechanistic_mind.ui.psy_observer_web.undercover_identity import (
+                slot_agent_body_ids,
+            )
+            oid, bid = slot_agent_body_ids(i, experimenter_slot=self.experimenter_slot)
+            row = {
+                "observer_id": oid,
+                "agent_id": oid,
+                "body_id": bid,
                 "x": float(rt.body.x),
                 "y": float(rt.body.y),
                 "theta": float(getattr(rt.body, "theta", 0.0) or 0.0),
@@ -248,14 +274,37 @@ class TwoAgentRuntime:
                 "cognition_ticks": int(st.get("cognition_ticks") or 0),
                 "agent_seed": int(rt.seed),
                 "tick": int(rt.tick),
-            })
+            }
+            # Observer-only flags — never copied into agent observations.
+            if is_exp:
+                row["observer_experimenter"] = True
+                row["observer_undercover"] = True
+                row["observer_label"] = "UNDERCOVER"
+                row["action_authority"] = "EXPERIMENTER"
+            out.append(row)
         return out
 
-    def agent_observation(self):
-        return self.slots[self.selected_index].agent_observation()
+    def foreign_bodies_for(self, observer_index: int) -> list[tuple[Any, Any]]:
+        """All physical bodies except the observer — one shared vision path per slot."""
+        n = len(self.slots)
+        if n <= 0:
+            return []
+        oi = int(observer_index) % n
+        return [
+            (self.slots[j].body, self.slots[j].config.body)
+            for j in range(n)
+            if j != oi
+        ]
 
-    def observation_views(self):
-        return self.slots[self.selected_index].observation_views()
+    def agent_observation(self, foreign_bodies=None):
+        i = int(self.selected_index)
+        fb = foreign_bodies if foreign_bodies is not None else self.foreign_bodies_for(i)
+        return self.slots[i].agent_observation(foreign_bodies=fb)
+
+    def observation_views(self, foreign_bodies=None):
+        i = int(self.selected_index)
+        fb = foreign_bodies if foreign_bodies is not None else self.foreign_bodies_for(i)
+        return self.slots[i].observation_views(foreign_bodies=fb)
 
     def cognitive_view(self):
         return self.slots[self.selected_index].cognitive_view()
@@ -288,6 +337,14 @@ class TwoAgentRuntime:
                 clear_fields(self.world)
         return snap if snap is not None else self.mechanisms()
 
+    def set_vision_radius(self, radius: int) -> dict[str, Any]:
+        """Apply vision Moore radius to every agent slot (global Observer control)."""
+        snap = None
+        for rt in self.slots:
+            snap = rt.set_vision_radius(radius)
+        self.config = self.slots[0].config
+        return snap if snap is not None else {"accepted": False, "reason": "no slots"}
+
     def set_ablations(self, **flags: bool) -> None:
         """Apply ablations to every agent slot (same rationale as set_mechanism)."""
         for rt in self.slots:
@@ -319,7 +376,10 @@ class TwoAgentRuntime:
             "mechanisms": by_id,
             "intentional_identity_diffs": {
                 "agent_seeds": [rt.seed for rt in self.slots],
-                "starts": [list(self.starts[i]) for i in range(len(self.slots))],
+                "starts": [
+                    list(self.starts[i]) if i < len(self.starts) else None
+                    for i in range(len(self.slots))
+                ],
                 "start_xy": [
                     (rt.config.body.start_x, rt.config.body.start_y) for rt in self.slots
                 ],
@@ -333,8 +393,8 @@ class TwoAgentRuntime:
 
     def observations(self) -> list[dict[str, float]]:
         out = []
-        for rt in self.slots:
-            obs = rt.agent_observation()
+        for i, rt in enumerate(self.slots):
+            obs = rt.agent_observation(foreign_bodies=self.foreign_bodies_for(i))
             hits = audit_cognition_payload(obs)
             if hits:
                 raise RuntimeError(f"cognition observation leaked: {hits}")
@@ -366,13 +426,19 @@ class TwoAgentRuntime:
             xy = (float(rt.body.x), float(rt.body.y))
             prev = self._prev_xy[i]
             if prev is not None:
+                w = int(self.world.T.shape[1])
+                h = int(self.world.T.shape[0])
+                dx = _wrap_delta_1d(prev[0], xy[0], w)
+                dy = _wrap_delta_1d(prev[1], xy[1], h)
                 st["distance_travelled"] = float(st.get("distance_travelled") or 0.0) + (
-                    abs(xy[0] - prev[0]) + abs(xy[1] - prev[1])
+                    abs(dx) + abs(dy)
                 )
             self._prev_xy[i] = xy
             cells = st.setdefault("unique_cells", set())
             if isinstance(cells, set):
-                cells.add((int(xy[0]), int(xy[1])))
+                w = int(self.world.T.shape[1])
+                h = int(self.world.T.shape[0])
+                cells.add((int(xy[0]) % w, int(xy[1]) % h))
             if contact:
                 st["collision_ticks"] = int(st.get("collision_ticks") or 0) + 1
             sel = rt.cognition.get("last_selection") or {}
@@ -384,7 +450,8 @@ class TwoAgentRuntime:
             }
 
     def _step_once(self) -> None:
-        order = self.process_order
+        n = len(self.slots)
+        order = self.process_order if len(self.process_order) == n else tuple(range(n))
         obs = self.observations()
         for i in order:
             self.slots[i].begin_tick(observation=obs[i])
@@ -393,44 +460,61 @@ class TwoAgentRuntime:
             self.slots[i].finish_tick(skip_planet=True, skip_resources=True)
         w = int(self.world.T.shape[1])
         h = int(self.world.T.shape[0])
-        self.last_contact = resolve_soft_contact(
-            self.slots[0].body,
-            self.slots[1].body,
-            self.slots[0].config.body,
-            self.slots[1].config.body,
-            width=w,
-            height=h,
-            enabled=self.contact_enabled,
-        )
-        # Observational contact-pair identity (does not alter contact mechanics).
-        if self.last_contact is not None:
-            self.last_contact.setdefault("contact_entity_a_kind", "BODY")
-            self.last_contact.setdefault("contact_entity_a_id", "body-0")
-            self.last_contact.setdefault("contact_entity_b_kind", "BODY")
-            self.last_contact.setdefault("contact_entity_b_id", "body-1")
+        # Pairwise soft contact for all bodies (including optional experimenter slot).
+        self.last_contacts = []
+        for ia in range(n):
+            for ib in range(ia + 1, n):
+                receipt = resolve_soft_contact(
+                    self.slots[ia].body,
+                    self.slots[ib].body,
+                    self.slots[ia].config.body,
+                    self.slots[ib].config.body,
+                    width=w,
+                    height=h,
+                    enabled=self.contact_enabled,
+                )
+                if receipt is not None:
+                    receipt.setdefault("contact_entity_a_kind", "BODY")
+                    receipt.setdefault("contact_entity_a_id", f"body-{ia}")
+                    receipt.setdefault("contact_entity_b_kind", "BODY")
+                    receipt.setdefault("contact_entity_b_id", f"body-{ib}")
+                    receipt["pair"] = (ia, ib)
+                self.last_contacts.append(receipt)
+        # Preserve last_contact as agent_0↔agent_1 (or first overlapping pair).
+        self.last_contact = None
+        if n >= 2:
+            self.last_contact = self.last_contacts[0] if self.last_contacts else None
+            for r in self.last_contacts:
+                if r and r.get("contact"):
+                    self.last_contact = r
+                    break
+        bodies = [s.body for s in self.slots]
+        body_cfgs = [s.config.body for s in self.slots]
         self.last_resource_sim = simultaneous_complementary_resources(
-            [self.slots[0].body, self.slots[1].body],
+            bodies,
             self.world,
-            [self.slots[0].config.body, self.slots[1].config.body],
+            body_cfgs,
             self.slots[0].config.complementary_resources,
             self.slots[0].config.deformation_work,
             receipt_tick=int(self.tick),
         )
-        self.slots[0].last_complementary_ledger = self.last_resource_sim[0]
-        self.slots[1].last_complementary_ledger = self.last_resource_sim[1]
+        for i, rt in enumerate(self.slots):
+            if self.last_resource_sim and i < len(self.last_resource_sim):
+                rt.last_complementary_ledger = self.last_resource_sim[i]
         extra = list(self._pending_sources)
         self._pending_sources = []
         h, w = int(self.world.T.shape[0]), int(self.world.T.shape[1])
         for src in extra:
             if "slot" in src and "cells" not in src:
                 i = int(src["slot"])
-                src["cells"] = _site_cells(self.slots[i].body, self.slots[i].config.body, w, h)
+                if 0 <= i < n:
+                    src["cells"] = _site_cells(self.slots[i].body, self.slots[i].config.body, w, h)
         sig_cfg = self.slots[0].config.physical_signal
         if self.signal_enabled or sig_cfg.enabled:
             self.last_signal_receipt = step_physical_signals(
                 self.world,
-                [self.slots[0].body, self.slots[1].body],
-                [self.slots[0].config.body, self.slots[1].config.body],
+                bodies,
+                body_cfgs,
                 sig_cfg,
                 contact=self.last_contact,
                 extra_sources=extra,
@@ -451,17 +535,25 @@ class TwoAgentRuntime:
         slot: int | None = None,
         iy: int | None = None,
         ix: int | None = None,
+        cells: list[tuple[int, int]] | None = None,
         trigger: str = "environmental",
         observer_source_id: str | None = None,
     ) -> None:
-        """Queue a physical deposit for the end of the next tick. Not a selected EMIT action."""
+        """Queue a physical deposit for the end of the next tick. Not a selected EMIT action.
+
+        Prefer ``cells`` or ``(iy, ix)`` for EXTERNAL_EXPERIMENTAL_INTERVENTION so the
+        deposit uses the shared FIELD path without body-slot emitter identity.
+        """
         src: dict[str, Any] = {
             "channel": str(channel).upper(),
             "amplitude": float(amplitude),
             "trigger": trigger,
-            "observer_source_id": observer_source_id or ("environment" if slot is None else f"agent_{int(slot)}"),
+            "observer_source_id": observer_source_id
+            or ("environment" if slot is None else f"agent_{int(slot)}"),
         }
-        if slot is not None:
+        if cells is not None:
+            src["cells"] = [(int(c[0]), int(c[1])) for c in cells]
+        elif slot is not None:
             src["slot"] = int(slot)
         else:
             src["iy"] = int(iy if iy is not None else 0)
@@ -496,7 +588,8 @@ class TwoAgentRuntime:
                     emitter_id = "UNKNOWN"
                 if body_id in (None, ""):
                     body_id = "UNKNOWN"
-                evidence = {k: v for k, v in src.items() if k != "cells"}
+                evidence = {k: v for k, v in src.items()}
+                # Keep cells for Observer specimen capture (SIGINT-03); never fed to cognition.
                 evidence["emitter_agent_id"] = emitter_id
                 evidence["emitter_body_id"] = body_id
                 evidence["body_id"] = body_id
@@ -595,9 +688,12 @@ class TwoAgentRuntime:
                 )
 
     def snapshot(self) -> dict[str, Any]:
-        s0 = self.slots[0].snapshot()
-        s1 = self.slots[1].snapshot()
-        s1.pop("world", None)
+        agents = []
+        for i, slot in enumerate(self.slots):
+            snap = slot.snapshot()
+            if i > 0:
+                snap.pop("world", None)
+            agents.append(snap)
         return {
             "schema": "mm.physical_system.two_agent.snapshot.v1",
             "experimental": True,
@@ -605,14 +701,16 @@ class TwoAgentRuntime:
             "tick": self.tick,
             "seed": self.seed,
             "independent_agent_seeds": self.independent_agent_seeds,
-            "agent_seeds": [self.slots[0].seed, self.slots[1].seed],
+            "agent_seeds": [s.seed for s in self.slots],
             "starts": [list(self.starts[0]), list(self.starts[1])],
             "contact_enabled": self.contact_enabled,
             "field_coupling_enabled": self.field_coupling_enabled,
             "signal_enabled": self.signal_enabled,
             "process_order": list(self.process_order),
-            "world": s0["world"],
-            "agents": [s0, s1],
+            "world": agents[0]["world"],
+            "agents": agents,
+            "experimenter_slot": self.experimenter_slot,
+            "experimenter_intervention": self.experimenter_slot is not None,
         }
 
     @classmethod
@@ -628,12 +726,31 @@ class TwoAgentRuntime:
             process_order=tuple(payload.get("process_order") or (0, 1)),
             independent_agent_seeds=bool(payload.get("independent_agent_seeds", True)),
         )
-        a0 = PhysicalSystemRuntime.restore(agents[0])
-        payload_b = deepcopy(agents[1])
-        payload_b["world"] = agents[0]["world"]
-        a1 = PhysicalSystemRuntime.restore(payload_b)
-        a1.world = a0.world
-        rt.slots = [a0, a1]
-        rt.world = a0.world
-        rt.config = a0.config
+        restored: list[PhysicalSystemRuntime] = []
+        for i, ag in enumerate(agents):
+            if i == 0:
+                restored.append(PhysicalSystemRuntime.restore(ag))
+            else:
+                payload_i = deepcopy(ag)
+                payload_i["world"] = agents[0]["world"]
+                ri = PhysicalSystemRuntime.restore(payload_i)
+                ri.world = restored[0].world
+                restored.append(ri)
+        rt.slots = restored
+        rt.world = restored[0].world
+        rt.config = restored[0].config
+        rt._pending_sources = []
+        rt.last_signal_receipt = None
+        rt.last_contact = None
+        rt.last_contacts = []
+        rt.experimenter_slot = payload.get("experimenter_slot")
+        if rt.experimenter_slot is not None:
+            rt.experimenter_slot = int(rt.experimenter_slot)
+            if 0 <= rt.experimenter_slot < len(rt.slots):
+                rt.slots[rt.experimenter_slot]._experimenter_controlled = True  # type: ignore[attr-defined]
+        # Align stats / process order with slot count
+        while len(rt._agent_stats) < len(rt.slots):
+            rt._agent_stats.append(_empty_agent_stats())
+            rt._prev_xy.append(None)
+        rt.process_order = tuple(range(len(rt.slots)))
         return rt

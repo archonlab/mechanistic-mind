@@ -5,7 +5,7 @@ Evidence dimensions are taken only from existing transition/continuation fields.
 """
 from __future__ import annotations
 
-from copy import deepcopy
+from mechanistic_mind.integrated.copy_opt import jsonish_copy
 from typing import Any
 
 from mechanistic_mind.research import prospective_composition as pr
@@ -66,7 +66,7 @@ def continuation_to_scenario(cont: dict[str, Any], *, scenario_id: str) -> dict[
     predicted = None
     states = cont.get("states") or []
     if len(states) >= 2:
-        predicted = deepcopy(states[1])
+        predicted = jsonish_copy(states[1])
     return {
         "scenario_id": scenario_id,
         "source_structure_ids": [e.get("transition_id") or e.get("key") for e in edges if e],
@@ -78,11 +78,11 @@ def continuation_to_scenario(cont: dict[str, Any], *, scenario_id: str) -> dict[
         "historical_support_raw": support,
         "reliability": float(reliability) if reliability != NOT_AVAILABLE else 0.0,
         "reliability_raw": reliability,
-        "current_match_evidence": deepcopy(root) if root else NOT_AVAILABLE,
+        "current_match_evidence": jsonish_copy(root) if root else NOT_AVAILABLE,
         "predicted_state_fragments": predicted if predicted is not None else NOT_AVAILABLE,
         "predicted_body_fragments": NOT_AVAILABLE,
         "predicted_environment_fragments": NOT_AVAILABLE,
-        "composition_path": deepcopy(edges),
+        "composition_path": jsonish_copy(edges),
         "score_reliability_path": cont.get("score_reliability", NOT_AVAILABLE),
     }
 
@@ -102,11 +102,11 @@ def one_step_scenario(store: dict[str, Any], observation: dict[str, float], acti
         "historical_support_raw": step.get("support", NOT_AVAILABLE),
         "reliability": float(step.get("reliability") or 0.0),
         "reliability_raw": step.get("reliability", NOT_AVAILABLE),
-        "current_match_evidence": deepcopy(step),
-        "predicted_state_fragments": deepcopy(step.get("predicted")) if step.get("predicted") is not None else NOT_AVAILABLE,
+        "current_match_evidence": jsonish_copy(step),
+        "predicted_state_fragments": jsonish_copy(step.get("predicted")) if step.get("predicted") is not None else NOT_AVAILABLE,
         "predicted_body_fragments": NOT_AVAILABLE,
         "predicted_environment_fragments": NOT_AVAILABLE,
-        "composition_path": [deepcopy(step)],
+        "composition_path": [jsonish_copy(step)],
         "score_reliability_path": step.get("reliability", NOT_AVAILABLE),
     }
 
@@ -209,7 +209,7 @@ def compete_scenarios(
     competition: dict[str, Any] = {
         "evidence_dimensions": ["historical_support", "reliability", "depth"],
         "evidence_order": "lexicographic_dominance (support, reliability, depth)",
-        "candidates_considered": deepcopy(candidates),
+        "candidates_considered": jsonish_copy(candidates),
         "supported_actions": supported_actions,
         "unsupported_actions": [a for a in actions if a not in supported_actions],
         "dominance_relations": [],
@@ -235,7 +235,7 @@ def compete_scenarios(
 
     if len(candidates) == 1:
         win = candidates[0]
-        competition["selected_scenario"] = deepcopy(win)
+        competition["selected_scenario"] = jsonish_copy(win)
         competition["selected_action"] = win["first_action"]
         competition["selection_reason"] = "SINGLE_SUPPORTED"
         competition["outcome_class"] = "SINGLE_SUPPORTED"
@@ -272,7 +272,7 @@ def compete_scenarios(
     front = _pareto_front(candidates)
     if len(front) == 1:
         win = front[0]
-        competition["selected_scenario"] = deepcopy(win)
+        competition["selected_scenario"] = jsonish_copy(win)
         competition["selected_action"] = win["first_action"]
         competition["selection_reason"] = "DOMINANT_SCENARIO"
         competition["outcome_class"] = "DOMINANT_SCENARIO"
@@ -307,7 +307,7 @@ def compete_scenarios(
     # pick a front scenario with that action (stable by scenario_id sort — display only after choice)
     tied = sorted([s for s in front if s["first_action"] == chosen_action], key=lambda s: s["scenario_id"])
     win = tied[0]
-    competition["selected_scenario"] = deepcopy(win)
+    competition["selected_scenario"] = jsonish_copy(win)
     competition["selected_action"] = chosen_action
     competition["selection_reason"] = tie_kind
     competition["tie_resolution"] = {

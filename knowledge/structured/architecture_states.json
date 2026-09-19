@@ -310,7 +310,7 @@
   {
     "architecture_state_id": "ARCH-4.42",
     "introduced_by": "EXP-4.42",
-    "architecture_change": "No `.git` in `<local-lab-tree>`. Existing persist `EMIT` / `action_relief` unused. 4.42 adds only distinct X vs A_PAT channels, delayed distal body on `internal_a`/`load_c`, and the probe/control suite. 4.41 learning rule unchanged. M1 is physical A because A_PAT is channel 1.",
+    "architecture_change": "No `.git` in `~/Desktop/psy`. Existing persist `EMIT` / `action_relief` unused. 4.42 adds only distinct X vs A_PAT channels, delayed distal body on `internal_a`/`load_c`, and the probe/control suite. 4.41 learning rule unchanged. M1 is physical A because A_PAT is channel 1.",
     "default_runtime_status": "UNKNOWN unless explicitly recorded",
     "experimental_status": "See experiment record",
     "provenance": [

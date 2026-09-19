@@ -1,0 +1,17 @@
+{
+  "counts": {
+    "mechanistic_mind": 307,
+    "web": 89,
+    "configs": 11,
+    "docs": 74,
+    "knowledge": 137,
+    "worlds": 14,
+    "mm": 1,
+    "packaging": 1,
+    "tools": 2,
+    "tests": 221,
+    "experiments_py": 165
+  },
+  "dest": "MM-2.0-Tiktaalik-Undercover-Public-Beta-1",
+  "src_commit": "a3b2b592aaf0977e085bf649d81c4cfd5564104c"
+}

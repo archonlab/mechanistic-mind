@@ -1,13 +1,39 @@
 import type { TrajectoryPoint } from './types';
 
+/** Unflatten OBS-05 `{h,w,data}` grids; pass through nested arrays. */
+export function coerceGrid(payload: any): number[][] | null {
+  if (!payload) return null;
+  if (Array.isArray(payload)) return payload as number[][];
+  if (typeof payload !== 'object') return null;
+  const h = Number(payload.h || 0);
+  const w = Number(payload.w || 0);
+  const data = payload.data;
+  if (!Array.isArray(data) || h <= 0 || w <= 0) return null;
+  const out: number[][] = [];
+  for (let y = 0; y < h; y++) {
+    const row: number[] = [];
+    const base = y * w;
+    for (let x = 0; x < w; x++) row.push(Number(data[base + x]));
+    out.push(row);
+  }
+  return out;
+}
+
 export function scalarGrid(world: any, id: string): number[][] | null {
-  if (world?.scalars?.[id]) return world.scalars[id];
-  if (id === 'flow_mag' && world?.vx && world?.vy) {
-    return world.vx.map((r: number[], y: number) =>
-      r.map((v, x) => Math.hypot(Number(v), Number(world.vy[y][x]))));
+  if (world?.scalars?.[id]) {
+    const g = coerceGrid(world.scalars[id]);
+    if (g) return g;
+  }
+  if (id === 'flow_mag') {
+    const vx = coerceGrid(world?.scalars?.vx) || coerceGrid(world?.vx);
+    const vy = coerceGrid(world?.scalars?.vy) || coerceGrid(world?.vy);
+    if (vx && vy) {
+      return vx.map((r: number[], y: number) =>
+        r.map((v, x) => Math.hypot(Number(v), Number(vy[y][x]))));
+    }
   }
   if (id.startsWith('M') && world?.M) return world.M[Number(id.slice(1))] || null;
-  return world?.[id] || null;
+  return coerceGrid(world?.[id]);
 }
 
 export function gridRange(grid: number[][] | null, lo?: number, hi?: number) {

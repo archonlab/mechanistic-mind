@@ -221,10 +221,86 @@ MECHANISM_DEFS: list[dict[str, Any]] = [
         "id": "spatiotemporal_climate_ecology",
         "config_path": "planet.climate_ecology.enabled",
         "label": "SPATIOTEMPORAL CLIMATE ECOLOGY",
-        "description": "Experimental world: latitudinal climate gradient, hidden seasonal cycle, finite R_A/R_B productivity from local T. Default OFF. Not a cognition change.",
+        "description": (
+            "Climate dynamics gate only: latitudinal T_eq, seasonal cycle, climate insolation. "
+            "Does NOT gate R_A/R_B environmental ecology (see resource_ecology_A / resource_ecology_B). "
+            "Flipping OFF ablates climate temporal dynamics while leaving resource fields intact."
+        ),
         "validation": "World physics only; cognition unchanged (mm_seasonal_resource_ecology).",
         "provenance": "mm_seasonal_resource_ecology_experiment",
         "default_integrated": False,
+        "toggle_semantics": "ABLATION_OF_CLIMATE_DYNAMICS_ONLY",
+    },
+    {
+        "id": "resource_ecology_A",
+        "config_path": "planet.climate_ecology.resource_ecology_A_enabled",
+        "label": "RESOURCE ECOLOGY A",
+        "description": (
+            "Environmental production, persistence and regeneration of R_A. "
+            "Independent of climate dynamics and of R_B ecology. "
+            "Does not erase agent-body R_A_site inventory."
+        ),
+        "validation": "World field ecology only; no semantic food labels.",
+        "provenance": "beta2_resource_ecology_authority",
+        "default_integrated": False,
+        "toggle_semantics": "ENVIRONMENTAL_R_A_ECOLOGY",
+    },
+    {
+        "id": "resource_ecology_B",
+        "config_path": "planet.climate_ecology.resource_ecology_B_enabled",
+        "label": "RESOURCE ECOLOGY B",
+        "description": (
+            "Environmental production, persistence and regeneration of R_B. "
+            "Independent of climate dynamics and of R_A ecology. "
+            "Does not erase agent-body R_B_site inventory."
+        ),
+        "validation": "World field ecology only; no semantic food labels.",
+        "provenance": "beta2_resource_ecology_authority",
+        "default_integrated": False,
+        "toggle_semantics": "ENVIRONMENTAL_R_B_ECOLOGY",
+    },
+    {
+        "id": "physical_near_field_vision",
+        "config_path": "near_field_exteroception.perception_enabled",
+        "label": "PHYSICAL NEAR-FIELD VISION",
+        "description": (
+            "Bounded Moore R=1 × body-oriented FOV 120° × surface_response → anonymous exo_0/1/2. "
+            "OFF removes visual contribution from cognition only; does not erase surface, "
+            "terrain, illumination field, physics, or history. "
+            "ACTIVE_SENSOR_ORIENTATION = NOT_AVAILABLE (no LOOK/TURN)."
+        ),
+        "validation": "Validated: PHYSICAL_PERCEPTION_01 / DIRECTIONAL_NEAR_FIELD_VISION_01 (P1–P22).",
+        "provenance": "physical_perception_01",
+        "default_integrated": True,
+        "toggle_semantics": "VISION_SENSOR_CONTRIBUTION",
+    },
+    {
+        "id": "illumination_cycle",
+        "config_path": "near_field_exteroception.illumination_enabled",
+        "label": "ILLUMINATION CYCLE",
+        "description": (
+            "Physical illumination dynamics (period=240). Modulates visual signal strength only. "
+            "Does not generate work, alter terrain, or inject DAY/NIGHT semantics into cognition. "
+            "LIVE OFF freezes intensity at current physical value."
+        ),
+        "validation": "Validated: ILLUMINATION_CYCLE_01 (period 240 selected).",
+        "provenance": "illumination_cycle_01",
+        "default_integrated": True,
+        "toggle_semantics": "ILLUMINATION_DYNAMICS",
+    },
+    {
+        "id": "physical_body_optical_response",
+        "config_path": "near_field_exteroception.body_optical_enabled",
+        "label": "PHYSICAL BODY OPTICAL RESPONSE",
+        "description": (
+            "Physical bodies contribute to local optical structure available to near-field vision. "
+            "Anonymous material optical_response composed with environmental surface_response. "
+            "Not agent recognition, not social vision, not experimenter detection."
+        ),
+        "validation": "Validated composition with PHYSICAL_PERCEPTION_01 filtering (FOV/illumination).",
+        "provenance": "visible_physical_bodies_beta2",
+        "default_integrated": True,
+        "toggle_semantics": "BODY_OPTICAL_CONTRIBUTION",
     },
     {
         "id": "experimental_physical_signal",
@@ -371,6 +447,31 @@ def mechanism_snapshot(config) -> dict[str, Any]:
         "spatiotemporal_climate_ecology": bool(
             getattr(getattr(config.planet, "climate_ecology", None), "enabled", False)
         ),
+        "resource_ecology_A": bool(
+            getattr(
+                getattr(config.planet, "climate_ecology", None),
+                "resource_ecology_A_enabled",
+                True,
+            )
+        ) if getattr(config.planet, "climate_ecology", None) is not None else False,
+        "resource_ecology_B": bool(
+            getattr(
+                getattr(config.planet, "climate_ecology", None),
+                "resource_ecology_B_enabled",
+                True,
+            )
+        ) if getattr(config.planet, "climate_ecology", None) is not None else False,
+        "physical_near_field_vision": bool(
+            getattr(getattr(config, "near_field_exteroception", None), "vision_contributes", False)
+        ),
+        "illumination_cycle": bool(
+            getattr(getattr(config, "near_field_exteroception", None), "enabled", False)
+            and getattr(getattr(config, "near_field_exteroception", None), "illumination_enabled", True)
+        ),
+        "physical_body_optical_response": bool(
+            getattr(getattr(config, "near_field_exteroception", None), "enabled", False)
+            and getattr(getattr(config, "near_field_exteroception", None), "body_optical_enabled", True)
+        ),
         "experimental_physical_signal": str(getattr(getattr(config, "physical_signal", None), "mode", "OFF")).upper() == "EXPERIMENTAL",
         "predictive_equivalence": bool(getattr(cog, "predictive_equivalence", False)),
         "predictive_relevance": bool(getattr(cog, "predictive_relevance", False)),
@@ -396,6 +497,11 @@ def mechanism_snapshot(config) -> dict[str, Any]:
         "instrumental_observation": "COGNITION", "unknown_action_physical_probe": "COGNITION",
         "cognition": "COGNITION",
         "spatiotemporal_climate_ecology": "WORLD",
+        "resource_ecology_A": "RESOURCES",
+        "resource_ecology_B": "RESOURCES",
+        "physical_near_field_vision": "SENSORS",
+        "illumination_cycle": "SENSORS",
+        "physical_body_optical_response": "SENSORS",
         "experimental_physical_signal": "WORLD",
         "predictive_equivalence": "COGNITION",
         "predictive_relevance": "COGNITION",
@@ -425,6 +531,7 @@ def mechanism_snapshot(config) -> dict[str, Any]:
         "discrete_action_work_accounting": ["deformation_work"],
         "resource_to_work_conversion": ["environmental_resource_transfer"],
         "complementary_resource_conversion": ["resource_A_transfer", "resource_B_transfer"],
+        "physical_body_optical_response": ["physical_near_field_vision"],
     }
     reset_recommended = {"body_deformation", "deformation_work", "distributed_morphology", "body_orientation"}
     items = []
@@ -551,6 +658,56 @@ def set_mechanism(config, mechanism_id: str, enabled: bool) -> dict[str, Any]:
         if getattr(config.planet, "climate_ecology", None) is None:
             config.planet.climate_ecology = ClimateEcologyConfig()
         config.planet.climate_ecology.enabled = on
+    elif mechanism_id == "resource_ecology_A":
+        from mechanistic_mind.planet.climate_ecology import ClimateEcologyConfig
+        if getattr(config.planet, "climate_ecology", None) is None:
+            config.planet.climate_ecology = ClimateEcologyConfig()
+        config.planet.climate_ecology.resource_ecology_A_enabled = on
+        ce = config.planet.climate_ecology
+        ce.resources_enabled = bool(ce.resource_ecology_A_enabled or ce.resource_ecology_B_enabled)
+    elif mechanism_id == "resource_ecology_B":
+        from mechanistic_mind.planet.climate_ecology import ClimateEcologyConfig
+        if getattr(config.planet, "climate_ecology", None) is None:
+            config.planet.climate_ecology = ClimateEcologyConfig()
+        config.planet.climate_ecology.resource_ecology_B_enabled = on
+        ce = config.planet.climate_ecology
+        ce.resources_enabled = bool(ce.resource_ecology_A_enabled or ce.resource_ecology_B_enabled)
+    elif mechanism_id == "physical_near_field_vision":
+        from mechanistic_mind.physical_system.near_field_exteroception import NearFieldExteroceptionConfig
+        if getattr(config, "near_field_exteroception", None) is None:
+            config.near_field_exteroception = NearFieldExteroceptionConfig()
+        nfe = config.near_field_exteroception
+        if on:
+            nfe.mode = "EXPERIMENTAL"
+            nfe.perception_enabled = True
+        else:
+            # Ablate exo_* contribution only; keep package mode if already EXPERIMENTAL
+            # so surface / illumination world state persist.
+            nfe.perception_enabled = False
+            if not nfe.enabled:
+                nfe.mode = "OFF"
+    elif mechanism_id == "illumination_cycle":
+        from mechanistic_mind.physical_system.near_field_exteroception import NearFieldExteroceptionConfig
+        if getattr(config, "near_field_exteroception", None) is None:
+            config.near_field_exteroception = NearFieldExteroceptionConfig()
+        nfe = config.near_field_exteroception
+        if on:
+            nfe.illumination_enabled = True
+            nfe.illumination_frozen = None
+            if not nfe.enabled:
+                # Enable observational package so cycle can run; vision stays off
+                # unless perception_enabled is already True.
+                nfe.mode = "EXPERIMENTAL"
+        else:
+            nfe.illumination_enabled = False
+    elif mechanism_id == "physical_body_optical_response":
+        from mechanistic_mind.physical_system.near_field_exteroception import NearFieldExteroceptionConfig
+        if getattr(config, "near_field_exteroception", None) is None:
+            config.near_field_exteroception = NearFieldExteroceptionConfig()
+        nfe = config.near_field_exteroception
+        nfe.body_optical_enabled = bool(on)
+        if on and not nfe.enabled:
+            nfe.mode = "EXPERIMENTAL"
     elif mechanism_id == "experimental_physical_signal":
         from mechanistic_mind.physical_system.physical_signal import PhysicalSignalConfig
         if getattr(config, "physical_signal", None) is None:

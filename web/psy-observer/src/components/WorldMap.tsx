@@ -17,9 +17,13 @@ type Props = {
   scaleMax: number;
   compositeLayers: string[];
   trajectory?: { x: number; y: number }[];
+  geometryInterpretation?: any;
   onHoverCell?: (info: { ix: number; iy: number; value: number | null; field: string } | null) => void;
   onSelectCell?: (info: { ix: number; iy: number; value: number | null; field: string } | null) => void;
   layers?: Record<string, boolean>;
+  agentsObserver?: Array<Record<string, unknown>>;
+  interactionTargetId?: string | null;
+  nearFieldSensor?: any;
 };
 
 function clamp01(t: number) {
@@ -77,13 +81,21 @@ function rangeOf(grid: number[][] | null, auto: boolean, lo: number, hi: number)
 export function WorldMap({
   world, body, layer, viewMode, perception, renderMode, opacity, showGrid,
   vectorDensity, contourLevels, autoScale, scaleMin, scaleMax, compositeLayers,
-  trajectory = [], onHoverCell,
+  trajectory = [], geometryInterpretation = null, onHoverCell,
   onSelectCell,
   layers = { body: true, sites: true, trajectory: true, velocity: true, orientation: true, deformation: true, occupancy: false, force: false },
+  agentsObserver = [],
+  interactionTargetId = null,
+  nearFieldSensor = null,
 }: Props) {
   const ref = useRef<HTMLCanvasElement | null>(null);
+  const heatCache = useRef<{
+    key: string;
+    canvas: HTMLCanvasElement;
+  } | null>(null);
   const [cam, setCam] = useState({ x: 0, y: 0, zoom: 1 });
   const drag = useRef<{ x: number; y: number; cx: number; cy: number } | null>(null);
+  const [viewport, setViewport] = useState({ w: 0, h: 0 });
   const boundary = world?.boundary;
   const topo = boundary?.spatial_topology || 'WRAP_PERIODIC';
 
@@ -92,12 +104,37 @@ export function WorldMap({
     return [layer];
   }, [renderMode, compositeLayers, layer]);
 
+  // Remeasure when simulation workspace / left dock layout changes (avoid 0×0 race).
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const parent = canvas.parentElement;
+    if (!parent) return;
+    const measure = () => {
+      const w = parent.clientWidth;
+      const h = parent.clientHeight;
+      setViewport((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
+    };
+    measure();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    ro?.observe(parent);
+    window.addEventListener('resize', measure);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, []);
+
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas || !world) return;
     const parent = canvas.parentElement!;
     const W = parent.clientWidth;
     const H = parent.clientHeight;
+    if (W < 2 || H < 2) {
+      // Layout not ready — wait for ResizeObserver; do not bake a 0×0 backing store.
+      return;
+    }
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     canvas.width = Math.floor(W * dpr);
     canvas.height = Math.floor(H * dpr);
@@ -148,7 +185,7 @@ export function WorldMap({
       });
       drawBoundaryChrome(ctx, W, H, ox, oy, gw * cell, gh * cell, topo);
       if (layers.body) {
-        drawBody(ctx, body, ox, oy, cell, layers);
+        drawBody(ctx, body, ox, oy, cell, layers, '#3b82f6', nearFieldSensor);
         (world.entities?.bodies || []).forEach((b: any, i: number) => {
           if (i === 0) return;
           drawBody(ctx, { ...body, x: b.x, y: b.y, theta: b.theta || 0 }, ox, oy, cell, { ...layers, sites: false, deformation: false }, '#f97316');
@@ -173,23 +210,87 @@ export function WorldMap({
     }
 
     const primary = getScalar(world, scalarIds[0] || 'T');
-    const gh = primary?.length || world.height || 32;
-    const gw = primary?.[0]?.length || world.width || 32;
+    const trav = (geometryInterpretation && geometryInterpretation.traversability) || null;
+    const geoTransport = geometryInterpretation?.geo_transport || {};
+    const geoSource = String(trav?.geo_source || geoTransport.geo_source || 'LIVE').toUpperCase();
+    const liveGeoUnavailable = trav?.status === 'LIVE_GEO_UNAVAILABLE'
+      || (geoSource === 'LIVE' && !trav?.class_grid && Number(trav?.n_observations || geoTransport.n_observations || 0) <= 0);
+    const classGrid = liveGeoUnavailable ? null : trav?.class_grid;
+    const gh = classGrid?.length || primary?.length || world.height || 32;
+    const gw = classGrid?.[0]?.length || primary?.[0]?.length || world.width || 32;
     const cell = Math.min(W / gw, H / gh) * cam.zoom;
     const ox = (W - gw * cell) / 2 + cam.x;
     const oy = (H - gh * cell) / 2 + cam.y;
+    const geoModes = ['TRAVERSABILITY', 'DEFLECTION', 'FLOW', 'TRAJECTORY'];
+    const isGeo = geoModes.includes(viewMode);
+    const empVer = Number(
+      trav?.empirical_version ??
+      geometryInterpretation?.geo_transport?.empirical_version ??
+      -1,
+    );
+    const staticVer = Number(
+      geoTransport.static_version ?? trav?.provenance?.geo_static_version ?? 0,
+    );
 
-    // field render
-    if (renderMode === 'COMPOSITE') {
+    // field render — PHYSICAL vs geometry landscape modes
+    // OBS-05: cache TRAVERSABILITY/DEFLECTION heatmaps; blit when only bodies move.
+    // Include static_version + geo_source so Apply/reset / LIVE↔SAVED never blit stale maps.
+    if ((viewMode === 'TRAVERSABILITY' && classGrid) || (viewMode === 'DEFLECTION' && trav && !liveGeoUnavailable)) {
+      const heatKey = [
+        viewMode,
+        empVer,
+        staticVer,
+        geoSource,
+        Math.round(ox * 10),
+        Math.round(oy * 10),
+        Math.round(cell * 100),
+        Math.round(opacity * 100),
+        W,
+        H,
+      ].join('|');
+      let cached = heatCache.current;
+      if (!cached || cached.key !== heatKey) {
+        const off = document.createElement('canvas');
+        off.width = Math.floor(W * dpr);
+        off.height = Math.floor(H * dpr);
+        const octx = off.getContext('2d')!;
+        octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        octx.fillStyle = '#070b10';
+        octx.fillRect(0, 0, W, H);
+        if (primary) {
+          const { lo, hi } = rangeOf(primary, true, 0, 1);
+          drawField(octx, primary, ox, oy, cell, 'CELL', lo, hi, viewMode === 'TRAVERSABILITY' ? 0.12 : 0.1, contourLevels);
+        }
+        if (viewMode === 'TRAVERSABILITY' && classGrid) {
+          drawClassGrid(octx, classGrid, ox, oy, cell, opacity);
+        } else if (trav) {
+          const metric = trav.opposing_rate_grid || trav.worst_alignment_grid;
+          drawMetricGrid(octx, metric, ox, oy, cell, opacity, 'opposing');
+        }
+        cached = { key: heatKey, canvas: off };
+        heatCache.current = cached;
+      }
+      ctx.drawImage(cached.canvas, 0, 0, W, H);
+    } else if (viewMode === 'FLOW') {
+      if (primary) {
+        const { lo, hi } = rangeOf(primary, autoScale, scaleMin, scaleMax);
+        drawField(ctx, primary, ox, oy, cell, 'SMOOTH', lo, hi, Math.min(0.35, opacity), contourLevels);
+      }
+      drawVectors(ctx, world, ox, oy, cell, Math.max(0.25, vectorDensity), opacity);
+    } else if (viewMode === 'TRAJECTORY') {
+      if (primary) {
+        const { lo, hi } = rangeOf(primary, true, 0, 1);
+        drawField(ctx, primary, ox, oy, cell, 'CELL', lo, hi, 0.15, contourLevels);
+      }
+    } else if (renderMode === 'COMPOSITE') {
       const alphas = [opacity, opacity * 0.55, opacity * 0.4];
       scalarIds.slice(0, 3).forEach((id, idx) => {
         const g = getScalar(world, id);
         if (!g) return;
         const { lo, hi } = rangeOf(g, autoScale, scaleMin, scaleMax);
-        drawField(ctx, g, ox, oy, cell, renderMode === 'COMPOSITE' ? 'SMOOTH' : renderMode, lo, hi, alphas[idx] ?? 0.4, contourLevels);
+        drawField(ctx, g, ox, oy, cell, 'SMOOTH', lo, hi, alphas[idx] ?? 0.4, contourLevels);
       });
     } else if (renderMode === 'VECTOR') {
-      // optional scalar backdrop
       if (primary) {
         const { lo, hi } = rangeOf(primary, autoScale, scaleMin, scaleMax);
         drawField(ctx, primary, ox, oy, cell, 'SMOOTH', lo, hi, Math.min(0.35, opacity), contourLevels);
@@ -198,6 +299,28 @@ export function WorldMap({
     } else if (primary) {
       const { lo, hi } = rangeOf(primary, autoScale, scaleMin, scaleMax);
       drawField(ctx, primary, ox, oy, cell, renderMode, lo, hi, opacity, contourLevels);
+    }
+
+    // Independent Observer-only terrain overlays (do not replace base field).
+    const terrainOverlays: Array<{ key: string; field: string; alpha: number }> = [];
+    if (layers.terrain_potential) terrainOverlays.push({ key: 'terrain_potential', field: 'terrain_potential', alpha: 0.42 });
+    if (layers.terrain_drag) terrainOverlays.push({ key: 'terrain_drag', field: 'terrain_drag', alpha: 0.40 });
+    if (layers.terrain_grad) terrainOverlays.push({ key: 'terrain_grad', field: 'terrain_grad_mag', alpha: 0.38 });
+    for (const ov of terrainOverlays) {
+      const g = getScalar(world, ov.field);
+      if (!g) continue;
+      const { lo, hi } = rangeOf(g, true, 0, 1);
+      drawField(ctx, g, ox, oy, cell, 'SMOOTH', lo, hi, ov.alpha * opacity, 0);
+    }
+    if (layers.ambient_magnitude) {
+      const g = getScalar(world, 'ambient_magnitude');
+      if (g) {
+        const { lo, hi } = rangeOf(g, true, 0, 1);
+        drawField(ctx, g, ox, oy, cell, 'SMOOTH', lo, hi, 0.35 * opacity, 0);
+      }
+    }
+    if (layers.ambient_force) {
+      drawAmbientForceArrows(ctx, world, ox, oy, cell, opacity);
     }
 
     if (showGrid && cell > 6) {
@@ -217,10 +340,10 @@ export function WorldMap({
       }
     }
 
-    // trajectory
-    if (layers.trajectory && trajectory.length > 1) {
-      ctx.strokeStyle = 'rgba(96,165,250,0.85)';
-      ctx.lineWidth = 1.5;
+    // trajectory — WRAP_PERIODIC aware (no map-spanning jumps)
+    if ((layers.trajectory || viewMode === 'TRAJECTORY') && trajectory.length > 1) {
+      ctx.strokeStyle = viewMode === 'TRAJECTORY' ? 'rgba(147,197,253,0.95)' : 'rgba(96,165,250,0.85)';
+      ctx.lineWidth = viewMode === 'TRAJECTORY' ? 2.2 : 1.5;
       periodicSegments(trajectory as any, gw, gh).forEach((segment) => {
         ctx.beginPath();
         segment.forEach((p, i) => {
@@ -230,6 +353,45 @@ export function WorldMap({
         });
         ctx.stroke();
       });
+    }
+
+    // Empirical directional glyphs (not ground-truth flow)
+    if (isGeo && Array.isArray(trav?.glyphs)) {
+      for (const g of trav.glyphs) {
+        const align = Number(g.mean_align);
+        const conf = Math.min(1, Number(g.attempts || 0) / 12);
+        const col = Number.isFinite(align)
+          ? (align >= 0.4 ? `rgba(74,222,128,${0.35 + 0.55 * conf})`
+            : align <= -0.3 ? `rgba(248,113,113,${0.4 + 0.55 * conf})`
+            : `rgba(251,191,36,${0.35 + 0.5 * conf})`)
+          : `rgba(148,163,184,${0.4 * conf})`;
+        const ax = ox + Number(g.x) * cell;
+        const ay = oy + Number(g.y) * cell;
+        const len = cell * (0.35 + 0.35 * conf);
+        ctx.strokeStyle = col;
+        ctx.fillStyle = col;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(ax + Number(g.ux) * len, ay + Number(g.uy) * len);
+        ctx.stroke();
+      }
+    }
+
+    // Geometry event markers
+    if (isGeo && Array.isArray(trav?.events)) {
+      for (const ev of trav.events) {
+        const ex = ox + Number(ev.x) * cell;
+        const ey = oy + Number(ev.y) * cell;
+        const kind = String(ev.kind || '');
+        ctx.fillStyle = kind.includes('STRONG') ? 'rgba(248,113,113,0.9)'
+          : kind.includes('REVERSAL') ? 'rgba(251,146,60,0.85)'
+          : kind.includes('CONTACT') ? 'rgba(244,114,182,0.85)'
+          : 'rgba(167,139,250,0.8)';
+        ctx.beginPath();
+        ctx.arc(ex, ey, Math.max(2.5, cell * 0.18), 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
     if (layers.occupancy && trajectory.length) {
@@ -245,26 +407,146 @@ export function WorldMap({
 
     drawBoundaryChrome(ctx, W, H, ox, oy, gw * cell, gh * cell, topo);
     if (layers.body) {
-      drawBody(ctx, body, ox, oy, cell, layers);
+      drawBody(ctx, body, ox, oy, cell, layers, '#3b82f6', nearFieldSensor);
       (world.entities?.bodies || []).forEach((b: any, i: number) => {
         if (i === 0) return;
         drawBody(ctx, { ...body, x: b.x, y: b.y, theta: b.theta || 0 }, ox, oy, cell, { ...layers, sites: false, deformation: false }, '#f97316');
       });
+      // Observer-only: experimenter YOU + target ring (never in agent observation)
+      for (const a of agentsObserver) {
+        if (!a || a.observer_experimenter !== true) continue;
+        const bx = ox + Number(a.x) * cell;
+        const by = oy + Number(a.y) * cell;
+        const r = Math.max(4, cell * 0.4);
+        ctx.beginPath();
+        ctx.arc(bx, by, r + 6, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(250,204,21,0.95)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(250,204,21,0.95)';
+        ctx.font = 'bold 11px ui-monospace, monospace';
+        ctx.fillText('YOU', bx + r + 6, by - 4);
+        drawBody(
+          ctx,
+          { x: a.x, y: a.y, theta: a.theta, vx: a.vx, vy: a.vy },
+          ox, oy, cell,
+          { ...layers, sites: false, deformation: false },
+          '#eab308',
+        );
+      }
+      if (interactionTargetId) {
+        const t = agentsObserver.find(a => String(a.observer_id) === String(interactionTargetId));
+        if (t) {
+          const bx = ox + Number(t.x) * cell;
+          const by = oy + Number(t.y) * cell;
+          const r = Math.max(4, cell * 0.4);
+          ctx.beginPath();
+          ctx.arc(bx, by, r + 8, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(52,211,153,0.9)';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([4, 3]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      }
+    }
+
+    // Observer-only geometry vectors (requested / realized / local flow / GT flow overlay)
+    const geo = geometryInterpretation;
+    if (geo && typeof geo === 'object') {
+      const showFlowOv = viewMode === 'FLOW' || viewMode === 'PHYSICAL' || (!isGeo && geo.flow_overlay);
+      const flowOv = geo.flow_overlay;
+      if (showFlowOv && flowOv?.status === 'AVAILABLE' && Array.isArray(flowOv.vectors)) {
+        ctx.strokeStyle = 'rgba(56,189,248,0.55)';
+        ctx.fillStyle = 'rgba(56,189,248,0.55)';
+        ctx.lineWidth = 1.2;
+        const scale = cell * 2.8;
+        for (const v of flowOv.vectors) {
+          const x0 = ox + Number(v.x) * cell;
+          const y0 = oy + Number(v.y) * cell;
+          const mag = Math.max(1e-6, Number(v.mag) || Math.hypot(Number(v.vx), Number(v.vy)));
+          const x1 = x0 + (Number(v.vx) / mag) * scale * Math.min(1.2, mag * 4);
+          const y1 = y0 + (Number(v.vy) / mag) * scale * Math.min(1.2, mag * 4);
+          ctx.beginPath();
+          ctx.moveTo(x0, y0);
+          ctx.lineTo(x1, y1);
+          ctx.stroke();
+        }
+      }
+      const agents = Array.isArray(geo.agents) ? geo.agents : [];
+      for (const a of agents) {
+        const ax = ox + Number(a.x) * cell;
+        const ay = oy + Number(a.y) * cell;
+        const arrow = (ux: number, uy: number, color: string, len: number, width = 2.5) => {
+          const x1 = ax + ux * len;
+          const y1 = ay + uy * len;
+          ctx.strokeStyle = color;
+          ctx.fillStyle = color;
+          ctx.lineWidth = width;
+          ctx.beginPath();
+          ctx.moveTo(ax, ay);
+          ctx.lineTo(x1, y1);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(x1, y1, 3, 0, Math.PI * 2);
+          ctx.fill();
+        };
+        if (Array.isArray(a.requested_unit) && a.requested_unit.length === 2) {
+          // dashed feel via two-tone: requested = yellow thick
+          arrow(Number(a.requested_unit[0]), Number(a.requested_unit[1]), 'rgba(250,204,21,0.98)', cell * 1.55, 3);
+        }
+        const since = a.since_prev_capture;
+        if (since && Number(since.mag ?? since.displacement_mag) > 1e-6) {
+          const dx = Number(since.dx);
+          const dy = Number(since.dy);
+          const mag = Math.hypot(dx, dy) || 1;
+          arrow(dx / mag, dy / mag, 'rgba(52,211,153,0.98)', cell * 1.55, 3);
+        }
+        if ((viewMode === 'FLOW' || viewMode === 'PHYSICAL') && a.local_flow?.status === 'AVAILABLE' && Number(a.local_flow.mag) > 1e-6) {
+          arrow(Number(a.local_flow.vx) / Number(a.local_flow.mag), Number(a.local_flow.vy) / Number(a.local_flow.mag), 'rgba(56,189,248,0.95)', cell * 1.15, 2);
+        }
+      }
     }
 
     // labels
-    ctx.fillStyle = 'rgba(226,232,240,0.85)';
+    ctx.fillStyle = 'rgba(226,232,240,0.9)';
     ctx.font = '11px ui-monospace, monospace';
-    ctx.fillText(`${world.width}×${world.height} · ${topo} · ${renderMode} · field=${scalarIds.join('+')}`, 10, H - 10);
-  }, [world, body, layer, viewMode, perception, renderMode, opacity, showGrid, vectorDensity, contourLevels, autoScale, scaleMin, scaleMax, scalarIds, cam, trajectory, topo, layers]);
+    const modeLabel = isGeo ? viewMode : `${renderMode} · field=${scalarIds.join('+')}`;
+    ctx.fillText(`${world.width}×${world.height} · ${topo} · ${modeLabel}`, 10, H - 10);
+    if (liveGeoUnavailable && (viewMode === 'TRAVERSABILITY' || viewMode === 'DEFLECTION')) {
+      ctx.fillStyle = 'rgba(248, 113, 113, 0.95)';
+      ctx.font = 'bold 14px ui-monospace, monospace';
+      ctx.fillText('LIVE GEO unavailable', 12, 22);
+      ctx.font = '11px ui-monospace, monospace';
+      ctx.fillStyle = 'rgba(226,232,240,0.85)';
+      ctx.fillText('No current-runtime empirical samples — not showing older runs', 12, 38);
+    } else if (viewMode === 'TRAVERSABILITY') {
+      if (geoSource === 'SAVED') {
+        ctx.fillStyle = 'rgba(251, 191, 36, 0.95)';
+        ctx.fillText('SAVED GEO (historical) — not LIVE runtime', 10, H - 52);
+        ctx.fillStyle = 'rgba(226,232,240,0.9)';
+      }
+      ctx.fillText('empirical class: gray=low evidence  green=easy  amber=mixed  orange=difficult  red=strong deflection', 10, H - 24);
+      ctx.fillText('glyphs=requested dir colored by mean alignment · NOT walls · Observer-only', 10, H - 38);
+    } else if (viewMode === 'DEFLECTION') {
+      ctx.fillText('deflection: opposing_rate heatmap · low evidence left dark · Observer empirical', 10, H - 24);
+    } else if (viewMode === 'FLOW') {
+      ctx.fillText('GROUND TRUTH flow (−∇T) cyan · yellow=requested · green=realized · distinct from empirical', 10, H - 24);
+    } else if (viewMode === 'TRAJECTORY') {
+      ctx.fillText('trajectory WRAP-aware · markers=STRONG DEFLECTION/REVERSAL · no intention labels', 10, H - 24);
+    } else if (geo && typeof geo === 'object') {
+      ctx.fillText('yellow=requested  green=realized  cyan=local/GT flow', 10, H - 24);
+    }
+  }, [world, body, layer, viewMode, perception, renderMode, opacity, showGrid, vectorDensity, contourLevels, autoScale, scaleMin, scaleMax, scalarIds, cam, trajectory, topo, layers, geometryInterpretation, agentsObserver, interactionTargetId, nearFieldSensor, viewport]);
 
   function clientToCell(e: React.MouseEvent) {
     const canvas = ref.current;
     if (!canvas || !world) return null;
     const rect = canvas.getBoundingClientRect();
+    const trav = geometryInterpretation?.traversability;
     const primary = getScalar(world, scalarIds[0] || 'T');
-    const gh = primary?.length || world.height || 32;
-    const gw = primary?.[0]?.length || world.width || 32;
+    const gh = trav?.class_grid?.length || primary?.length || world.height || 32;
+    const gw = trav?.class_grid?.[0]?.length || primary?.[0]?.length || world.width || 32;
     const W = rect.width;
     const H = rect.height;
     const cell = Math.min(W / gw, H / gh) * cam.zoom;
@@ -274,8 +556,14 @@ export function WorldMap({
     const y = (e.clientY - rect.top - oy) / cell;
     const ix = Math.floor(x);
     const iy = Math.floor(y);
-    if (ix < 0 || iy < 0 || ix >= gw || iy >= gh || !primary) return { ix, iy, value: null as number | null, field: scalarIds[0] };
-    return { ix, iy, value: Number(primary[iy][ix]), field: scalarIds[0] };
+    if (ix < 0 || iy < 0 || ix >= gw || iy >= gh) return { ix, iy, value: null as number | null, field: scalarIds[0] };
+    const classCode = trav?.class_grid?.[iy]?.[ix];
+    const fieldVal = primary ? Number(primary[iy][ix]) : null;
+    return {
+      ix, iy,
+      value: classCode != null ? Number(classCode) : fieldVal,
+      field: trav?.class_grid ? 'trav_class' : scalarIds[0],
+    };
   }
 
   return (
@@ -302,6 +590,58 @@ export function WorldMap({
       <canvas className="map" ref={ref} />
     </div>
   );
+}
+
+function drawClassGrid(
+  ctx: CanvasRenderingContext2D,
+  grid: number[][],
+  ox: number, oy: number, cell: number, alpha: number,
+) {
+  // 0 UNKNOWN, 1 LOW_EVIDENCE, 2 EASY, 3 MIXED, 4 DIFFICULT, 5 STRONG_DEFLECTION
+  const colors = [
+    'rgba(15,23,42,0)',
+    'rgba(100,116,139,0.45)',
+    'rgba(34,197,94,0.55)',
+    'rgba(245,158,11,0.50)',
+    'rgba(249,115,22,0.58)',
+    'rgba(239,68,68,0.65)',
+  ];
+  const gh = grid.length;
+  const gw = grid[0]?.length || 0;
+  for (let y = 0; y < gh; y++) {
+    for (let x = 0; x < gw; x++) {
+      const code = Math.max(0, Math.min(5, Number(grid[y][x]) | 0));
+      if (code === 0) continue;
+      ctx.fillStyle = colors[code].replace(/[\d.]+\)$/, `${(0.35 + 0.4 * alpha).toFixed(2)})`);
+      // simpler: use fixed colors with alpha multiply
+      ctx.globalAlpha = Math.min(1, 0.25 + alpha * 0.7);
+      ctx.fillStyle = colors[code];
+      ctx.fillRect(ox + x * cell, oy + y * cell, cell + 0.5, cell + 0.5);
+      ctx.globalAlpha = 1;
+    }
+  }
+}
+
+function drawMetricGrid(
+  ctx: CanvasRenderingContext2D,
+  grid: (number | null)[][] | null | undefined,
+  ox: number, oy: number, cell: number, alpha: number, kind: string,
+) {
+  if (!grid || !grid.length) return;
+  const gh = grid.length;
+  const gw = grid[0]?.length || 0;
+  for (let y = 0; y < gh; y++) {
+    for (let x = 0; x < gw; x++) {
+      const v = grid[y][x];
+      if (v == null || !Number.isFinite(Number(v))) continue;
+      const n = Number(v);
+      let t = 0;
+      if (kind === 'opposing') t = clamp01(n);
+      else t = clamp01((-n + 1) / 2); // alignment −1..1 → red..green inverted for deflection
+      ctx.fillStyle = `rgba(${Math.floor(30 + 220 * t)},${Math.floor(60 + 80 * (1 - t))},${Math.floor(40 + 40 * (1 - t))},${0.25 + 0.55 * alpha * t})`;
+      ctx.fillRect(ox + x * cell, oy + y * cell, cell + 0.5, cell + 0.5);
+    }
+  }
 }
 
 function drawField(
@@ -378,7 +718,8 @@ function drawField(
 function drawVectors(
   ctx: CanvasRenderingContext2D, world: any, ox: number, oy: number, cell: number, density: number, alpha: number,
 ) {
-  const vx = world.vx; const vy = world.vy;
+  const vx = scalarGrid(world, 'vx');
+  const vy = scalarGrid(world, 'vy');
   if (!vx || !vy) return;
   const gh = vx.length; const gw = vx[0].length;
   const step = Math.max(1, Math.round(1 / Math.max(0.05, Math.min(1, density))));
@@ -404,10 +745,40 @@ function drawVectors(
   }
 }
 
+/** Observer GT sparse ambient force arrows (not planet flow). */
+function drawAmbientForceArrows(
+  ctx: CanvasRenderingContext2D, world: any, ox: number, oy: number, cell: number, alpha: number,
+) {
+  const fx = scalarGrid(world, 'ambient_fx');
+  const fy = scalarGrid(world, 'ambient_fy');
+  if (!fx || !fy) return;
+  const gh = fx.length; const gw = fx[0].length;
+  const step = Math.max(2, Math.round(Math.max(gw, gh) / 12));
+  ctx.strokeStyle = `rgba(251,191,36,${0.85 * alpha})`;
+  ctx.lineWidth = 1.4;
+  for (let y = Math.floor(step / 2); y < gh; y += step) {
+    for (let x = Math.floor(step / 2); x < gw; x += step) {
+      const u = Number(fx[y][x]); const v = Number(fy[y][x]);
+      const mag = Math.hypot(u, v);
+      if (mag < 1e-7) continue;
+      const len = Math.min(cell * step * 0.7, mag * cell * 40);
+      const cx = ox + (x + 0.5) * cell;
+      const cy = oy + (y + 0.5) * cell;
+      const dx = (u / mag) * len;
+      const dy = (v / mag) * len;
+      ctx.beginPath();
+      ctx.moveTo(cx - dx * 0.2, cy - dy * 0.2);
+      ctx.lineTo(cx + dx * 0.8, cy + dy * 0.8);
+      ctx.stroke();
+    }
+  }
+}
+
 function drawBody(
   ctx: CanvasRenderingContext2D, body: any, ox: number, oy: number,
   cell: number, layers: Record<string, boolean>,
   fill = '#3b82f6',
+  nearFieldSensor: any = null,
 ) {
   if (!body) return;
   const bx = ox + Number(body.x) * cell;
@@ -434,6 +805,49 @@ function drawBody(
       ctx.beginPath();
       ctx.arc(bx, by, r + 14, theta, theta + Math.max(-Math.PI / 2, Math.min(Math.PI / 2, omega * 4)), omega < 0);
       ctx.stroke();
+    }
+    // Local FOV wedge — reach scales with Moore vision radius (candidate domain).
+    if (nearFieldSensor && Number(nearFieldSensor.fov_deg) > 0) {
+      const fov = Number(nearFieldSensor.fov_deg) * Math.PI / 180;
+      const half = fov / 2;
+      const visionR = Math.max(1, Math.min(3, Number(nearFieldSensor.vision_radius ?? nearFieldSensor.radius ?? 1)));
+      const reach = cell * (visionR + 0.15);
+      ctx.beginPath();
+      ctx.moveTo(bx, by);
+      ctx.arc(bx, by, reach, theta - half, theta + half);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.18)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.55)';
+      ctx.stroke();
+      const neighbors = nearFieldSensor.neighbors || [];
+      for (const nb of neighbors) {
+        const c = nb.cell;
+        if (!c) continue;
+        const nx = ox + (Number(c[0]) + 0.5) * cell;
+        const ny = oy + (Number(c[1]) + 0.5) * cell;
+        const contrib = Number(nb.final_contribution || 0);
+        const det = Boolean(nb.detectable) && contrib > 0;
+        ctx.beginPath();
+        ctx.arc(nx, ny, Math.max(2, cell * (det ? 0.22 : 0.16)), 0, Math.PI * 2);
+        const bodyOpt = Number(nb.body_optical || 0);
+        if (det) {
+          ctx.fillStyle = bodyOpt > 0
+            ? `rgba(251, 191, 36, ${Math.min(0.95, 0.35 + contrib)})`
+            : `rgba(52, 211, 153, ${Math.min(0.95, 0.35 + contrib)})`;
+          ctx.fill();
+          ctx.strokeStyle = bodyOpt > 0 ? 'rgba(245, 158, 11, 1)' : 'rgba(16, 185, 129, 1)';
+          ctx.lineWidth = 2;
+        } else if (nb.inside_fov) {
+          ctx.strokeStyle = bodyOpt > 0 ? 'rgba(251, 191, 36, 0.85)' : 'rgba(56, 189, 248, 0.9)';
+          ctx.lineWidth = 1.5;
+        } else {
+          // Candidate Moore source domain, outside FOV
+          ctx.strokeStyle = 'rgba(148, 163, 184, 0.45)';
+          ctx.lineWidth = 1;
+        }
+        ctx.stroke();
+      }
     }
   }
   if (layers.sites && Array.isArray(body.sites)) {

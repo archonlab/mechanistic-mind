@@ -29,8 +29,8 @@ from .actions import available_actions
 from .observation import audit_cognition_payload
 from .unknown_action_probe import classify_unmodeled_actions, probe_receipt
 
-# Performance: retain tick-local last_selection payloads without deepcopy.
-# Set False to restore legacy deepcopy retention for A/B equivalence checks.
+# BETA2-03: retain tick-local last_selection payloads without deepcopy.
+# Set False to restore BETA2-02 deepcopy retention for equivalence harnesses.
 _USE_TICK_LOCAL_RETAIN = True
 
 

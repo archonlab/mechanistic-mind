@@ -57,6 +57,26 @@ export async function applyExperiment(body: unknown) {
   return r.json();
 }
 
+/** LIVE ecology/mechanism mutation — does not rebuild runtime. */
+export async function applyLiveIntervention(body: unknown) {
+  const r = await fetch(`${API}/api/experiment/live`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const detail = await r.text();
+    throw new Error(detail || r.statusText);
+  }
+  return r.json();
+}
+
+export async function getInterventions() {
+  const r = await fetch(`${API}/api/interventions`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
 export async function getSnapshot() {
   const r = await fetch(`${API}/api/snapshot`);
   return r.json();
@@ -125,6 +145,272 @@ export async function saveAnalysisReport(body: {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function setGeometryAgentFilter(agent_filter: string) {
+  const r = await fetch(`${API}/api/geometry/agent-filter`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ agent_filter }),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function getGeometryCell(ix: number, iy: number, agent_filter?: string) {
+  const q = new URLSearchParams({ ix: String(ix), iy: String(iy) });
+  if (agent_filter) q.set('agent_filter', agent_filter);
+  const r = await fetch(`${API}/api/geometry/cell?${q}`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function getGeometryLive() {
+  const r = await fetch(`${API}/api/geometry/live`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function hydrateGeometryRun(run_id: string, max_rows = 20000) {
+  const r = await fetch(`${API}/api/geometry/hydrate/${encodeURIComponent(run_id)}?max_rows=${max_rows}`, {
+    method: 'POST',
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function geometryUseLive() {
+  const r = await fetch(`${API}/api/geometry/use-live`, { method: 'POST' });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function geometryClearSaved() {
+  const r = await fetch(`${API}/api/geometry/clear-saved`, { method: 'POST' });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function getSignalContextLive() {
+  const r = await fetch(`${API}/api/signal-context/live`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function getSignalContextEpisode(episode_id: string) {
+  const r = await fetch(`${API}/api/signal-context/episode/${encodeURIComponent(episode_id)}`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function analyzeSignalContextRun(
+  run_id: string,
+  opts?: { max_timeline_rows?: number; max_events?: number; max_episode_details?: number },
+) {
+  const q = new URLSearchParams();
+  if (opts?.max_timeline_rows != null) q.set('max_timeline_rows', String(opts.max_timeline_rows));
+  if (opts?.max_events != null) q.set('max_events', String(opts.max_events));
+  if (opts?.max_episode_details != null) q.set('max_episode_details', String(opts.max_episode_details));
+  const qs = q.toString();
+  const r = await fetch(
+    `${API}/api/signal-context/run/${encodeURIComponent(run_id)}${qs ? `?${qs}` : ''}`,
+  );
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function listSignalInterventions() {
+  const r = await fetch(`${API}/api/signal-context/interventions`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function getSignalIntervention(experiment_id: string) {
+  const r = await fetch(
+    `${API}/api/signal-context/interventions/${encodeURIComponent(experiment_id)}`,
+  );
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function listSignalSpecimens(opts?: { channel?: string; limit?: number }) {
+  const q = new URLSearchParams();
+  if (opts?.channel) q.set('channel', opts.channel);
+  if (opts?.limit != null) q.set('limit', String(opts.limit));
+  const qs = q.toString();
+  const r = await fetch(`${API}/api/signal-context/specimens${qs ? `?${qs}` : ''}`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function saveSignalSpecimen(event: Record<string, unknown>) {
+  const r = await fetch(`${API}/api/signal-context/specimens/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ event }),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function replaySignalSpecimen(body: {
+  specimen_id: string;
+  target?: 'SELF' | 'PEER' | 'LOCATION';
+  mode?: 'EXACT' | 'ALTER_AMPLITUDE' | 'ALTER_CHANNEL' | 'DELAY';
+  amplitude_scale?: number;
+}) {
+  const r = await fetch(`${API}/api/signal-context/specimens/replay`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function listSignalRepertoire(opts?: { filter?: string; limit?: number }) {
+  const q = new URLSearchParams();
+  if (opts?.filter) q.set('filter', opts.filter);
+  if (opts?.limit != null) q.set('limit', String(opts.limit));
+  const qs = q.toString();
+  const r = await fetch(`${API}/api/signal-context/repertoire${qs ? `?${qs}` : ''}`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function listInteractionEpisodes(opts?: { limit?: number }) {
+  const q = new URLSearchParams();
+  if (opts?.limit != null) q.set('limit', String(opts.limit));
+  const qs = q.toString();
+  const r = await fetch(`${API}/api/signal-context/episodes${qs ? `?${qs}` : ''}`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function replayInteractionEpisode(body: {
+  episode: Record<string, unknown>;
+  mode?: string;
+}) {
+  const r = await fetch(`${API}/api/signal-context/episodes/replay`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function listCognitiveForensics(opts?: { limit?: number }) {
+  const q = new URLSearchParams();
+  if (opts?.limit != null) q.set('limit', String(opts.limit));
+  const qs = q.toString();
+  const r = await fetch(`${API}/api/signal-context/forensics${qs ? `?${qs}` : ''}`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function experimenterStatus() {
+  const r = await fetch(`${API}/api/experimenter/status`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function experimenterSpawn(body: {
+  x?: number; y?: number; theta?: number; near_agent?: number; run_id?: string;
+} = {}) {
+  const r = await fetch(`${API}/api/experimenter/spawn`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function experimenterRemove() {
+  const r = await fetch(`${API}/api/experimenter/remove`, { method: 'POST' });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function experimenterCommand(body: {
+  kind: string;
+  action?: string;
+  amplitude?: number;
+  specimen_id?: string;
+  run_id?: string;
+}) {
+  const r = await fetch(`${API}/api/experimenter/command`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function experimenterSetTarget(agent_id: string | null) {
+  const r = await fetch(`${API}/api/experimenter/target`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ agent_id }),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function experimenterCapture() {
+  const r = await fetch(`${API}/api/experimenter/capture`, { method: 'POST' });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function experimenterListCaptures() {
+  const r = await fetch(`${API}/api/experimenter/captures`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function experimenterTestCapture(capture_id: string, horizon = 40) {
+  const r = await fetch(`${API}/api/experimenter/test`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ capture_id, horizon }),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function getActionRealizationLive() {
+  const r = await fetch(`${API}/api/action-realization/live`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function getActionRealizationHistory(opts?: { agent_id?: string; limit?: number }) {
+  const q = new URLSearchParams();
+  if (opts?.agent_id) q.set('agent_id', opts.agent_id);
+  if (opts?.limit != null) q.set('limit', String(opts.limit));
+  const qs = q.toString();
+  const r = await fetch(`${API}/api/action-realization/history${qs ? `?${qs}` : ''}`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function getWorkEcologyLive() {
+  const r = await fetch(`${API}/api/work-ecology/live`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function experimenterSetMobility(mode: 'ORDINARY_WORK' | 'RESEARCH_MOBILITY') {
+  const r = await fetch(`${API}/api/experimenter/mobility`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode }),
   });
   if (!r.ok) throw new Error(await r.text());
   return r.json();

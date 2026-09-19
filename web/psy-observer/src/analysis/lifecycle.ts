@@ -3,6 +3,7 @@
  */
 import type { AnalysisState } from './aggregates.ts';
 import type { AnalysisLifecycle, AnalysisMode, CoverageLevel, DataCoverage } from './types.ts';
+import { buildRunCoverageSummary, classifySequenceCoverage } from './measurementIntegrity.ts';
 
 const MIN_SAMPLES_FOR_ANALYSIS = 3;
 
@@ -28,14 +29,31 @@ export function deriveCoverage(
   }
   const st = String(status || '').toUpperCase();
   const uniqueTicks = state.unique_simulation_ticks?.size ?? 0;
+  const maxGaps = Object.values(state.agents).reduce(
+    (m, a) => Math.max(m, a.trajectory_gaps_skipped || 0),
+    0,
+  );
+  const seq = classifySequenceCoverage({
+    uniqueTicks,
+    gapsSkipped: maxGaps,
+    startTick: state.start_tick,
+    endTick: state.end_tick,
+  });
   // Bounded buffers: if unique tick span >> retained unique ticks, evidence may be truncated
   const partial = uniqueTicks > 0
     && state.start_tick != null
     && state.end_tick != null
     && state.end_tick - state.start_tick + 1 > Math.max(uniqueTicks, 1) * 2
     && uniqueTicks < 50;
+  const sparse = seq === 'SPARSE';
 
   if (st === 'STOPPED' || st === 'COMPLETE' || mode === 'FINAL') {
+    if (sparse) {
+      return {
+        level: 'PARTIAL',
+        reason: 'SPARSE LIVE sampling — sequence metrics are lower bounds / observed contiguous only',
+      };
+    }
     if (partial) {
       return {
         level: 'PARTIAL',
@@ -49,17 +67,21 @@ export function deriveCoverage(
   }
   if (st === 'PAUSED') {
     return {
-      level: partial ? 'PARTIAL' : 'INCREMENTAL',
-      reason: partial
-        ? 'earlier evidence no longer retained'
-        : 'LIVE / INCREMENTAL through current pause tick',
+      level: (partial || sparse) ? 'PARTIAL' : 'INCREMENTAL',
+      reason: sparse
+        ? 'SPARSE sampling through pause — streaks/aggregates incomplete'
+        : partial
+          ? 'earlier evidence no longer retained'
+          : 'LIVE / INCREMENTAL through current pause tick',
     };
   }
   return {
-    level: partial ? 'PARTIAL' : 'LIVE',
-    reason: partial
-      ? 'earlier evidence no longer retained'
-      : 'LIVE / INCREMENTAL automatic analysis',
+    level: (partial || sparse) ? 'PARTIAL' : 'LIVE',
+    reason: sparse
+      ? 'SPARSE LIVE sampling — not equivalent to complete simulation coverage'
+      : partial
+        ? 'earlier evidence no longer retained'
+        : 'LIVE / INCREMENTAL automatic analysis',
   };
 }
 
@@ -101,14 +123,14 @@ export function buildLifecycle(
 export function buildCoverageBlock(state: AnalysisState, mode: AnalysisMode): DataCoverage {
   const { level, reason } = deriveCoverage(state, mode, state.status);
   const uniqueTicks = state.unique_simulation_ticks?.size ?? 0;
+  const summary = buildRunCoverageSummary(state);
+  const hasScenario = Object.values(state.agents).some((a) => (a.scenario_selected || 0) > 0);
   return {
     world: state.map_w && state.map_h ? `${state.map_w}×${state.map_h} ${state.boundary}` : 'PARTIAL / NOT AVAILABLE',
     body: uniqueTicks > 0
-      ? `unique timeline ticks ${uniqueTicks} (${state.timeline_samples} Observer samples)`
+      ? `unique timeline ticks ${uniqueTicks} (${state.timeline_samples} Observer samples) · ${summary.body_trajectory}`
       : 'NOT AVAILABLE',
-    cognition: Object.values(state.agents).some((a) => a.prediction_count != null || a.prospective != null)
-      ? 'metrics / structured events (partial)'
-      : 'NOT AVAILABLE / sparse',
+    cognition: summary.cognition_aggregates,
     signals: state.event_samples > 0 ? `structured signal events (${state.event_samples} unique ingested)` : 'NOT AVAILABLE',
     causal_provenance: state.causal_pairs.length
       ? `${state.causal_pairs.length} emission→reception parent refs`
@@ -119,7 +141,13 @@ export function buildCoverageBlock(state: AnalysisState, mode: AnalysisMode): Da
     telemetry_samples: state.telemetry_samples,
     level,
     reason,
-  };
+    sequence_coverage: summary.coverage_class,
+    runtime_span: summary.runtime_span,
+    gap_count_agents_max: summary.gap_count_agents_max,
+    action_occupancy_semantics: summary.action_occupancy,
+    continuous_streaks: summary.continuous_streaks,
+    structured_cognition_events: hasScenario ? 'AVAILABLE' : summary.structured_cognition_events,
+  } as DataCoverage;
 }
 
 /** Reject meaningless tick-0 / zero extrema before enough evidence exists. */

@@ -390,6 +390,11 @@ def write_finalized_run(
             "runtime_generation": identity.get("runtime_generation"),
             "agent_count": agent_count,
             "agents": agent_summaries(runtime),
+            "ecology_preset": (
+                getattr(getattr(runtime, "config", None), "ecology_preset", None)
+                or identity.get("ecology_preset")
+                or "CURRENT"
+            ),
             "model": model,
             "experiment_profile": session_meta.get("experiment_profile") or model.get("display_name"),
             "experimental_overrides": (model.get("experimental_overrides") or {}),

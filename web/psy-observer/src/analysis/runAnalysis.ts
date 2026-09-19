@@ -35,6 +35,19 @@ import {
   liveSummaryKey,
   telemetryRowKey,
 } from './dedup.ts';
+import {
+  buildConfigurationHistory,
+  collectWorldInterventions,
+} from './configurationHistory.ts';
+import type { RegimeReport } from './configurationHistory.ts';
+import {
+  analyzeOpticalSeries,
+  mergeAgentVision,
+  opticalTickFromLiveFrame,
+  opticalTicksFromScientificRows,
+  visionImportantEvents,
+} from './visionForensics.ts';
+import type { OpticalTickTS, VisionForensicsReport } from './visionForensics.ts';
 
 export type AnalysisInput = {
   frame?: any;
@@ -47,6 +60,12 @@ export type AnalysisInput = {
   scientificEvidence?: boolean;
   /** Skip folding runtime cumulative action_counts into tick aggregates. */
   skipLiveCumulativeActions?: boolean;
+  /** Optional pre-collected WORLD_INTERVENTION events. */
+  world_interventions?: any[];
+  /** Scientific timeline rows with optional vision_optical compact. */
+  scientific_rows?: any[];
+  /** Pre-built optical tick series for vision forensics. */
+  optical_ticks?: import('./visionForensics.ts').OpticalTickTS[];
 };
 
 /** Reset or create state; call when generation/seed/runtime identity changes. */
@@ -74,6 +93,34 @@ export function ingestAnalysisInput(state: AnalysisState, input: AnalysisInput):
   if (input.telemetry?.length) ingestTelemetry(state, input.telemetry, frame);
   if (frame && !input.skipLiveCumulativeActions) ingestLiveSummaries(state, frame);
   else if (frame && input.scientificEvidence) ingestLiveSummariesScientific(state, frame);
+  // Merge WORLD_INTERVENTION provenance (frame list + event stream).
+  const collected = collectWorldInterventions({
+    frame,
+    events: [
+      ...(input.events || []),
+      ...(input.world_interventions || []),
+    ],
+  });
+  if (collected.length) {
+    const seen = new Set(
+      state.world_interventions.map((e) => String(e.event_id || `${e.simulation_tick}-${JSON.stringify(e.changes)}`)),
+    );
+    for (const ev of collected) {
+      const id = String(ev.event_id || `${ev.simulation_tick}-${JSON.stringify(ev.changes)}`);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      state.world_interventions.push(ev);
+    }
+    state.world_interventions.sort((a, b) =>
+      Number(a.simulation_tick ?? a.tick ?? 0) - Number(b.simulation_tick ?? b.tick ?? 0),
+    );
+  }
+  if (!state.initial_world_fingerprint && state.world_interventions[0]?.effective_world_fingerprint_before) {
+    state.initial_world_fingerprint = state.world_interventions[0].effective_world_fingerprint_before;
+  }
+  if (!state.initial_world_fingerprint && frame?.experiment?.observer_ground_truth?.effective_world?.world_fingerprint) {
+    state.initial_world_fingerprint = frame.experiment.observer_ground_truth.effective_world.world_fingerprint;
+  }
   return state;
 }
 
@@ -138,7 +185,17 @@ function ingestTimeline(state: AnalysisState, timeline: any[]) {
         const src = String(ev.action_source);
         agg.selection_sources[src] = (agg.selection_sources[src] || 0) + 1;
       }
-      if (b.x != null && b.y != null) ingestXy(agg, Number(b.x), Number(b.y), b.speed != null ? Number(b.speed) : undefined, tick);
+      if (b.x != null && b.y != null) {
+        ingestXy(
+          agg,
+          Number(b.x),
+          Number(b.y),
+          b.speed != null ? Number(b.speed) : undefined,
+          tick,
+          state.map_w ?? undefined,
+          state.map_h ?? undefined,
+        );
+      }
       if (b.work != null) updateResourceSeries(agg.work, Number(b.work));
       if (b.resource_A != null) updateResourceSeries(agg.resA, Number(b.resource_A));
       if (b.resource_B != null) updateResourceSeries(agg.resB, Number(b.resource_B));
@@ -151,8 +208,8 @@ function ingestTimeline(state: AnalysisState, timeline: any[]) {
             tick,
             category: 'FIRST',
             kind: 'FIRST_MOVE',
-            title: `FIRST MOVE (${aid})`,
-            reason: `First MOVE selection recorded for ${aid} in timeline.`,
+            title: `FIRST OBSERVED MOVE (${aid})`,
+            reason: `First MOVE selection observed for ${aid} in retained timeline (not necessarily first ever if coverage incomplete).`,
             evidence_class: 'OBSERVED',
             agent_ids: [aid],
           });
@@ -511,7 +568,11 @@ function ingestLiveSummaries(state: AnalysisState, frame: any) {
     for (const o of observers) {
       const aid = String(o.observer_id);
       const agg = ensureAgent(state, aid, canonicalBody(aid), o.agent_seed != null ? Number(o.agent_seed) : null);
-      if (o.distance_travelled != null) agg.distance = Math.max(agg.distance, Number(o.distance_travelled));
+      if (o.distance_travelled != null) {
+        // Runtime cumulative may be wrap-aware after LOCAL_PHYSICAL_COHERENCE_01;
+        // never overwrite Analyzer unique-tick path — keep as separate ceiling hint only.
+        (agg as any)._runtime_distance_travelled = Number(o.distance_travelled);
+      }
       if (o.unique_cells_visited != null && Number(o.unique_cells_visited) > agg.unique_cells.size) {
         (agg as any)._unique_cells_runtime = Number(o.unique_cells_visited);
       }
@@ -525,9 +586,11 @@ function ingestLiveSummaries(state: AnalysisState, frame: any) {
       }
       // selection_source for tick-level occupancy comes from scientific/timeline rows only.
       // Do not increment selection_sources here (would double-count vs timeline).
+      // CRITICAL: never mutate agg.last_xy from LIVE summaries — that poisoned
+      // the next unique-tick delta and inflated WRAP path/unwrapped by ~100×.
+      // Also never seed start_xy from LIVE pose — that poisoned net_displacement.
       if (o.x != null && o.y != null) {
-        if (!agg.start_xy) agg.start_xy = { x: Number(o.x), y: Number(o.y) };
-        agg.last_xy = { x: Number(o.x), y: Number(o.y) };
+        agg.live_pose_xy = { x: Number(o.x), y: Number(o.y) };
       }
       const spd = Math.hypot(Number(o.vx || 0), Number(o.vy || 0));
       if (spd > agg.max_speed) agg.max_speed = spd;
@@ -565,6 +628,8 @@ function ingestLiveSummaries(state: AnalysisState, frame: any) {
         Number(frame.body.y),
         Math.hypot(Number(frame.body.vx || 0), Number(frame.body.vy || 0)),
         Number.isFinite(tick) ? tick : undefined,
+        state.map_w ?? undefined,
+        state.map_h ?? undefined,
       );
     }
   }
@@ -595,7 +660,11 @@ function pushImportant(state: AnalysisState, ev: any) {
   pushBounded(state.important, ev, BOUNDS.important_events);
 }
 
-export function buildRunAnalysis(state: AnalysisState, mode: AnalysisMode = 'LIVE'): RunAnalysis {
+export function buildRunAnalysis(
+  state: AnalysisState,
+  mode: AnalysisMode = 'LIVE',
+  opts?: { optical_ticks?: OpticalTickTS[]; scientific_rows?: any[]; frame?: any },
+): RunAnalysis {
   // Prefer episodes rebuilt from unique contact simulation ticks (authoritative).
   let episodes = episodesFromContactTicks(state.contact_tick_set, BOUNDS.contact_episodes);
   if (!episodes.length && state.contact_episodes.length) {
@@ -614,14 +683,62 @@ export function buildRunAnalysis(state: AnalysisState, mode: AnalysisMode = 'LIV
 
   const identity = buildIdentity(state, mode);
   const lifecycle = buildLifecycle(state, mode, state.end_tick);
-  const agents = buildAgentAnalyses(state);
+  let agents = buildAgentAnalyses(state);
+
+  // Vision forensics from scientific rows / explicit ticks / LIVE frame snapshot
+  let opticalTicks: OpticalTickTS[] = opts?.optical_ticks || [];
+  let opticalHistoryAuthority: import('./visionForensics.ts').OpticalHistoryAuthority = 'NONE';
+  if (opticalTicks.length) {
+    opticalHistoryAuthority = 'HISTORICAL';
+  } else if (opts?.scientific_rows?.length) {
+    opticalTicks = opticalTicksFromScientificRows(opts.scientific_rows);
+    opticalHistoryAuthority = opticalTicks.length ? 'HISTORICAL' : 'NONE';
+  }
+  if (!opticalTicks.length && opts?.frame) {
+    const live: OpticalTickTS[] = [];
+    for (const aid of Object.keys(opts.frame.agents_views || { agent_0: true })) {
+      const ot = opticalTickFromLiveFrame(opts.frame, aid);
+      if (ot) live.push(ot);
+    }
+    opticalTicks = live;
+    opticalHistoryAuthority = opticalTicks.length ? 'LIVE_FRAME_ONLY' : 'NONE';
+  }
+  const vision_forensics: VisionForensicsReport = analyzeOpticalSeries(opticalTicks, {
+    first_contact_tick: state.first_contact_tick,
+    optical_history_authority: opticalHistoryAuthority,
+  });
+  if (vision_forensics.summary.by_agent && Object.keys(vision_forensics.summary.by_agent).length) {
+    agents = agents.map((a) => {
+      const byId = vision_forensics.summary.by_agent?.[a.agent_id];
+      const byBody = vision_forensics.summary.by_agent?.[`body-${a.agent_id.replace('agent_', '')}`];
+      return mergeAgentVision(a, byId || byBody);
+    });
+  } else {
+    agents = agents.map((a) => mergeAgentVision(a, undefined));
+  }
+
   const comparison = buildComparison(agents);
   const interactions = buildInteractions(state, episodes);
-  const important_events = buildImportantEvents(state);
-  const causal_chains = buildCausalChains(state);
+  const important_events = [
+    ...buildImportantEvents(state),
+    ...visionImportantEvents(vision_forensics),
+  ];
+  const signal_chains = buildCausalChains(state);
+  const causal_chains = [...signal_chains, ...vision_forensics.causal_chains].slice(
+    0,
+    BOUNDS.max_causal_chains,
+  );
   const phases = detectPhases(state);
   const overview = buildOverview(state, important_events, phases, interactions);
   const coverage = buildCoverageBlock(state, mode);
+  const configuration_history: RegimeReport = buildConfigurationHistory(
+    state.world_interventions,
+    {
+      start_tick: state.start_tick ?? 0,
+      end_tick: state.end_tick,
+      initial_fingerprint: state.initial_world_fingerprint,
+    },
+  );
   const analysis: RunAnalysis = {
     identity,
     lifecycle,
@@ -634,6 +751,8 @@ export function buildRunAnalysis(state: AnalysisState, mode: AnalysisMode = 'LIV
     overview,
     keyframes: [...state.keyframes],
     coverage,
+    configuration_history,
+    vision_forensics,
     analysis_log: '',
     generated_at_tick: state.end_tick ?? 0,
   };
@@ -673,5 +792,9 @@ function buildIdentity(state: AnalysisState, mode: AnalysisMode): RunIdentity {
 export function analyzeObserverData(input: AnalysisInput): RunAnalysis {
   const state = createAnalysisState();
   ingestAnalysisInput(state, input);
-  return buildRunAnalysis(state, input.mode || 'LIVE');
+  return buildRunAnalysis(state, input.mode || 'LIVE', {
+    optical_ticks: input.optical_ticks,
+    scientific_rows: input.scientific_rows,
+    frame: input.frame,
+  });
 }

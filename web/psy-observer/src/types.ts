@@ -38,6 +38,7 @@ export type ObserverFrame = {
   model_banner?: Record<string, any>;
   cognition_pipeline?: Record<string, any>;
   prospection_view?: Record<string, any>;
+  experimenter_interaction?: Record<string, any>;
   agents_observer?: any[];
   agents_views?: Record<string, any>;
   signal_forensics?: Record<string, any>;

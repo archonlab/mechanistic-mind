@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { RunAnalysis } from '../analysis/types';
+import { SignalContextPanel } from './SignalContextPanel';
 
 function show(v: any) {
   if (v == null || v === 'NOT AVAILABLE') return 'NOT AVAILABLE';
@@ -245,9 +246,23 @@ export function AnalyzeResultsPanel({
         <div className="metric"><span>Cognitive WAIT</span><strong>{show(a.cognition.cognitive_wait_selections)}</strong></div>
         <div className="metric"><span>Fallback WAIT</span><strong>{show(a.cognition.fallback_wait_selections)}</strong></div>
         <div className="subtle">sources {show(a.cognition.selected_action_sources)}</div>
-        <h4>MOVEMENT</h4>
-        <div className="metric"><span>Distance</span><strong>{show(a.movement.distance_travelled)}</strong></div>
-        <div className="metric"><span>Net disp.</span><strong>{show(a.movement.net_displacement)}</strong></div>
+        <h4>TRAJECTORY</h4>
+        {(a.movement as any).path_vs_velocity_consistency === 'FLAG' ? (
+          <div className="availability" style={{ color: '#b45309' }}>
+            WARNING: trajectory metrics inconsistent with runtime displacement (ratio {show((a.movement as any).path_vs_velocity_ratio)})
+          </div>
+        ) : null}
+        <div className="metric"><span>Path (euclid)</span><strong>{show((a.movement as any).path_length_euclidean)}</strong></div>
+        <div className="metric"><span>Net</span><strong>{show(a.movement.net_displacement)}</strong></div>
+        <div className="metric"><span>Max excursion</span><strong>{show((a.movement as any).max_excursion_from_start)}</strong></div>
+        <div className="metric"><span>Unwrapped Δ</span><strong>({show((a.movement as any).unwrapped_dx)}, {show((a.movement as any).unwrapped_dy)})</strong></div>
+        <div className="metric"><span>Cell crossings</span><strong>{show((a.movement as any).cell_boundary_crossings)}</strong></div>
+        <div className="metric"><span>Boundary wraps</span><strong>x {show((a.movement as any).boundary_crossings_x)} · y {show((a.movement as any).boundary_crossings_y)}</strong></div>
+        <div className="subtle">Requested: WAIT {show(a.actions.wait_pct)}% · MOVE {show(a.actions.move_pct)}%</div>
+        <div className="subtle">Physical during WAIT {show((a.movement as any).path_during_requested_WAIT)} · during MOVE {show((a.movement as any).path_during_requested_MOVE)}</div>
+        <div className="subtle">Local context: cell {show((a.movement as any).current_cell)} · neighborhood replacements {show((a.movement as any).neighborhood_replacements)}</div>
+        <div className="subtle">unique_pos_ticks {show((a.movement as any).unique_position_ticks)} · dup_ignored {show((a.movement as any).duplicate_observer_samples_ignored)} · gaps {show((a.movement as any).trajectory_gaps_skipped)}</div>
+        <div className="metric"><span>Distance (manhattan)</span><strong>{show(a.movement.distance_travelled)}</strong></div>
         <div className="metric"><span>Max speed</span><strong>{show(a.movement.max_speed)}</strong></div>
         <div className="metric"><span>Unique cells</span><strong>{show(a.movement.unique_cells)}</strong></div>
         <h4>RESOURCES</h4>
@@ -261,6 +276,13 @@ export function AnalyzeResultsPanel({
         <div className="subtle">emit A/B {a.signals.emissions_A}/{a.signals.emissions_B} · recv A/B {a.signals.receptions_A}/{a.signals.receptions_B}</div>
         <div className="subtle">contact emit {a.signals.contact_triggered_emissions} · motion emit {a.signals.motion_triggered_emissions}</div>
         <div className="subtle">attr mixed/not_unique/unknown {a.signals.reception_attribution.mixed}/{a.signals.reception_attribution.not_unique}/{a.signals.reception_attribution.unknown}</div>
+        <h4>VISION</h4>
+        <div className="subtle">Physical visual exposure ≠ recognition · Sensor change ≠ interpretation</div>
+        <div className="metric"><span>Exposures</span><strong>{show(a.vision?.foreign_body_exposure_ticks)}</strong></div>
+        <div className="metric"><span>Episodes</span><strong>{show(a.vision?.observed_exposure_episodes)}</strong></div>
+        <div className="metric"><span>Vision-only</span><strong>{show(a.vision?.vision_only_episodes)}</strong></div>
+        <div className="metric"><span>Body optical Δ</span><strong>{show(a.vision?.peak_body_optical_contribution)}</strong></div>
+        <div className="metric"><span>Cognition link</span><strong>{a.vision?.cognition_linkage ?? 'NOT_ESTABLISHED'}</strong></div>
         <h4>INTERACTION</h4>
         <div className="subtle">contacts {show(a.interaction.body_body_contacts)} · cross-agent {a.interaction.cross_agent_signal_contributions}</div>
       </section>
@@ -329,6 +351,30 @@ export function AnalyzeResultsPanel({
     </section>
 
     <section className="panel science-card wide">
+      <h3>VISUAL FORENSICS</h3>
+      <div className="subtle">Physical visual exposure ≠ recognition. Sensor change ≠ interpretation. Temporal follow-up ≠ causal behavioral effect.</div>
+      {analysis.vision_forensics ? (
+        <>
+          <div className="metric"><span>Coverage</span><strong>{analysis.vision_forensics.coverage}</strong></div>
+          <div className="metric"><span>Authority</span><strong>{analysis.vision_forensics.optical_history_authority || '—'}</strong></div>
+          <div className="metric"><span>Exposure ticks</span><strong>{String(analysis.vision_forensics.summary.total_exposure_ticks)}</strong></div>
+          <div className="metric"><span>Episodes</span><strong>{String(analysis.vision_forensics.summary.exposure_episodes)}</strong></div>
+          <div className="metric"><span>Peak body</span><strong>{String(analysis.vision_forensics.summary.peak_body_contribution)}</strong></div>
+          <div className="metric"><span>First exposure</span><strong>{
+            analysis.vision_forensics.summary.first_observed_exposure_status === 'NOT_AVAILABLE'
+              ? 'NOT_AVAILABLE'
+              : analysis.vision_forensics.summary.first_observed_body_optical_exposure
+                ? `t${analysis.vision_forensics.summary.first_observed_body_optical_exposure.tick}`
+                : 'NONE'
+          }</strong></div>
+          <div className="metric"><span>Cognition link</span><strong>{analysis.vision_forensics.summary.cognition_linkage_default}</strong></div>
+        </>
+      ) : (
+        <div className="na">NOT_AVAILABLE — no optical series</div>
+      )}
+    </section>
+
+    <section className="panel science-card wide">
       <h3>PHASES</h3>
       {analysis.phases.map((ph, i) => (
         <div key={i} className="subtle"><b>{ph.start}–{ph.end}</b> {ph.name} — {ph.reason}</div>
@@ -352,5 +398,9 @@ export function AnalyzeResultsPanel({
       </div>
     </section>
     </>}
+
+    <section className="panel science-card wide">
+      <SignalContextPanel />
+    </section>
   </div>;
 }

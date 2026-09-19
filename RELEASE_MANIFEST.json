@@ -1,0 +1,109 @@
+{
+  "product": "Mechanistic Mind",
+  "version": "2.0",
+  "codename": "Tiktaalik: Undercover",
+  "release_channel": "Public Beta 1",
+  "package_date_utc": "2026-09-19T16:50:33.363510+00:00",
+  "source_commit": "a3b2b592aaf0977e085bf649d81c4cfd5564104c",
+  "python_requirements": "requirements-observer.txt",
+  "platforms": {
+    "linux": "validated_clean_package_launcher_and_smoke",
+    "macos": "static_validation",
+    "windows": "static_validation"
+  },
+  "archives": {
+    "tar.gz": "MM-2.0-Tiktaalik-Undercover-Public-Beta-1.tar.gz",
+    "zip": "MM-2.0-Tiktaalik-Undercover-Public-Beta-1.zip",
+    "sha256": {
+      "MM-2.0-Tiktaalik-Undercover-Public-Beta-1.tar.gz": "d0b35dd2b56e25226704903c9df0be3a9d4e4433108acb4a11a82a4c94af6a97",
+      "MM-2.0-Tiktaalik-Undercover-Public-Beta-1.zip": "3abec52068b52925f6c581bf9d1568385a6cdf17a17046bf95956c9d0509d27c"
+    }
+  },
+  "scientific_fingerprint": "EXACT_MATCH",
+  "smoke": {
+    "two_agent": {
+      "tick": 30,
+      "agents": 2,
+      "sci_rows": 60,
+      "vision_radius_final": 1,
+      "vision_optical": true,
+      "default_r_restored": true
+    },
+    "undercover": {
+      "enabled_attempted": true,
+      "slot_count": 2,
+      "experimenter_slot_present": false,
+      "unique_body_ids": 2,
+      "body_ids": [
+        "130797747539504",
+        "130797747539024"
+      ],
+      "tick": 10,
+      "no_duplicate_physical_pair": true
+    },
+    "identity": "MM 2.0 TIKTAALIK | TIKTAALIK: UNDERCOVER | PUBLIC BETA 1"
+  },
+  "acceptance_gates": {
+    "RA1": "PASS",
+    "RA2": "PASS",
+    "RA3": "PASS",
+    "RA4": "PASS",
+    "RA5": "PASS",
+    "RA6": "PASS",
+    "RA7": "PASS",
+    "RA8": "PASS",
+    "RA9": "PASS",
+    "RA10": "PASS",
+    "RA11": "PASS",
+    "RA12": "PASS",
+    "RA13": "PASS",
+    "RA14": "PASS_WITH_GAP",
+    "RA15": "PASS_WITH_GAP",
+    "RA16": "PASS",
+    "RA17": "PASS",
+    "RA18": "PASS",
+    "RA19": "PASS",
+    "RA20": "PASS",
+    "RA21": "PASS",
+    "RA22": "PASS",
+    "RA23": "PASS",
+    "RA24": "PASS",
+    "RA25": "PASS",
+    "RA26": "PASS",
+    "RA27": "PASS",
+    "RA28": "PASS",
+    "RA29": "PASS",
+    "RA30": "PASS",
+    "RA31": "PASS",
+    "RA32": "PASS",
+    "RA33": "PASS",
+    "RA34": "PASS",
+    "RA35": "PASS",
+    "RA36": "PASS",
+    "RA37": "PASS",
+    "RA38": "PASS",
+    "RA39": "STATIC_VALIDATION",
+    "RA40": "STATIC_VALIDATION",
+    "RA41": "PASS",
+    "RA42": "PASS",
+    "RA43": "PASS",
+    "RA44": "PASS",
+    "RA45": "PASS",
+    "RA46": "PASS",
+    "RA47": "PASS",
+    "RA48": "PASS",
+    "RA49": "PASS",
+    "RA50": "PASS"
+  },
+  "known_validation_gaps": [
+    "PyPI bootstrap blocked by proxy on packaging host; end-user network required for first-run pip",
+    "macOS native runtime not executed",
+    "Windows native runtime not executed"
+  ],
+  "license": "AGPL-3.0-or-later (see LICENSE, COPYRIGHT, COMMERCIAL_LICENSING.md)",
+  "directory_size_approx": "16M",
+  "archive_sizes_approx": {
+    "tar.gz": "2.8M",
+    "zip": "3.4M"
+  }
+}

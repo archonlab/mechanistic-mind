@@ -45,6 +45,7 @@ from .deformation_work import DeformationWorkConfig, drag_dissipation, kinetic_e
 from .environmental_resource import EnvironmentalResourceConfig, step_environmental_resource
 from .complementary_resources import ComplementaryResourcesConfig, step_complementary_resources
 from .physical_signal import PhysicalSignalConfig
+from .near_field_exteroception import NearFieldExteroceptionConfig
 from .mechanism_registry import RUNTIME_VERSION, mechanism_snapshot, set_mechanism
 from .structured_events import StructuredEventBuffer
 from .endogenous_motor import (
@@ -80,6 +81,7 @@ class PhysicalSystemConfig:
     Historical manifests: from_dict missing keys → those mechanisms OFF.
     """
     runtime_version: str = RUNTIME_VERSION
+    ecology_preset: str = "CURRENT"  # CURRENT | GENTLE_FREE_MOVEMENT — Observer/runtime GT only
     planet: PlanetConfig = field(default_factory=default_planet_config)
     body: PhysicalBodyConfig = field(default_factory=default_physical_body2_config)
     internal: InternalMediumConfig = field(default_factory=default_internal_medium_config)
@@ -94,6 +96,9 @@ class PhysicalSystemConfig:
     endogenous_motor_work: EndogenousMotorWorkConfig = field(default_factory=EndogenousMotorWorkConfig)
     discrete_action_work: DiscreteActionWorkConfig = field(default_factory=DiscreteActionWorkConfig)
     physical_signal: PhysicalSignalConfig = field(default_factory=PhysicalSignalConfig)
+    near_field_exteroception: NearFieldExteroceptionConfig = field(
+        default_factory=NearFieldExteroceptionConfig
+    )
 
     def copy(self) -> "PhysicalSystemConfig":
         return deepcopy(self)
@@ -153,6 +158,7 @@ class PhysicalSystemRuntime:
         self.last_work_ledger: dict[str, Any] | None = None
         self.last_resource_ledger: dict[str, Any] | None = None
         self.last_complementary_ledger: dict[str, Any] | None = None
+        self.last_passive_reservoir_trickle: dict[str, Any] | None = None
         self.last_motor_work_ledger: dict[str, Any] | None = None
         self.last_action_work_ledger: dict[str, Any] | None = None
         self.last_work_allocation: dict[str, Any] | None = None
@@ -175,6 +181,22 @@ class PhysicalSystemRuntime:
         if seed is not None:
             self.seed = int(seed)
         self.world = initialize_planet(self.config.planet, seed=self.seed)
+        nfe = getattr(self.config, "near_field_exteroception", None)
+        if nfe is not None and nfe.enabled and nfe.surface_enabled:
+            from mechanistic_mind.physical_system.near_field_exteroception import (
+                install_surface_on_planet,
+                illumination_intensity,
+                ILLUMINATION_GENERATOR_VERSION,
+            )
+            install_surface_on_planet(self.world, experiment_seed=self.seed, cfg=nfe)
+            self.world.illumination_intensity = illumination_intensity(0, nfe)
+            self.world.illumination_meta = {
+                "period": int(nfe.illumination_period),
+                "min": float(nfe.illumination_min),
+                "max": float(nfe.illumination_max),
+                "generator_version": ILLUMINATION_GENERATOR_VERSION,
+                "note": "Observational only — does not drive forces/work/resources",
+            }
         self.body = initialize_physical_body(
             self.config.body,
             width=self.config.planet.width,
@@ -195,6 +217,7 @@ class PhysicalSystemRuntime:
         self.last_work_ledger = None
         self.last_resource_ledger = None
         self.last_complementary_ledger = None
+        self.last_passive_reservoir_trickle = None
         self.last_motor_work_ledger = None
         self.last_action_work_ledger = None
         self.last_work_allocation = None
@@ -213,9 +236,10 @@ class PhysicalSystemRuntime:
         if self.config.cognition.cognition_enabled:
             self.last_agent_observation = self.agent_observation()
 
-    def agent_observation(self) -> dict[str, float]:
+    def agent_observation(self, foreign_bodies=None) -> dict[str, float]:
         sig = getattr(self.config, "physical_signal", None)
         include = bool(sig is not None and sig.enabled and sig.perception_enabled)
+        nfe = getattr(self.config, "near_field_exteroception", None)
         return accessible_observation(
             world=self.world,
             body=self.body,
@@ -223,12 +247,15 @@ class PhysicalSystemRuntime:
             planet_config=self.config.planet,
             body_config=self.config.body,
             include_signal_fields=include,
+            near_field_cfg=nfe,
+            foreign_bodies=foreign_bodies,
         )
 
-    def observation_views(self) -> dict[str, Any]:
+    def observation_views(self, foreign_bodies=None) -> dict[str, Any]:
         """Observer: WORLD TRUTH + AGENT OBSERVATION (separated)."""
         sig = getattr(self.config, "physical_signal", None)
         include = bool(sig is not None and sig.enabled and sig.perception_enabled)
+        nfe = getattr(self.config, "near_field_exteroception", None)
         return observation_bundle(
             world=self.world,
             body=self.body,
@@ -236,6 +263,8 @@ class PhysicalSystemRuntime:
             planet_config=self.config.planet,
             body_config=self.config.body,
             include_signal_fields=include,
+            near_field_cfg=nfe,
+            foreign_bodies=foreign_bodies,
         )
 
     def cognitive_view(self) -> dict[str, Any]:
@@ -297,6 +326,25 @@ class PhysicalSystemRuntime:
             self.config.deformation_work,
             receipt_tick=int(self.tick),
         )
+        # BODY-01: optional passive trickle after resource conversion (ordinary path).
+        # Does not bypass allocate_shared_work / realize_discrete_action.
+        trickle = float(getattr(self.config.deformation_work, "passive_reservoir_trickle", 0.0) or 0.0)
+        if trickle > 0.0:
+            w_max = float(self.config.deformation_work.reservoir_max)
+            w0 = float(getattr(self.body, "mechanical_work_reservoir", 0.0) or 0.0)
+            credited = min(trickle, max(0.0, w_max - w0))
+            if credited > 0.0:
+                self.body.mechanical_work_reservoir = min(w_max, w0 + credited)
+            self.last_passive_reservoir_trickle = {
+                "enabled": True,
+                "source": "PASSIVE_BODY_TRICKLE",
+                "before": w0,
+                "credited": float(credited),
+                "after": float(self.body.mechanical_work_reservoir),
+                "not_experimenter_research_supply": True,
+            }
+        else:
+            self.last_passive_reservoir_trickle = {"enabled": False, "credited": 0.0}
 
     def _motor_increment_mode(self, site_path: bool) -> str:
         return "acceleration" if site_path else "force"
@@ -511,6 +559,11 @@ class PhysicalSystemRuntime:
 
         if not skip_planet:
             step_planet(self.world, self.config.planet, seed=self.seed)
+        # Observational illumination cache (no force/work/resource coupling).
+        nfe = getattr(self.config, "near_field_exteroception", None)
+        if nfe is not None and nfe.enabled:
+            from mechanistic_mind.physical_system.near_field_exteroception import illumination_intensity
+            self.world.illumination_intensity = illumination_intensity(int(self.world.tick), nfe)
         local_world = sample_local_world(self.body, self.world, self.config.body)
         mech_decomp = mechanical_stage_decomposition(
             vx_before_mech=float(body_after_impulse["vx"]),
@@ -571,6 +624,12 @@ class PhysicalSystemRuntime:
                         None if not (mw_on or action_work_on)
                         else float(alloc.get("allocated_deformation") or 0.0)
                     ),
+                    terrain_cfg=getattr(self.config.planet, "terrain", None),
+                    ambient_cfg=getattr(self.config.planet, "ambient", None),
+                    locomotor_active=(
+                        str(selected).upper().startswith("MOVE")
+                        or abs(float(impulse[0])) + abs(float(impulse[1])) > 1e-12
+                    ),
                 )
                 self.last_deformation_meta = (self.last_orientation_meta or {}).get("deformation")
                 dm = self.last_deformation_meta or {}
@@ -624,6 +683,16 @@ class PhysicalSystemRuntime:
                 }
                 nf = (self.last_orientation_meta or {}).get("net_force") or [0.0, 0.0]
                 force_contrib["environmental_site"] = [float(nf[0]), float(nf[1])]
+                tmeta = (self.last_orientation_meta or {}).get("terrain") or {}
+                if tmeta.get("enabled"):
+                    force_contrib["terrain_potential"] = [
+                        float(tmeta.get("fx") or 0.0),
+                        float(tmeta.get("fy") or 0.0),
+                    ]
+                    force_contrib["terrain_extra_drag"] = float(tmeta.get("extra_drag") or 0.0)
+                    force_contrib["terrain_note"] = (
+                        "External channel only — never credits mechanical_work_reservoir"
+                    )
             else:
                 self.last_morphology_meta = step_morphology_mechanics(
                     self.body,
@@ -1220,6 +1289,14 @@ class PhysicalSystemRuntime:
         return mechanism_snapshot(self.config)
 
     def set_mechanism(self, mechanism_id: str, enabled: bool) -> dict[str, Any]:
+        nfe = getattr(self.config, "near_field_exteroception", None)
+        if mechanism_id == "illumination_cycle" and not bool(enabled) and nfe is not None:
+            # Freeze at current physical intensity before disabling dynamics.
+            from mechanistic_mind.physical_system.near_field_exteroception import illumination_intensity
+            cur = getattr(self.world, "illumination_intensity", None)
+            if cur is None:
+                cur = illumination_intensity(int(self.world.tick), nfe)
+            nfe.illumination_frozen = float(cur)
         snap = set_mechanism(self.config, mechanism_id, enabled)
         if mechanism_id == "experimental_physical_signal":
             from mechanistic_mind.physical_system.physical_signal import clear_fields, ensure_fields
@@ -1227,6 +1304,28 @@ class PhysicalSystemRuntime:
                 ensure_fields(self.world)
             else:
                 clear_fields(self.world)
+        if mechanism_id in ("physical_near_field_vision", "illumination_cycle"):
+            nfe = getattr(self.config, "near_field_exteroception", None)
+            if nfe is not None and nfe.enabled and nfe.surface_enabled:
+                if getattr(self.world, "surface_response", None) is None:
+                    from mechanistic_mind.physical_system.near_field_exteroception import (
+                        install_surface_on_planet,
+                        illumination_intensity,
+                        ILLUMINATION_GENERATOR_VERSION,
+                    )
+                    install_surface_on_planet(self.world, experiment_seed=self.seed, cfg=nfe)
+                    if getattr(self.world, "illumination_intensity", None) is None:
+                        self.world.illumination_intensity = illumination_intensity(int(self.world.tick), nfe)
+                        self.world.illumination_meta = {
+                            "period": int(nfe.illumination_period),
+                            "min": float(nfe.illumination_min),
+                            "max": float(nfe.illumination_max),
+                            "generator_version": ILLUMINATION_GENERATOR_VERSION,
+                            "note": "Observational only — does not drive forces/work/resources",
+                        }
+            if nfe is not None and nfe.enabled:
+                from mechanistic_mind.physical_system.near_field_exteroception import illumination_intensity
+                self.world.illumination_intensity = illumination_intensity(int(self.world.tick), nfe)
         # Keep the cognition store's config copy aligned with live toggles.
         if isinstance(self.cognition, dict):
             self.cognition["config"] = self.config.cognition.to_dict()
@@ -1261,6 +1360,33 @@ class PhysicalSystemRuntime:
             if isinstance(map_meta, dict):
                 map_meta["enabled"] = bool(getattr(self.config.cognition, "multistep_action_prospection", False))
         return snap
+
+    def set_vision_radius(self, radius: int) -> dict[str, Any]:
+        """LIVE Moore candidate radius {1,2,3}. Does not reset world/cognition/RNG."""
+        from mechanistic_mind.physical_system.near_field_exteroception import (
+            DEFAULT_VISION_RADIUS,
+            clamp_vision_radius,
+            moore_max_candidates,
+        )
+
+        nfe = getattr(self.config, "near_field_exteroception", None)
+        if nfe is None:
+            return {
+                "accepted": False,
+                "reason": "near_field_exteroception absent",
+                "radius": DEFAULT_VISION_RADIUS,
+            }
+        old = clamp_vision_radius(getattr(nfe, "radius", DEFAULT_VISION_RADIUS))
+        new = clamp_vision_radius(radius)
+        nfe.radius = new
+        return {
+            "accepted": True,
+            "old": old,
+            "new": new,
+            "radius": new,
+            "max_candidates": moore_max_candidates(new),
+            "noop": old == new,
+        }
 
     def set_motion_trace(self, *, enabled: bool, mode: str = "every_10") -> dict[str, Any]:
         self.motion_trace_enabled = bool(enabled)
@@ -1533,6 +1659,7 @@ class PhysicalSystemRuntime:
             "seed": self.seed,
             "model": self.model_identity(),
             "config": {
+                "ecology_preset": getattr(self.config, "ecology_preset", "CURRENT") or "CURRENT",
                 "planet": self.config.planet.to_dict(),
                 "body": self.config.body.to_dict(),
                 "internal": self.config.internal.to_dict(),
@@ -1547,6 +1674,7 @@ class PhysicalSystemRuntime:
                 "endogenous_motor_work": self.config.endogenous_motor_work.to_dict(),
                 "discrete_action_work": self.config.discrete_action_work.to_dict(),
                 "physical_signal": self.config.physical_signal.to_dict(),
+                "near_field_exteroception": self.config.near_field_exteroception.to_dict(),
                 "cognition": self.config.cognition.to_dict(),
             },
             "world": serialize_planet_state(self.world, self.config.planet),
@@ -1566,6 +1694,7 @@ class PhysicalSystemRuntime:
         configs = payload["config"]
         cog_cfg = CognitionConfig.from_dict(configs.get("cognition"))
         config = PhysicalSystemConfig(
+            ecology_preset=str(configs.get("ecology_preset") or "CURRENT"),
             planet=PlanetConfig.from_dict(configs["planet"]),
             body=_config_from_dict(PhysicalBodyConfig, configs["body"]),
             internal=_config_from_dict(InternalMediumConfig, configs["internal"]),
@@ -1579,6 +1708,9 @@ class PhysicalSystemRuntime:
             endogenous_motor_work=EndogenousMotorWorkConfig.from_dict(configs.get("endogenous_motor_work")),
             discrete_action_work=DiscreteActionWorkConfig.from_dict(configs.get("discrete_action_work")),
             physical_signal=PhysicalSignalConfig.from_dict(configs.get("physical_signal")),
+            near_field_exteroception=NearFieldExteroceptionConfig.from_dict(
+                configs.get("near_field_exteroception")
+            ),
             cognition=cog_cfg,
         )
         runtime = cls(seed=int(payload["seed"]), config=config)

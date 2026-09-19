@@ -24,8 +24,8 @@ MIN_CLASS_SUPPORT = 3
 # over consequent channels). Sensitivity-tested. Does not define observation identity.
 CONTINUATION_LINF = 0.10
 
-# Performance: flat float maps use dict() instead of deepcopy (exact for dict[str,float]).
-# Set False to restore legacy deepcopy for A/B equivalence checks.
+# BETA2-03: flat float maps use dict() instead of deepcopy (exact for dict[str,float]).
+# Set False to restore BETA2-02 deepcopy path for equivalence harnesses.
 _USE_FLOAT_MAP_DICT_COPY = True
 
 

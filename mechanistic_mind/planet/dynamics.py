@@ -173,6 +173,7 @@ def step_planet(
     F = forcing_field(cfg, state.tick, h, w, seed=seed)
     ce = getattr(cfg, "climate_ecology", None)
     T_eq = None
+    # Climate dynamics only (T_eq / seasonal insolation). Independent of resource ecology.
     if ce is not None and bool(getattr(ce, "enabled", False)):
         T_eq = equilibrium_temperature(ce, int(state.tick), h, w, seed=seed)
         F = np.clip(F + climate_insolation(ce, int(state.tick), h, w, seed=seed), 0.0, 1.5)
@@ -180,12 +181,17 @@ def step_planet(
     step_flow(state, cfg)
     step_matter(state, cfg)
     step_wave(state, cfg, impulse=impulse)
-    if ce is not None and bool(getattr(ce, "enabled", False)):
-        ra = state.R_A if state.R_A is not None else np.zeros((h, w), dtype=np.float64)
-        rb = state.R_B if state.R_B is not None else np.zeros((h, w), dtype=np.float64)
-        state.R_A, state.R_B = step_climate_resources(
-            state.T, ra, rb, ce, int(state.tick), seed=seed, hetero=state.capacity,
-        )
+    # Resource ecology: independent of climate.enabled. Uses current physical T.
+    if ce is not None:
+        from mechanistic_mind.planet.climate_ecology import resource_ecology_any
+        if resource_ecology_any(ce):
+            ra = state.R_A if state.R_A is not None else np.zeros((h, w), dtype=np.float64)
+            rb = state.R_B if state.R_B is not None else np.zeros((h, w), dtype=np.float64)
+            state.R_A, state.R_B = step_climate_resources(
+                state.T, ra, rb, ce, int(state.tick), seed=seed, hetero=state.capacity,
+                geo_suit_A=getattr(state, "resource_geo_suit_A", None),
+                geo_suit_B=getattr(state, "resource_geo_suit_B", None),
+            )
     # OPEN-5: external material boundary after wave; skip entirely when OFF
     step_external_material_boundary(state)
     state.tick += 1

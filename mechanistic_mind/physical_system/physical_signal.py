@@ -202,6 +202,8 @@ def step_physical_signals(
                         # Observer stream that recorded this deposit (instrumentation ≠ emitter claim).
                         "observer_source_id": agent_id,
                         "realized": realized,
+                        "amplitude": realized,
+                        "cells": [(int(iy), int(ix)) for iy, ix in cells],
                         "x": float(body.x),
                         "y": float(body.y),
                         "physical_quantity": "speed",
@@ -222,6 +224,8 @@ def step_physical_signals(
                         "emitter_body_id": body_id,
                         "observer_source_id": agent_id,
                         "realized": realized,
+                        "amplitude": realized,
+                        "cells": [(int(iy), int(ix)) for iy, ix in cells],
                         "x": float(body.x),
                         "y": float(body.y),
                         "physical_quantity": "contact_gain",
@@ -271,6 +275,8 @@ def step_physical_signals(
                     emitter_agent if slot_i is not None else "environment"
                 ),
                 "realized": realized,
+                "amplitude": realized,
+                "cells": [(int(iy), int(ix)) for iy, ix in cells],
                 "iy": cells[0][0],
                 "ix": cells[0][1],
                 "x": float(cells[0][1]) + 0.5,

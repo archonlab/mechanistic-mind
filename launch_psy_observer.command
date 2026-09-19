@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Psy Observer Web — Beta 1 launcher (macOS Finder double-clickable).
+# Psy Observer Web — Public Beta 1 launcher (macOS Finder double-clickable).
 # Resolves its own directory; keeps Terminal open on failure.
 # First launch may create .venv_psy_web and install requirements-observer.txt.
 
@@ -108,7 +108,7 @@ See $LOG_FILE"
 }
 
 if [ ! -f "$ROOT/mechanistic_mind/ui/psy_observer_web/web_dist/index.html" ]; then
-  fail "Missing production web_dist. Re-download the Beta 1 archive."
+  fail "Missing production web_dist. Re-download the Public Public Beta 1 archive."
 fi
 if [ ! -f "$BOOTSTRAP" ]; then
   fail "Missing bootstrap script: scripts/bootstrap_psy_observer_env.py"
@@ -125,6 +125,6 @@ else
 fi
 
 cd "$ROOT"
-echo "Starting Psy Observer Web (Beta 1)…"
+echo "Starting Psy Observer Web (Public Beta 1)…"
 # Gatekeeper note: first open may require right-click → Open if macOS quarantines the file.
 exec "$PY" -m mechanistic_mind.ui.psy_observer_web.launcher "$@"

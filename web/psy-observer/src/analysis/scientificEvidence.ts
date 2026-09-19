@@ -102,7 +102,10 @@ export function analyzeEvidencePackage(
     }
   }
 
-  const analysis = buildRunAnalysis(state, mode);
+  const analysis = buildRunAnalysis(state, mode, {
+    scientific_rows: pkg.scientific_rows,
+    frame,
+  });
   const covLevel = mapCoverage(pkg.coverage);
   const detail = pkg.coverage_detail || {};
   const range = pkg.scientific_tick_range || [null, null];

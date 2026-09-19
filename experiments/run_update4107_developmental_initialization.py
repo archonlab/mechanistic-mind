@@ -453,7 +453,7 @@ Canonical 4.10 `make_engine` uses **50**, which is **below** the MDS ladder.
 
     write_md(
         "INITIALIZATION_HISTORY_AUDIT.md",
-        "# Initialization history audit\n\nHISTORY_UNAVAILABLE — no local git repository in `<local-lab-tree>`.\n",
+        "# Initialization history audit\n\nHISTORY_UNAVAILABLE — no local git repository in `~/Desktop/psy`.\n",
     )
 
     dump(

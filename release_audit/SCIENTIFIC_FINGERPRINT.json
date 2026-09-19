@@ -1,0 +1,103 @@
+{
+  "verdict": "EXACT_MATCH",
+  "lab_tick": 40,
+  "pub_tick": 40,
+  "lab_actions": [
+    "WAIT",
+    "WAIT"
+  ],
+  "pub_actions": [
+    "WAIT",
+    "WAIT"
+  ],
+  "lab_fp": {
+    "tick": 40,
+    "seed": 17,
+    "agents": [
+      {
+        "agent": "agent_0",
+        "tick": 40,
+        "action": "WAIT",
+        "selection_source": "PROSPECTIVE_SCENARIO",
+        "x": 8.494857,
+        "y": 16.504055,
+        "vx": -0.000307,
+        "vy": 0.000463,
+        "theta": -0.001001,
+        "work": 4.0,
+        "seed": 17,
+        "obs_fields": {
+          "local.FIELD_A": 0.0,
+          "local.FIELD_B": 0.0
+        }
+      },
+      {
+        "agent": "agent_1",
+        "tick": 40,
+        "action": "WAIT",
+        "selection_source": "PROSPECTIVE_SCENARIO",
+        "x": 12.513946,
+        "y": 16.468845,
+        "vx": 0.000431,
+        "vy": -0.001108,
+        "theta": -0.002296,
+        "work": 4.0,
+        "seed": 18,
+        "obs_fields": {
+          "local.FIELD_A": 0.0,
+          "local.FIELD_B": 0.0
+        }
+      }
+    ],
+    "field_A_sum": 0.0,
+    "field_B_sum": 0.0,
+    "field_A_max": 0.0,
+    "field_B_max": 0.0,
+    "pending_sources": 0
+  },
+  "pub_fp": {
+    "tick": 40,
+    "seed": 17,
+    "agents": [
+      {
+        "agent": "agent_0",
+        "tick": 40,
+        "action": "WAIT",
+        "selection_source": "PROSPECTIVE_SCENARIO",
+        "x": 8.494857,
+        "y": 16.504055,
+        "vx": -0.000307,
+        "vy": 0.000463,
+        "theta": -0.001001,
+        "work": 4.0,
+        "seed": 17,
+        "obs_fields": {
+          "local.FIELD_A": 0.0,
+          "local.FIELD_B": 0.0
+        }
+      },
+      {
+        "agent": "agent_1",
+        "tick": 40,
+        "action": "WAIT",
+        "selection_source": "PROSPECTIVE_SCENARIO",
+        "x": 12.513946,
+        "y": 16.468845,
+        "vx": 0.000431,
+        "vy": -0.001108,
+        "theta": -0.002296,
+        "work": 4.0,
+        "seed": 18,
+        "obs_fields": {
+          "local.FIELD_A": 0.0,
+          "local.FIELD_B": 0.0
+        }
+      }
+    ],
+    "field_A_sum": 0.0,
+    "field_B_sum": 0.0,
+    "field_A_max": 0.0,
+    "field_B_max": 0.0,
+    "pending_sources": 0
+  }
+}

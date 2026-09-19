@@ -70,14 +70,206 @@ def collect_scientific_tick_rows(runtime: Any) -> list[dict[str, Any]]:
     slots = getattr(runtime, "slots", None)
     rows: list[dict[str, Any]] = []
     if slots:
+        from mechanistic_mind.ui.psy_observer_web.undercover_identity import slot_agent_body_ids
+
+        exp_slot = getattr(runtime, "experimenter_slot", None)
         for i, slot in enumerate(slots):
-            rows.append(_row_for_slot(tick, i, slot, contact=contact))
+            foreign = []
+            for j in range(len(slots)):
+                if j == i:
+                    continue
+                _aid, bid = slot_agent_body_ids(j, experimenter_slot=exp_slot)
+                foreign.append((slots[j].body, slots[j].config.body, bid))
+            rows.append(
+                _row_for_slot(
+                    tick,
+                    i,
+                    slot,
+                    contact=contact,
+                    foreign_bodies=foreign,
+                    runtime_root=runtime,
+                    experimenter_slot=exp_slot,
+                )
+            )
         return rows
-    rows.append(_row_for_slot(tick, 0, runtime, contact=contact))
+    rows.append(_row_for_slot(tick, 0, runtime, contact=contact, runtime_root=runtime))
     return rows
 
 
-def _row_for_slot(tick: int, index: int, slot: Any, *, contact: bool) -> dict[str, Any]:
+def _compact_action_realization_for_slot(slot: Any, *, contact: bool) -> dict[str, Any] | None:
+    """GEO-03: compact per-tick action realization for offline reconstruction."""
+    try:
+        from mechanistic_mind.ui.psy_observer_web.geometry.action_realization import (
+            build_action_realization_receipt,
+            compact_receipt,
+        )
+        receipt = build_action_realization_receipt(
+            slot,
+            agent_id="agent_0",  # overwritten by caller identity fields
+            contact={"contact": bool(contact)} if contact else None,
+        )
+        c = compact_receipt(receipt)
+        # Extra ledger fields for offline attribution without full snapshots
+        c["work_requested"] = receipt.get("work_requested")
+        c["work_allocated"] = receipt.get("work_allocated")
+        c["environmental_force"] = receipt.get("environmental_force")
+        c["expected_free_progress_status"] = receipt.get("expected_free_progress_status")
+        return c
+    except Exception:
+        return None
+
+
+# Float-dust floor for body-derived exo delta (not a perceptual threshold).
+BODY_OPTICAL_EPS = 1e-12
+
+
+def body_derived_exo_contribution(
+    exo: dict[str, Any] | None,
+    exo_without_foreign_bodies: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Counterfactual body-derived channel delta under the real soft-OR pipeline.
+
+    foreign_body_contribution[ch] = max(0, exo[ch] - exo_without_foreign_bodies[ch])
+
+    This is NOT an additive env+body split of soft-OR. It is the change in
+    agent-accessible exo_* caused by including foreign-body optical occupancy
+    in sample_near_field (same FOV / distance / illumination / threshold path).
+    """
+    exo = dict(exo or {})
+    wo = dict(exo_without_foreign_bodies or {})
+    keys = ("exo_0", "exo_1", "exo_2")
+    contrib = {
+        k: float(max(0.0, float(exo.get(k) or 0.0) - float(wo.get(k) or 0.0)))
+        for k in keys
+    }
+    total = float(sum(contrib.values()))
+    return {
+        "foreign_body_contribution": contrib,
+        "foreign_body_total": total,
+        "body_exposure": bool(total > BODY_OPTICAL_EPS),
+        "epsilon": BODY_OPTICAL_EPS,
+        "semantics": (
+            "COUNTERFACTUAL_EXO_DELTA: exo(with foreign bodies) - exo(without); "
+            "soft-OR composition already applied inside sample_near_field"
+        ),
+    }
+
+
+def _compact_vision_optical_for_slot(
+    slot: Any,
+    *,
+    foreign_bodies: list[tuple[Any, Any, str]] | None = None,
+    field_reception: bool = False,
+) -> dict[str, Any] | None:
+    """Observer/Analyzer compact optical GT — same authority as Sensor Inspector.
+
+    Reuses sample_near_field (identical to serialize._physical_bundle →
+    NearFieldSensorPanel). Never enters cognition.
+    """
+    nfe = getattr(getattr(slot, "config", None), "near_field_exteroception", None)
+    if nfe is None or not getattr(nfe, "enabled", False):
+        return {
+            "available": False,
+            "reason": "near_field_exteroception OFF / absent",
+            "vision_enabled": False,
+            "body_optics_enabled": False,
+            "identity_layer": "OBSERVER_GT_ONLY",
+        }
+    try:
+        from mechanistic_mind.physical_system.near_field_exteroception import (
+            cognition_exo_fragments,
+            sample_near_field,
+        )
+
+        fb_pairs = [(b, c) for b, c, _ in (foreign_bodies or [])]
+        # Authoritative sample — same function Sensor Inspector consumes.
+        sample = sample_near_field(
+            world=slot.world,
+            body=slot.body,
+            cfg=nfe,
+            foreign_bodies=fb_pairs,
+        )
+        src_cells: list[dict[str, Any]] = []
+        for b, _c, bid in foreign_bodies or []:
+            src_cells.append({
+                "source_body_id": bid,
+                "source_identity_layer": "OBSERVER_GT_ONLY",
+                "cell": [int(b.x), int(b.y)],
+            })
+        # Counterfactual without foreign bodies (Observer-only; not cognition).
+        exo_without = cognition_exo_fragments(
+            world=slot.world, body=slot.body, cfg=nfe, foreign_bodies=[]
+        )
+        exo = dict(sample.get("fragments") or {})
+        derived = body_derived_exo_contribution(exo, exo_without)
+        # Keep body-optical candidates only (env-only DET is not body exposure).
+        neighbors_compact = [
+            {
+                "cell": r["cell"],
+                "inside_fov": r["inside_fov"],
+                "distance": r.get("distance"),
+                "relative_angle_deg": r["relative_angle_deg"],
+                "surface_response": r["surface_response"],
+                "body_optical": r["body_optical"],
+                "composed_optical": r["composed_optical"],
+                "final_contribution": r["final_contribution"],
+                "detectable": r.get("detectable"),
+            }
+            for r in (sample.get("neighbors") or [])
+            if float(r.get("body_optical") or 0.0) > 0.0
+        ]
+        vision_on = bool(sample.get("vision_contributes") or sample.get("perception_enabled"))
+        body_optics_on = bool(sample.get("body_optical_enabled"))
+        return {
+            "available": True,
+            "identity_layer": "OBSERVER_GT_ONLY",
+            "authority": "sample_near_field",
+            "vision_enabled": vision_on,
+            "body_optics_enabled": body_optics_on,
+            "perception_enabled": bool(sample.get("perception_enabled")),
+            "vision_contributes": bool(sample.get("vision_contributes")),
+            "body_optical_enabled": body_optics_on,
+            "illumination": sample.get("illumination"),
+            "final_exo": {k: float(exo.get(k) or 0.0) for k in ("exo_0", "exo_1", "exo_2")},
+            "exo": exo,  # alias for Analyzer back-compat
+            "exo_without_foreign_bodies": exo_without,
+            "foreign_body_contribution": derived["foreign_body_contribution"],
+            "foreign_body_total": derived["foreign_body_total"],
+            "body_exposure": derived["body_exposure"],
+            "body_exposure_epsilon": derived["epsilon"],
+            "body_exposure_semantics": derived["semantics"],
+            "n_body_optical_cells": sample.get("n_body_optical_cells"),
+            "n_detectable": sample.get("n_detectable"),
+            "aggregate_intensity": sample.get("aggregate_intensity"),
+            "vision_radius": int(sample.get("vision_radius") or sample.get("radius") or 1),
+            "radius": int(sample.get("vision_radius") or sample.get("radius") or 1),
+            "max_candidates": sample.get("max_candidates"),
+            "neighbors_optical": neighbors_compact,
+            "source_bodies_gt": src_cells,
+            "field_reception": bool(field_reception),
+            "note": (
+                "Physical optical GT for Analyzer vision forensics. "
+                "Same sample_near_field authority as Sensor Inspector. Not cognition-visible."
+            ),
+        }
+    except Exception:
+        return {
+            "available": False,
+            "reason": "vision_optical_compact_failed",
+            "identity_layer": "OBSERVER_GT_ONLY",
+        }
+
+
+def _row_for_slot(
+    tick: int,
+    index: int,
+    slot: Any,
+    *,
+    contact: bool,
+    foreign_bodies: list[tuple[Any, Any, str]] | None = None,
+    runtime_root: Any = None,
+    experimenter_slot: int | None = None,
+) -> dict[str, Any]:
     body = slot.body
     sel = {}
     cog = getattr(slot, "cognition", None)
@@ -89,11 +281,18 @@ def _row_for_slot(tick: int, index: int, slot: Any, *, contact: bool) -> dict[st
     work_alloc = getattr(slot, "last_work_allocation", None) or {}
     vx = float(getattr(body, "vx", 0.0) or 0.0)
     vy = float(getattr(body, "vy", 0.0) or 0.0)
+    ar = _compact_action_realization_for_slot(slot, contact=contact)
+    obs = getattr(slot, "last_agent_observation", None) or {}
+    field_reception = any(
+        float(obs.get(k) or 0.0) > 0.0 for k in ("local.FIELD_A", "local.FIELD_B")
+    )
+    from mechanistic_mind.ui.psy_observer_web.undercover_identity import slot_agent_body_ids
+    aid, bid = slot_agent_body_ids(index, experimenter_slot=experimenter_slot)
     return {
         "schema": SCHEMA_TICK,
         "tick": tick,
-        "agent_id": f"agent_{index}",
-        "body_id": f"body-{index}",
+        "agent_id": aid,
+        "body_id": bid,
         "action": getattr(slot, "last_selected_action", None),
         "action_source": sel.get("source"),
         "x": float(getattr(body, "x", 0.0) or 0.0),
@@ -112,7 +311,42 @@ def _row_for_slot(tick: int, index: int, slot: Any, *, contact: bool) -> dict[st
         if work_alloc
         else None,
         "agent_seed": int(getattr(slot, "seed", 0) or 0),
+        # GEO-03 compact forensic fields (Observer-only; not cognition input)
+        "action_realization": ar,
+        # GEO-04 compact work budget (Observer-only)
+        "work_ecology": _compact_work_ecology_for_slot(slot),
+        # BODY-01 compact locomotor economy (Observer-only)
+        "locomotor_economy": _compact_locomotor_for_slot(slot),
+        # VF compact optical GT (Observer/Analyzer only — not cognition input)
+        "vision_optical": _compact_vision_optical_for_slot(
+            slot, foreign_bodies=foreign_bodies, field_reception=field_reception
+        ),
+        "observer_undercover": bool(
+            experimenter_slot is not None and int(index) == int(experimenter_slot)
+        ),
     }
+
+
+def _compact_locomotor_for_slot(slot: Any) -> dict[str, Any] | None:
+    try:
+        from mechanistic_mind.ui.psy_observer_web.geometry.locomotor_economy import (
+            build_locomotor_economy_receipt,
+            compact_locomotor_economy,
+        )
+        return compact_locomotor_economy(build_locomotor_economy_receipt(slot))
+    except Exception:
+        return None
+
+
+def _compact_work_ecology_for_slot(slot: Any) -> dict[str, Any] | None:
+    try:
+        from mechanistic_mind.ui.psy_observer_web.geometry.work_ecology import (
+            build_work_budget_receipt,
+            compact_work_budget,
+        )
+        return compact_work_budget(build_work_budget_receipt(slot))
+    except Exception:
+        return None
 
 
 def event_stable_key(ev: dict[str, Any]) -> str:
