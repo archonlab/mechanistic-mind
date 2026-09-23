@@ -696,7 +696,7 @@ export function opticalTicksFromScientificRows(rows: any[]): OpticalTickTS[] {
       typeof vo.foreign_body_total === 'number'
         ? vo.foreign_body_total
         : contrib
-          ? Object.values(contrib).reduce((a, b) => a + Number(b || 0), 0)
+          ? Object.values(contrib).reduce((a: number, b) => a + Number(b || 0), 0)
           : undefined;
     const bodyExposure =
       typeof vo.body_exposure === 'boolean'

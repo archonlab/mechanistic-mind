@@ -30,7 +30,10 @@ from mechanistic_mind.ui.psy_observer_web.signal_context.intervention import (
     stable_id,
 )
 
-DEFAULT_SIGINT05 = None  # public package: pass explicit path
+_PROJECT_ROOT = Path(__file__).resolve().parents[4]
+DEFAULT_SIGINT05 = (
+    _PROJECT_ROOT / "results" / "signal_context_interpreter" / "beta2_sigint_05_20260918T110813Z"
+)
 
 HORIZON_MARKERS = (1, 2, 5, 10, 25, 50, 100)
 
@@ -39,11 +42,7 @@ def load_sigint05_level2_hits(
     sigint05_dir: Path | str | None = None,
 ) -> list[dict[str, Any]]:
     """Return the exact SIGINT-05 trials classified L2_cognition=True."""
-    if not sigint05_dir:
-        raise FileNotFoundError(
-            'SIGINT-05 fixture directory required (no bundled default in public package)'
-        )
-    root = Path(sigint05_dir)
+    root = Path(sigint05_dir) if sigint05_dir else DEFAULT_SIGINT05
     trials = json.loads((root / "matched_episode_trials.json").read_text(encoding="utf-8"))
     hits = [t for t in trials if (t.get("levels") or {}).get("L2_cognition")]
     # Attach episode payload from repertoire

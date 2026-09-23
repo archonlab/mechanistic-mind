@@ -46,13 +46,24 @@ export function NearFieldSensorPanel({
     <div className="panel science-card">
       <h3>VISION</h3>
       <div className="subtle">Physical near-field optical transduction · not semantic vision</div>
-      <div className="na">ACTIVE_SENSOR_ORIENTATION = NOT_AVAILABLE · no LOOK / TURN / GAZE</div>
+      <div className="na">
+        ACTIVE_SENSOR_ORIENTATION = {String(nf?.ACTIVE_SENSOR_ORIENTATION || physical?.orientation?.ACTIVE_SENSOR_ORIENTATION || 'NOT_AVAILABLE')}
+        {' · '}no LOOK_AT / TRACK / ATTENTION semantics
+      </div>
+      {(nf?.articulated_head_enabled || physical?.orientation?.articulated_head_enabled) ? (
+        <div className="subtle" style={{ marginTop: 4 }}>
+          body θ={Number(nf?.body_theta ?? physical?.orientation?.theta ?? 0).toFixed(3)}
+          {' · '}head_rel={Number(nf?.head_relative_angle ?? physical?.orientation?.head_relative_angle ?? 0).toFixed(3)}
+          {' · '}head_world={Number(nf?.head_world_heading ?? physical?.orientation?.head_world_heading ?? 0).toFixed(3)}
+          {' · '}neck_motor={Number(nf?.neck_motor ?? physical?.orientation?.neck_motor ?? 0).toFixed(2)}
+        </div>
+      ) : null}
 
       <div className="section-label" style={{ marginTop: 8 }}>Authority (LIVE)</div>
       {visionMech ? (
         <div className="metric" style={{ alignItems: 'center' }}>
           <span>Physical near-field vision</span>
-          <button type="button" onClick={() => onToggleMechanism?.(visionMech)}>
+          <button type="button" disabled={!onToggleMechanism} title={!onToggleMechanism ? 'Control not wired' : 'LIVE mutable'} onClick={() => onToggleMechanism?.(visionMech)}>
             {visionMech.enabled ? 'ON' : 'OFF'}
           </button>
         </div>
@@ -62,7 +73,7 @@ export function NearFieldSensorPanel({
       {illumMech ? (
         <div className="metric" style={{ alignItems: 'center' }}>
           <span>Illumination cycle</span>
-          <button type="button" onClick={() => onToggleMechanism?.(illumMech)}>
+          <button type="button" disabled={!onToggleMechanism} title={!onToggleMechanism ? 'Control not wired' : 'LIVE mutable'} onClick={() => onToggleMechanism?.(illumMech)}>
             {illumMech.enabled ? 'ON' : 'OFF'}
           </button>
         </div>
@@ -74,14 +85,14 @@ export function NearFieldSensorPanel({
             <button
               key={opt.radius}
               type="button"
-              disabled={!onSetVisionRadius}
+              disabled={!onSetVisionRadius || !visionOn}
               aria-pressed={radius === opt.radius}
               style={{
                 fontWeight: radius === opt.radius ? 700 : 400,
                 outline: radius === opt.radius ? '2px solid currentColor' : undefined,
               }}
+              title={!onSetVisionRadius ? 'Vision radius control not wired' : !visionOn ? 'Vision OFF — enable the mechanism first' : 'LIVE — Moore candidate neighborhood, not eyesight quality'}
               onClick={() => onSetVisionRadius?.(opt.radius)}
-              title="Moore candidate neighborhood — not eyesight quality / attention"
             >
               {opt.label}
             </button>
@@ -90,7 +101,7 @@ export function NearFieldSensorPanel({
       </div>
       <div className="subtle">
         R expands candidate cells only. FOV / distance / illumination filters unchanged.
-        Default R=1.
+        Default new experiment R=3 (Public Beta cap).
       </div>
       <div className="subtle">Vision OFF removes exo_* only. Illumination OFF freezes intensity.</div>
 
@@ -104,7 +115,9 @@ export function NearFieldSensorPanel({
           <KV name="Vision radius" value={`R=${radius}`} />
           <KV name="Maximum candidate cells" value={maxCand} />
           <KV name="FOV" value={`${nf.fov_deg}°`} />
-          <KV name="θ (body / sensor axis)" value={`${Number(nf.body_theta).toFixed(3)} rad`} />
+          <KV name="θ body" value={`${Number(nf.body_theta).toFixed(3)} rad`} />
+          <KV name="θ sensor (FOV)" value={`${Number(nf.sensor_forward_axis ?? nf.head_world_heading ?? nf.body_theta).toFixed(3)} rad`} />
+          <KV name="head_relative" value={nf.head_relative_angle != null ? `${Number(nf.head_relative_angle).toFixed(3)} rad` : '—'} />
           <KV name="Illumination" value={Number(nf.illumination).toFixed(4)} />
           <KV name="Illumination dynamics" value={nf.illumination_enabled === false ? 'FROZEN' : 'CYCLING'} />
           <KV name="Candidates (Moore)" value={nf.n_candidates ?? '—'} />

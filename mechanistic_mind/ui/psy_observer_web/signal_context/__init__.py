@@ -22,7 +22,9 @@ from mechanistic_mind.ui.psy_observer_web.signal_context.matched_controls import
     find_matched_controls,
 )
 from mechanistic_mind.ui.psy_observer_web.signal_context.analyze_run import (
+    analyze_signal_from_rows_events,
     analyze_signal_run,
+    compute_temporal_physical_relations,
     signal_episode_context,
 )
 from mechanistic_mind.ui.psy_observer_web.signal_context.intervention import (
@@ -39,7 +41,9 @@ __all__ = [
     "cognitive_delta",
     "coverage_status",
     "find_matched_controls",
+    "analyze_signal_from_rows_events",
     "analyze_signal_run",
+    "compute_temporal_physical_relations",
     "signal_episode_context",
     "intervention_design_doc",
     "rank_sigint01_candidates",

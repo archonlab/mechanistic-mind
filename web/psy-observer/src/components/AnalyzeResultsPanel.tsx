@@ -25,6 +25,7 @@ export type RunCatalogEntry = {
 export function AnalyzeResultsPanel({
   analysis,
   analyzing,
+  analysisProgress,
   analysisSource,
   onAnalysisSourceChange,
   savedRuns,
@@ -38,6 +39,7 @@ export function AnalyzeResultsPanel({
 }: {
   analysis: RunAnalysis | null;
   analyzing?: boolean;
+  analysisProgress?: string;
   analysisSource: AnalysisSourceMode;
   onAnalysisSourceChange: (s: AnalysisSourceMode) => void;
   savedRuns: RunCatalogEntry[];
@@ -128,7 +130,7 @@ export function AnalyzeResultsPanel({
             disabled={analyzing || (analysisSource === 'saved' && !selectedRunId)}
             onClick={onAnalyze}
           >
-            {analyzing ? 'Analyzing…' : 'Analyze'}
+            {analyzing ? (analysisProgress || 'Analyzing…') : 'Analyze'}
           </button>
         </div>
       </fieldset>
@@ -223,7 +225,29 @@ export function AnalyzeResultsPanel({
       <section className="panel science-card" key={a.agent_id}>
         <h3>{a.agent_id.toUpperCase()}</h3>
         <div className="subtle">seed {show(a.seed)} · {a.body_id} · canonical action ticks {a.ticks_observed}</div>
-        <h4>TICK-LEVEL ACTION OCCUPANCY</h4>
+        {(analysis as any).composite_motor?.authoritative ? (() => {
+          const cm = (analysis as any).composite_motor;
+          const ag = cm.agents?.[a.agent_id];
+          return (
+            <>
+              <h4>COMPOSITE MOTOR FORENSICS</h4>
+              <div className="subtle">Authoritative schema {cm.schema}. Control ≠ effector-active ticks.</div>
+              {ag ? (
+                <>
+                  <div className="metric"><span>Locomotion ticks</span><strong>{ag.locomotion_ticks}</strong></div>
+                  <div className="metric"><span>Neck-control ticks</span><strong>{ag.neck_control_ticks}</strong></div>
+                  <div className="metric"><span>Oscillator-control ticks</span><strong>{ag.oscillator_control_ticks}</strong></div>
+                  <div className="metric"><span>OSC_EMIT selections</span><strong>{ag.control_vs_effector?.OSC_EMIT_selections}</strong></div>
+                  <div className="metric"><span>Emission active ticks</span><strong>{ag.control_vs_effector?.emission_active_ticks}</strong></div>
+                  <div className="metric"><span>Push ticks</span><strong>{ag.push_ticks}</strong></div>
+                  <div className="subtle">combinations {show(ag.combinations)}</div>
+                </>
+              ) : null}
+              <h4>LEGACY PROJECTION (canonical one-label occupancy)</h4>
+            </>
+          );
+        })() : null}
+        <h4>TICK-LEVEL ACTION OCCUPANCY{(analysis as any).composite_motor?.authoritative ? ' — LEGACY PROJECTION' : ''}</h4>
         <div className="subtle">One canonical action per (simulation tick, agent). Not selection-event counts.</div>
         <div className="metric"><span>WAIT ticks</span><strong>{show(a.actions.wait_count)} ({show(a.actions.wait_pct)}%)</strong></div>
         <div className="metric"><span>MOVE ticks</span><strong>{show(a.actions.move_count)} ({show(a.actions.move_pct)}%)</strong></div>

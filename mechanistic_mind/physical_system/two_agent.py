@@ -16,6 +16,7 @@ from typing import Any
 import numpy as np
 
 from mechanistic_mind.physical_system.body_contact import resolve_soft_contact
+from mechanistic_mind.physical_system.physical_push import apply_push_through_contact
 from mechanistic_mind.physical_system.complementary_resources import simultaneous_complementary_resources
 from mechanistic_mind.physical_system.observation import audit_cognition_payload
 from mechanistic_mind.physical_system.physical_signal import (
@@ -309,9 +310,40 @@ class TwoAgentRuntime:
     def cognitive_view(self):
         return self.slots[self.selected_index].cognitive_view()
 
+    def cognitive_view_cache_stats(self) -> dict:
+        builds = hits = 0
+        for slot in self.slots:
+            st = slot.cognitive_view_cache_stats() if hasattr(slot, "cognitive_view_cache_stats") else {}
+            builds += int(st.get("builds") or 0)
+            hits += int(st.get("hits") or 0)
+        return {"builds": builds, "hits": hits, "agents": len(self.slots)}
+
+    def reset_cognitive_view_cache_stats(self) -> None:
+        for slot in self.slots:
+            if hasattr(slot, "reset_cognitive_view_cache_stats"):
+                slot.reset_cognitive_view_cache_stats()
+
     def mechanisms(self):
         """Mechanism snapshot. Flags are kept identical across slots (see set_mechanism)."""
         return self.slots[0].mechanisms()
+
+    def set_psc_motor_resolution(self, mode: str) -> dict[str, Any]:
+        """Apply motor-resolution mode to all agent slots (no resets)."""
+        results = []
+        for slot in self.slots:
+            results.append(slot.set_psc_motor_resolution(mode))
+        # Keep shared config view aligned with slot 0
+        if self.slots:
+            self.config = self.slots[0].config
+        return {
+            "accepted": all(r.get("accepted") for r in results),
+            "agents": results,
+            "psc_motor_resolution": (results[0].get("new") if results else mode),
+            "history_reset": False,
+            "cognition_reset": False,
+            "smc_reset": False,
+            "body_reset": False,
+        }
 
     def set_mechanism(self, mechanism_id: str, enabled: bool) -> dict[str, Any]:
         """Apply experiment toggles to every agent slot.
@@ -414,9 +446,10 @@ class TwoAgentRuntime:
             st = self._agent_stats[i]
             st["ticks"] = int(st.get("ticks") or 0) + 1
             act = rt.last_selected_action
-            if act:
+            if act is not None:
                 counts = st.setdefault("action_counts", {})
-                counts[act] = int(counts.get(act) or 0) + 1
+                key = str(act)
+                counts[key] = int(counts.get(key) or 0) + 1
                 if act == "WAIT":
                     st["wait_count"] = int(st.get("wait_count") or 0) + 1
                 elif str(act).startswith("MOVE"):
@@ -473,12 +506,45 @@ class TwoAgentRuntime:
                     height=h,
                     enabled=self.contact_enabled,
                 )
+                push_receipt = apply_push_through_contact(
+                    self.slots[ia].body,
+                    self.slots[ib].body,
+                    self.slots[ia].config.body,
+                    self.slots[ib].config.body,
+                    contact=bool(receipt and receipt.get("contact")),
+                    push_cfg=self.slots[ia].config.physical_push,
+                    width=w,
+                    height=h,
+                )
                 if receipt is not None:
+                    receipt["push"] = push_receipt
                     receipt.setdefault("contact_entity_a_kind", "BODY")
                     receipt.setdefault("contact_entity_a_id", f"body-{ia}")
                     receipt.setdefault("contact_entity_b_kind", "BODY")
                     receipt.setdefault("contact_entity_b_id", f"body-{ib}")
                     receipt["pair"] = (ia, ib)
+                if push_receipt.get("push_applied"):
+                    for slot_i in (ia, ib):
+                        self.slots[slot_i].last_push_meta = push_receipt
+                        self.slots[slot_i].structured_events.emit(
+                            "PUSH_FORCE_APPLIED",
+                            tick=int(self.tick),
+                            evidence={
+                                "pair": [ia, ib],
+                                "pusher": push_receipt.get("pusher"),
+                                "causally_linked": True,
+                                "impulse_a": push_receipt.get("impulse_a"),
+                                "impulse_b": push_receipt.get("impulse_b"),
+                                "semantics": push_receipt.get("semantics"),
+                            },
+                        )
+                elif push_receipt.get("push_without_contact"):
+                    for slot_i in (ia, ib):
+                        self.slots[slot_i].structured_events.emit(
+                            "PUSH_NO_CONTACT",
+                            tick=int(self.tick),
+                            evidence={"pair": [ia, ib], "force_transferred": False},
+                        )
                 self.last_contacts.append(receipt)
         # Preserve last_contact as agent_0↔agent_1 (or first overlapping pair).
         self.last_contact = None
@@ -523,6 +589,30 @@ class TwoAgentRuntime:
             self._emit_signal_events()
         else:
             self.last_signal_receipt = None
+        # Oscillatory banded signaling (Option B) — shared world, all bodies.
+        osc_cfg = getattr(self.slots[0].config, "oscillatory_signaling", None)
+        if osc_cfg is not None and osc_cfg.enabled:
+            from mechanistic_mind.physical_system.oscillatory_signaling import (
+                ensure_osc_fields,
+                step_oscillatory_signaling,
+            )
+            ensure_osc_fields(self.world, osc_cfg)
+            head_on = bool(getattr(self.slots[0].config.articulated_head, "enabled", False))
+            osc_meta = step_oscillatory_signaling(
+                self.world,
+                bodies,
+                osc_cfg,
+                tick=int(self.tick),
+                articulated_head=head_on,
+                body_ids=[f"agent_{i}" for i in range(n)],
+                slots=list(range(n)),
+            )
+            self.last_osc_meta = osc_meta
+            for rt in self.slots:
+                rt.last_osc_meta = osc_meta
+                rt.world = self.world
+        else:
+            self.last_osc_meta = {"enabled": False}
         for rt in self.slots:
             rt.world = self.world
         self._record_stats_after_tick()
@@ -687,10 +777,10 @@ class TwoAgentRuntime:
                     evidence=evidence,
                 )
 
-    def snapshot(self) -> dict[str, Any]:
+    def snapshot(self, *, persist: bool = False) -> dict[str, Any]:
         agents = []
         for i, slot in enumerate(self.slots):
-            snap = slot.snapshot()
+            snap = slot.snapshot(persist=persist)
             if i > 0:
                 snap.pop("world", None)
             agents.append(snap)
@@ -702,7 +792,12 @@ class TwoAgentRuntime:
             "seed": self.seed,
             "independent_agent_seeds": self.independent_agent_seeds,
             "agent_seeds": [s.seed for s in self.slots],
-            "starts": [list(self.starts[0]), list(self.starts[1])],
+            "starts": [
+                list(self.starts[i]) if i < len(self.starts) else (
+                    list(self.starts[0]) if self.starts else [0, 0]
+                )
+                for i in range(max(2, len(self.starts)))
+            ],
             "contact_enabled": self.contact_enabled,
             "field_coupling_enabled": self.field_coupling_enabled,
             "signal_enabled": self.signal_enabled,

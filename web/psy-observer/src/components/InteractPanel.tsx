@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import {
   experimenterCapture,
   experimenterCommand,
@@ -10,6 +10,8 @@ import {
   experimenterTestCapture,
   listSignalSpecimens,
 } from '../api/client';
+import { InspectorAccordion } from '../inspectors/primitives';
+import { cameraFollowStore } from '../observer/stores';
 
 type ExpState = {
   status?: string;
@@ -31,17 +33,23 @@ export function InteractPanel({
   onRefresh,
   /** Display-only: last key from global App-shell listener (no second handler here). */
   globalPressed,
+  layoutTab,
 }: {
   live?: ExpState | null;
   onRefresh?: () => void;
   globalPressed?: string | null;
+  layoutTab?: string;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [specimens, setSpecimens] = useState<Array<Record<string, unknown>>>([]);
   const [selectedSpecimen, setSelectedSpecimen] = useState<string>('');
   const [testResult, setTestResult] = useState<Record<string, unknown> | null>(null);
-  const [cameraFollow, setCameraFollow] = useState<'FREE' | 'YOU' | 'TARGET'>('FREE');
+  const cameraFollow = useSyncExternalStore(
+    cameraFollowStore.subscribe,
+    cameraFollowStore.get,
+    cameraFollowStore.get,
+  );
 
   const st = live || {};
   const active = st.status === 'CONTROL_ACTIVE';
@@ -73,10 +81,16 @@ export function InteractPanel({
     setMsg(null);
     try {
       const out = await experimenterSpawn(near != null ? { near_agent: near } : {});
-      setMsg(out.accepted ? 'SPAWNED · INTERVENTION ACTIVE' : String(out.error));
+      if (out.accepted) {
+        setMsg('SPAWNED · INTERVENTION ACTIVE');
+      } else {
+        const err = String(out.error || 'SPAWN_REJECTED:UNKNOWN');
+        const detail = out.detail ? ` · ${out.detail}` : '';
+        setMsg(err.startsWith('SPAWN_REJECTED') ? `${err}${detail}` : `SPAWN_REJECTED:${err}${detail}`);
+      }
       onRefresh?.();
     } catch (e) {
-      setMsg(String(e));
+      setMsg(`SPAWN_REJECTED:RUNTIME_UNAVAILABLE · ${String(e)}`);
     } finally {
       setBusy(null);
     }
@@ -150,9 +164,12 @@ export function InteractPanel({
 
   const realized = st.last_realized || {};
   const events = st.recent_events || [];
+  const show = (id: string) => !layoutTab || layoutTab === id;
+  const spawnWhy = active ? 'Already in world — Remove first' : undefined;
+  const moveWhy = !active ? 'Spawn controlled Tiktaalik first' : undefined;
 
   return (
-    <div className="panel interact-lab" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="interact-lab" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div className="metric">
         <span>INTERACTION LAB</span>
         <strong>EXPERIMENTER-CONTROLLED TIKTAALIK</strong>
@@ -172,189 +189,167 @@ export function InteractPanel({
         <span>Status</span>
         <strong>{st.status || 'NOT_SPAWNED'}</strong>
       </div>
+      {msg ? <div className={String(msg).includes('REJECTED') ? 'bad' : 'subtle'}>{msg}</div> : null}
 
-      <div className="toolbar-row" style={{ gap: 8, flexWrap: 'wrap' }}>
-        <button className="active" disabled={!!busy || active} onClick={() => spawn()}>
-          SPAWN CONTROLLED TIKTAALIK
-        </button>
-        <button disabled={!!busy || active} onClick={() => spawn(1)}>SPAWN NEAR AGENT_1</button>
-        <button disabled={!!busy || !active} onClick={remove}>REMOVE</button>
-      </div>
-
-      <div className="panel" style={{ padding: 8 }}>
-        <div className="metric"><span>CONTROLLED BODY</span><strong>{st.body_id || '—'}</strong></div>
-        <div className="metric"><span>REQUESTED</span><strong>{st.last_requested || globalPressed || '—'}</strong></div>
-        <div className="metric">
-          <span>REALIZED</span>
-          <strong>
-            x={fmt(realized.x)} y={fmt(realized.y)} · spd={fmt(realized.speed)} · θ={fmt(realized.theta)}
-          </strong>
-        </div>
-        <div className="metric"><span>QUEUE</span><strong>{st.queue_len ?? 0}</strong></div>
-      </div>
-
-      <div className="panel" style={{ padding: 8 }}>
-        <div className="metric"><span>EXPERIMENTER MOBILITY</span><strong>{st.mobility_mode || 'ORDINARY_WORK'}</strong></div>
-        <div className="subtle">
-          RESEARCH MOBILITY = external work supply before ordinary allocation.
-          Not eating. Ordinary action → physics path preserved. No teleport/noclip.
-        </div>
-        <div className="toolbar-row" style={{ gap: 8, flexWrap: 'wrap' }}>
-          <button
-            className={(st.mobility_mode || 'ORDINARY_WORK') === 'ORDINARY_WORK' ? 'active' : ''}
-            disabled={!active || !!busy}
-            onClick={async () => {
-              await experimenterSetMobility('ORDINARY_WORK');
-              onRefresh?.();
-            }}
-          >
-            ORDINARY WORK
-          </button>
-          <button
-            className={st.mobility_mode === 'RESEARCH_MOBILITY' ? 'active' : ''}
-            disabled={!active || !!busy}
-            onClick={async () => {
-              await experimenterSetMobility('RESEARCH_MOBILITY');
-              onRefresh?.();
-            }}
-          >
-            RESEARCH MOBILITY
-          </button>
-        </div>
-        {st.mobility_mode === 'RESEARCH_MOBILITY' && (
-          <div className="subtle">
-            WORK SOURCE · EXPERIMENTER_RESEARCH_SUPPLY
-            {st.research_supply && typeof st.research_supply.credited === 'number'
-              ? ` · last +${Number(st.research_supply.credited).toFixed(3)}`
-              : ''}
+      {show('agent') && (
+        <InspectorAccordion id="exp-spawn" title="Spawn" defaultOpen>
+          <div className="toolbar-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <button className="active" disabled={!!busy || active} title={spawnWhy} onClick={() => spawn()}>
+              SPAWN CONTROLLED TIKTAALIK
+            </button>
+            <button disabled={!!busy || active} title={spawnWhy} onClick={() => spawn(0)}>SPAWN NEAR AGENT_0</button>
+            <button disabled={!!busy || active} title={spawnWhy} onClick={() => spawn(1)}>SPAWN NEAR AGENT_1</button>
+            <button disabled={!!busy || !active} title={!active ? 'Nothing to remove' : undefined} onClick={remove}>REMOVE</button>
           </div>
-        )}
-      </div>
-
-      <div className="subtle">
-        Keyboard is global (any Observer tab) while CONTROL ACTIVE:
-        W/A/S/D move · Space WAIT · Q FIELD_A · E FIELD_B —
-        requests only; physics realizes. Key-repeat suppressed. Typing fields ignored.
-      </div>
-
-      <div className="toolbar-row" style={{ gap: 6, flexWrap: 'wrap' }}>
-        {(['MOVE:N', 'MOVE:S', 'MOVE:W', 'MOVE:E', 'WAIT'] as const).map(a => (
-          <button key={a} disabled={!active} onClick={() => sendCmd('ACTION', a)}>{a}</button>
-        ))}
-        <button disabled={!active} onClick={() => sendCmd('FIELD_A')}>FIELD_A</button>
-        <button disabled={!active} onClick={() => sendCmd('FIELD_B')}>FIELD_B</button>
-      </div>
-
-      <div className="panel" style={{ padding: 8 }}>
-        <div className="metric"><span>SIGNAL LIBRARY</span><strong>NATURAL SPECIMEN REPLAY</strong></div>
-        <div className="toolbar-row" style={{ gap: 8 }}>
-          <select
-            value={selectedSpecimen}
-            onChange={e => setSelectedSpecimen(e.target.value)}
-            style={{ minWidth: 180 }}
-          >
-            <option value="">— select specimen —</option>
-            {specimens.map(s => (
-              <option key={String(s.specimen_id)} value={String(s.specimen_id)}>
-                {String(s.specimen_id)} · {String(s.channel || '?')}
-              </option>
-            ))}
-          </select>
-          <button disabled={!active || !selectedSpecimen || !!busy} onClick={replaySpecimen}>
-            REPLAY FROM BODY
-          </button>
-          <button onClick={refreshSpecimens}>↻</button>
-        </div>
-        <div className="subtle">No semantic labels. Physical footprint replay only.</div>
-      </div>
-
-      <div className="panel" style={{ padding: 8 }}>
-        <div className="metric"><span>INTERACTION TARGET</span><strong>Observer-only</strong></div>
-        <div className="toolbar-row" style={{ gap: 8 }}>
-          <button onClick={() => experimenterSetTarget('agent_0').then(onRefresh)}>agent_0</button>
-          <button onClick={() => experimenterSetTarget('agent_1').then(onRefresh)}>agent_1</button>
-          <button onClick={() => experimenterSetTarget(null).then(onRefresh)}>clear</button>
-        </div>
-        {st.target && (
-          <div className="subtle">
-            {String(st.target.agent_id)} · dist={fmt(st.target.distance)} ·
-            action={String(st.target.action)} · src={String(st.target.selection_source)} ·
-            FIELD_A={fmt(st.target.field_A)} FIELD_B={fmt(st.target.field_B)}
-          </div>
-        )}
-      </div>
-
-      <div className="panel" style={{ padding: 8 }}>
-        <div className="metric"><span>AUTONOMOUS RESPONSE</span><strong>observational only</strong></div>
-        {st.target ? (
-          <div className="subtle">
-            CURRENT selection_source={String(st.target.selection_source)} ·
-            requested_action={String(st.target.action)}
-            {' · '}COGNITIVE STATE CHANGE: mark only after matched baseline (OBSERVATIONAL ONLY here)
-          </div>
-        ) : (
-          <div className="subtle">Select an autonomous agent to compare local FIELD / selection / action.</div>
-        )}
-      </div>
-
-      <div className="panel" style={{ padding: 8, maxHeight: 160, overflow: 'auto' }}>
-        <div className="metric"><span>LIVE EVENT STRIP</span><strong>mechanistic</strong></div>
-        {events.length === 0 && <div className="subtle">No events yet.</div>}
-        {events.slice().reverse().map((ev, i) => (
-          <div key={i} className="subtle">
-            t{String(ev.tick)} · {String(ev.event_type)}
-            {ev.action ? ` ${ev.action}` : ''}
-            {ev.channel ? ` FIELD_${ev.channel}` : ''}
-            {ev.with_body ? ` ${ev.with_body}` : ''}
-          </div>
-        ))}
-      </div>
-
-      <div className="toolbar-row" style={{ gap: 8, flexWrap: 'wrap' }}>
-        <button className="active" disabled={!!busy} onClick={capture}>CAPTURE INTERACTION</button>
-        <button disabled={!!busy} onClick={testLast}>TEST THIS INTERACTION</button>
-      </div>
-      <div className="subtle">
-        CAPTURE → EXPLORATORY_HUMAN_INTERACTION · TEST → matched CONTROL / BODY_ONLY / FIELD_ONLY /
-        BODY_PLUS_FIELD / SHAM · verdict SOURCE_CONTEXT_DEPENDENCE (not recognition).
-      </div>
-
-      {(st.captures || []).length > 0 && (
-        <div className="subtle">
-          Captures: {(st.captures || []).map(c => c.capture_id).join(', ')}
-        </div>
-      )}
-
-      {testResult && (
-        <div className="panel" style={{ padding: 8 }}>
+          <div className="metric"><span>CONTROLLED BODY</span><strong>{st.body_id || '—'}</strong></div>
+          <div className="metric"><span>REQUESTED</span><strong>{st.last_requested || globalPressed || '—'}</strong></div>
           <div className="metric">
-            <span>MATCHED TEST</span>
-            <strong>{String((testResult.factorial as any)?.SOURCE_CONTEXT_DEPENDENCE || '—')}</strong>
+            <span>REALIZED</span>
+            <strong>
+              x={fmt(realized.x)} y={fmt(realized.y)} · spd={fmt(realized.speed)} · θ={fmt(realized.theta)}
+            </strong>
           </div>
-          <pre style={{ fontSize: 11, maxHeight: 120, overflow: 'auto' }}>
-            {JSON.stringify(
-              testResult.fingerprint
-                || (testResult.factorial as Record<string, unknown> | undefined)?.arms
-                || testResult,
-              null,
-              2,
-            )}
-          </pre>
-        </div>
+          <div className="metric"><span>QUEUE</span><strong>{st.queue_len ?? 0}</strong></div>
+          <div className="metric"><span>EXPERIMENTER MOBILITY</span><strong>{st.mobility_mode || 'ORDINARY_WORK'}</strong></div>
+          <div className="subtle">
+            RESEARCH MOBILITY = external work supply before ordinary allocation.
+            Not eating. Ordinary action → physics path preserved. No teleport/noclip.
+          </div>
+          <div className="toolbar-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <button
+              className={(st.mobility_mode || 'ORDINARY_WORK') === 'ORDINARY_WORK' ? 'active' : ''}
+              disabled={!active || !!busy}
+              title={moveWhy}
+              onClick={async () => {
+                await experimenterSetMobility('ORDINARY_WORK');
+                onRefresh?.();
+              }}
+            >
+              ORDINARY WORK
+            </button>
+            <button
+              className={st.mobility_mode === 'RESEARCH_MOBILITY' ? 'active' : ''}
+              disabled={!active || !!busy}
+              title={moveWhy}
+              onClick={async () => {
+                await experimenterSetMobility('RESEARCH_MOBILITY');
+                onRefresh?.();
+              }}
+            >
+              RESEARCH MOBILITY
+            </button>
+          </div>
+        </InspectorAccordion>
       )}
 
-      <div className="toolbar-row" style={{ gap: 8 }}>
-        <span className="subtle">Camera (Observer-only):</span>
-        {(['FREE', 'YOU', 'TARGET'] as const).map(c => (
-          <button key={c} className={cameraFollow === c ? 'active' : ''} onClick={() => setCameraFollow(c)}>
-            {c === 'YOU' ? 'FOLLOW CONTROLLED' : c === 'TARGET' ? 'FOLLOW TARGET' : 'FREE'}
-          </button>
-        ))}
-      </div>
-      {/* cameraFollow is UI preference; map follow wiring is Observer-local */}
-      <input type="hidden" value={cameraFollow} readOnly />
+      {show('movement') && (
+        <InspectorAccordion id="exp-move" title="Manual control" defaultOpen>
+          <div className="subtle">
+            Keyboard is global while CONTROL ACTIVE: W/A/S/D move · Space WAIT · Q FIELD_A · E FIELD_B.
+            Requests only; physics realizes.
+          </div>
+          <div className="toolbar-row" style={{ gap: 6, flexWrap: 'wrap' }}>
+            {(['MOVE:N', 'MOVE:S', 'MOVE:W', 'MOVE:E', 'WAIT'] as const).map(a => (
+              <button key={a} disabled={!active} title={moveWhy} onClick={() => sendCmd('ACTION', a)}>{a}</button>
+            ))}
+          </div>
+        </InspectorAccordion>
+      )}
 
-      {msg && <div className="control-receipt">{msg}</div>}
+      {show('fields') && (
+        <InspectorAccordion id="exp-fields" title="Fields / specimen replay" defaultOpen>
+          <div className="toolbar-row" style={{ gap: 6, flexWrap: 'wrap' }}>
+            <button disabled={!active} title={moveWhy} onClick={() => sendCmd('FIELD_A')}>FIELD_A</button>
+            <button disabled={!active} title={moveWhy} onClick={() => sendCmd('FIELD_B')}>FIELD_B</button>
+          </div>
+          <div className="metric"><span>SIGNAL LIBRARY</span><strong>NATURAL SPECIMEN REPLAY</strong></div>
+          <div className="toolbar-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <select
+              value={selectedSpecimen}
+              onChange={e => setSelectedSpecimen(e.target.value)}
+              style={{ minWidth: 0, flex: '1 1 160px' }}
+            >
+              <option value="">— select specimen —</option>
+              {specimens.map(s => (
+                <option key={String(s.specimen_id)} value={String(s.specimen_id)}>
+                  {String(s.specimen_id)} · {String(s.channel || '?')}
+                </option>
+              ))}
+            </select>
+            <button disabled={!active || !selectedSpecimen || !!busy} title={moveWhy} onClick={replaySpecimen}>
+              REPLAY FROM BODY
+            </button>
+            <button onClick={refreshSpecimens}>↻</button>
+          </div>
+          <div className="subtle">No semantic labels. Physical footprint replay only.</div>
+        </InspectorAccordion>
+      )}
+
+      {show('interaction') && (
+        <InspectorAccordion id="exp-interact" title="Interaction" defaultOpen>
+          <div className="metric"><span>INTERACTION TARGET</span><strong>Observer-only</strong></div>
+          <div className="toolbar-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <button onClick={() => experimenterSetTarget('agent_0').then(onRefresh)}>agent_0</button>
+            <button onClick={() => experimenterSetTarget('agent_1').then(onRefresh)}>agent_1</button>
+            <button onClick={() => experimenterSetTarget(null).then(onRefresh)}>clear</button>
+          </div>
+          {st.target && (
+            <div className="subtle">
+              {String(st.target.agent_id)} · dist={fmt(st.target.distance)} ·
+              action={String(st.target.action)} · src={String(st.target.selection_source)}
+            </div>
+          )}
+          <div className="toolbar-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <button className="active" disabled={!!busy} onClick={capture}>CAPTURE INTERACTION</button>
+            <button disabled={!!busy} onClick={testLast}>TEST THIS INTERACTION</button>
+          </div>
+          {(st.captures || []).length > 0 && (
+            <div className="subtle">
+              Captures: {(st.captures || []).map(c => c.capture_id).join(', ')}
+            </div>
+          )}
+          {testResult && (
+            <div>
+              <div className="metric">
+                <span>MATCHED TEST</span>
+                <strong>{String((testResult.factorial as any)?.SOURCE_CONTEXT_DEPENDENCE || '—')}</strong>
+              </div>
+              <pre className="insp-pre">
+                {JSON.stringify(
+                  testResult.fingerprint
+                    || (testResult.factorial as Record<string, unknown> | undefined)?.arms
+                    || testResult,
+                  null,
+                  2,
+                )}
+              </pre>
+            </div>
+          )}
+          <div className="metric"><span>LIVE EVENT STRIP</span><strong>mechanistic</strong></div>
+          {events.length === 0 && <div className="subtle">No events yet.</div>}
+          {events.slice().reverse().map((ev, i) => (
+            <div key={i} className="subtle">
+              t{String(ev.tick)} · {String(ev.event_type)}
+              {ev.action ? ` ${ev.action}` : ''}
+              {ev.channel ? ` FIELD_${ev.channel}` : ''}
+              {ev.with_body ? ` ${ev.with_body}` : ''}
+            </div>
+          ))}
+        </InspectorAccordion>
+      )}
+
+      {show('camera') && (
+        <InspectorAccordion id="exp-camera" title="Camera" defaultOpen>
+          <div className="subtle">Observer-only view. Does not change organism physics.</div>
+          <div className="toolbar-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            {(['FREE', 'YOU', 'TARGET'] as const).map(c => (
+              <button key={c} className={cameraFollow === c ? 'active' : ''} onClick={() => cameraFollowStore.set(c)}>
+                {c === 'YOU' ? 'FOLLOW CONTROLLED' : c === 'TARGET' ? 'FOLLOW TARGET' : 'FREE'}
+              </button>
+            ))}
+          </div>
+        </InspectorAccordion>
+      )}
     </div>
   );
 }

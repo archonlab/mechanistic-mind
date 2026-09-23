@@ -35,10 +35,28 @@ class ControlBody(BaseModel):
 class StopBody(BaseModel):
     save: bool = False
     reason: str | None = None
+    wait: bool = True
 
 
 class SpeedBody(BaseModel):
     speed: float = 1.0
+
+
+class ExecutionModeBody(BaseModel):
+    mode: str = "LIVE"
+    target_tick: int | None = None
+
+
+class EvidenceModeBody(BaseModel):
+    mode: str = "FULL_SCIENTIFIC"
+
+
+class ObserverHzBody(BaseModel):
+    hz: float = 10.0
+
+
+class TargetTickBody(BaseModel):
+    target_tick: int | None = None
 
 
 class SelectAgentBody(BaseModel):
@@ -69,11 +87,13 @@ class ExperimentBody(BaseModel):
     ecology_preset: str | None = None
     # Matched-control override when terrain is enabled by ecology preset (Advanced / Raw).
     terrain_seed: int | None = None
+    public_preset: str | None = None
+    psc_motor_resolution: str | None = None
 
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    from mechanistic_mind.model.tiktaalik import display_name, model_metadata, release_display_name
+    from mechanistic_mind.model.tiktaalik import display_name, model_metadata
 
     session = get_session()
     meta = session.runtime.model_identity() if hasattr(session.runtime, "model_identity") else model_metadata()
@@ -81,7 +101,6 @@ def health() -> dict[str, Any]:
         "ok": True,
         "app": "Psy Observer",
         "model": display_name(),
-        "release": release_display_name(),
         "model_metadata": meta,
         "version": __version__,
         "runtime": "TwoAgentRuntime" if getattr(session.runtime, "slots", None) else "PhysicalSystemRuntime",
@@ -195,12 +214,26 @@ def control_pause() -> dict[str, Any]:
 def control_stop(body: StopBody | None = None) -> dict[str, Any]:
     save = bool(body.save) if body is not None else False
     reason = body.reason if body is not None else None
-    return get_session().stop(save=save, reason=reason)
+    wait = True if body is None else bool(body.wait)
+    return get_session().stop(save=save, reason=reason, wait=wait)
 
 
 @app.get("/api/control/stop-info")
 def control_stop_info() -> dict[str, Any]:
     return get_session().stop_info()
+
+
+@app.get("/api/control/save-job")
+def control_save_job() -> dict[str, Any]:
+    """Poll Save & Stop layers without waiting on snapshot I/O."""
+    sess = get_session()
+    job = sess.save_job_status()
+    job["header"] = {
+        "status": sess.status,
+        "tick": int(sess.runtime.tick),
+        "runtime_generation": int(sess._runtime_generation),
+    }
+    return job
 
 
 @app.post("/api/control/finalize")
@@ -237,6 +270,26 @@ def control_reset(seed: int | None = None) -> dict[str, Any]:
 @app.post("/api/control/speed")
 def control_speed(body: SpeedBody) -> dict[str, Any]:
     return get_session().set_speed(body.speed)
+
+
+@app.post("/api/control/execution-mode")
+def control_execution_mode(body: ExecutionModeBody) -> dict[str, Any]:
+    return get_session().set_execution_mode(body.mode, target_tick=body.target_tick)
+
+
+@app.post("/api/control/evidence-mode")
+def control_evidence_mode(body: EvidenceModeBody) -> dict[str, Any]:
+    return get_session().set_evidence_mode(body.mode)
+
+
+@app.post("/api/control/observer-hz")
+def control_observer_hz(body: ObserverHzBody) -> dict[str, Any]:
+    return get_session().set_observer_hz(body.hz)
+
+
+@app.post("/api/control/target-tick")
+def control_target_tick(body: TargetTickBody) -> dict[str, Any]:
+    return get_session().set_target_tick(body.target_tick)
 
 
 @app.post("/api/control/select-agent")
@@ -437,23 +490,77 @@ def diagnostics_gearbox() -> dict[str, Any]:
 
 
 @app.get("/api/mechanisms")
-def get_mechanisms() -> dict[str, Any]:
-    """CURRENT INTEGRATED MM mechanism registry + live toggles."""
+def get_mechanisms(include_catalog: bool = True) -> dict[str, Any]:
+    """CURRENT INTEGRATED MM mechanism registry + live toggles + integrity.
+
+    include_catalog=false → WARM enabled flags only (no COLD catalog/descriptions).
+    """
+    sess = get_session()
+    if not include_catalog and hasattr(sess, "mechanisms_warm_state"):
+        return sess.mechanisms_warm_state()
     from mechanistic_mind.physical_system.mechanism_registry import RUNTIME_VERSION
     from mechanistic_mind.physical_system.structured_events import EVENT_SCHEMA
-    rt = getattr(get_session(), "runtime", None)
+    from mechanistic_mind.physical_system.mechanism_configuration import (
+        fresh_experiment_default_map,
+        mechanism_catalog,
+        NEW_EXPERIMENT_VISION_RADIUS,
+    )
+    rt = getattr(sess, "runtime", None)
     if rt is None:
         return {"error": "no runtime", "model": RUNTIME_VERSION}
     snap = rt.mechanisms()
+    integrity = sess.mechanism_integrity_status()
     return {
         "model": "MM 1.0 — Tiktaalik",
         "runtime_version": snap.get("runtime_version"),
+        "catalog_included": True,
+        "runtime_generation": int(getattr(sess, "_runtime_generation", 0) or 0),
         "mechanisms": snap.get("mechanisms"),
         "enabled": snap.get("enabled"),
         "disabled": snap.get("disabled"),
         "force_contributions": getattr(rt, "last_force_contributions", None),
         "events_schema": EVENT_SCHEMA,
+        "mechanism_integrity": integrity,
+        "preflight": integrity.get("preflight"),
+        "fresh_defaults": fresh_experiment_default_map(),
+        "fresh_vision_radius": NEW_EXPERIMENT_VISION_RADIUS,
+        "catalog": mechanism_catalog(),
+        "psc_motor_resolution": (
+            str(getattr(getattr(getattr(rt, "config", None), "cognition", None), "psc_motor_resolution", None) or "LOCO_FACTORIZED")
+        ),
     }
+
+
+@app.get("/api/mechanisms/state")
+def get_mechanisms_state() -> dict[str, Any]:
+    """WARM mechanism enabled flags — safe to poll while RUNNING."""
+    return get_session().mechanisms_warm_state()
+
+
+@app.get("/api/mechanisms/defaults")
+def get_mechanism_defaults() -> dict[str, Any]:
+    from mechanistic_mind.physical_system.mechanism_configuration import (
+        fresh_experiment_default_map,
+        mechanism_catalog,
+        NEW_EXPERIMENT_VISION_RADIUS,
+        RESOLVED_CONFIG_VERSION,
+    )
+    return {
+        "resolved_config_version": RESOLVED_CONFIG_VERSION,
+        "mechanisms": fresh_experiment_default_map(),
+        "vision_radius": NEW_EXPERIMENT_VISION_RADIUS,
+        "catalog": mechanism_catalog(),
+    }
+
+
+@app.get("/api/mechanisms/preflight")
+def get_mechanism_preflight() -> dict[str, Any]:
+    return get_session().mechanism_integrity_status()
+
+
+class PscMotorResolutionBody(BaseModel):
+    mode: str | None = None
+    psc_motor_resolution: str | None = None
 
 
 class MechanismToggleBody(BaseModel):
@@ -522,31 +629,48 @@ def integrated_gearbox() -> dict[str, Any]:
 
 @app.get("/api/results/packs")
 def result_packs() -> dict[str, Any]:
+    """Catalog of mm_* result packs — lightweight (no full directory listing).
+
+    LIVE RUNNING refreshAux used to call this every ~1.5s and pay
+    ``len(list(p.iterdir()))`` per pack — O(files on disk) Observer-side cost that
+    grows with research output and can starve the UI while the sim still runs.
+    """
     import json
+    import time as _time
+
     root = Path(__file__).resolve().parents[3]
+    cache = getattr(result_packs, "_cache", None)
+    now = _time.monotonic()
+    if isinstance(cache, dict) and (now - float(cache.get("t", 0))) < 5.0:
+        return cache["payload"]
     out = []
-    for p in sorted((root / "results").glob("mm_*")):
-        if not p.is_dir():
-            continue
-        promotion = p / "PROMOTION.json"
-        promoted = None
-        if promotion.exists():
-            try:
-                promoted = bool(json.loads(promotion.read_text()).get("promote"))
-            except Exception:
-                promoted = None
-        out.append({
-            "id": p.name,
-            "has_final_report": (p / "FINAL_REPORT.md").exists(),
-            "has_promotion": promotion.exists(),
-            "promoted": promoted,
-            "files": len(list(p.iterdir())),
-        })
-    return {
+    results_root = root / "results"
+    if results_root.is_dir():
+        for p in sorted(results_root.glob("mm_*")):
+            if not p.is_dir():
+                continue
+            promotion = p / "PROMOTION.json"
+            promoted = None
+            if promotion.exists():
+                try:
+                    promoted = bool(json.loads(promotion.read_text()).get("promote"))
+                except Exception:
+                    promoted = None
+            out.append({
+                "id": p.name,
+                "has_final_report": (p / "FINAL_REPORT.md").exists(),
+                "has_promotion": promotion.exists(),
+                "promoted": promoted,
+                # Do not scan pack directories — was a LIVE-path disk tax.
+                "files": None,
+            })
+    payload = {
         "status": "CATALOG_ONLY",
         "analyzer": "NOT_AVAILABLE",
         "packs": out,
     }
+    result_packs._cache = {"t": now, "payload": payload}  # type: ignore[attr-defined]
+    return payload
 
 
 @app.get("/api/results/packs/{pack_id}")
@@ -664,27 +788,6 @@ def analysis_evidence(
         except Exception:
             pass
 
-    ui_timeline = []
-    st = run_dir / "session_timeline.jsonl"
-    if st.is_file():
-        for line in st.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                ui_timeline.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-
-    ui_events = []
-    se = run_dir / "structured_events.json"
-    if se.is_file():
-        try:
-            payload = json.loads(se.read_text(encoding="utf-8"))
-            ui_events = list(payload.get("events") or [])
-        except Exception:
-            pass
-
     cut = cutoff_tick
     if cut is None and manifest.get("final_tick") is not None:
         cut = int(manifest["final_tick"])
@@ -692,21 +795,178 @@ def analysis_evidence(
     pkg = load_evidence_package(
         evidence_dir=run_dir,
         runtime=None,
-        ui_timeline=ui_timeline,
-        ui_events=ui_events,
+        ui_timeline=[],
+        ui_events=[],
         cutoff_tick=cut,
         runtime_status="STOPPED",
         run_id=rid,
         identity=identity,
+        include_bulk_rows=False,
+        include_behavioral=False,
+        include_v3_core=False,
     )
     pkg["source"] = "saved"
     pkg["run_dir"] = str(run_dir)
+    return pkg
+
+
+_ANALYSIS_JOBS: dict[str, dict[str, Any]] = {}
+
+
+def _analysis_jobs_root() -> Path:
+    from mechanistic_mind.ui.psy_observer_web.run_finalize import default_results_root
+    sess = get_session()
+    root = Path(sess.config.results_root) if getattr(sess.config, "results_root", None) else default_results_root()
+    return Path(root) / "analysis_jobs"
+
+
+@app.post("/api/analysis/jobs")
+def analysis_job_start(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Start heavy analysis in a subprocess. Does not mutate the source run."""
+    import subprocess
+    import sys
+    import uuid
+    from datetime import datetime, timezone
+
+    from mechanistic_mind.ui.psy_observer_web.scientific_history import published_run_dir
+    from mechanistic_mind.ui.psy_observer_web.run_finalize import default_results_root
+
+    body = payload or {}
+    source = str(body.get("source") or "current").lower()
+    sess = get_session()
+    run_dir: Path | None = None
+    rid = str(body.get("run_id") or "").strip()
+    if source == "current":
+        with sess._lock:
+            live = sess._sci_live_dir
+            if sess._sci_writer is not None:
+                sess._sci_writer.flush()
+            if sess._v3_writer is not None:
+                try:
+                    sess._v3_writer.flush()
+                except Exception:
+                    pass
+            rid = rid or str(sess._active_run_id or "")
+        run_dir = Path(live) if live else None
+    elif source == "saved":
+        if not rid or "/" in rid or ".." in rid or not rid.startswith("psyweb-"):
+            return {"accepted": False, "error": "invalid run_id"}
+        root = Path(sess.config.results_root) if getattr(sess.config, "results_root", None) else default_results_root()
+        run_dir = published_run_dir(root, rid)
+    else:
+        return {"accepted": False, "error": "invalid source"}
+    if run_dir is None or not run_dir.is_dir():
+        return {"accepted": False, "error": "run directory not found"}
+
+    job_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S") + "-" + uuid.uuid4().hex[:8]
+    out_dir = _analysis_jobs_root() / job_id
+    out_dir.mkdir(parents=True, exist_ok=True)
+    # Never write analyzer artifacts into the live/forensic run directory.
+    max_tick = body.get("cutoff_tick")
+    cmd = [
+        sys.executable, "-m", "mechanistic_mind.scientific_v3.analyzer_next.job",
+        "--run-dir", str(run_dir),
+        "--out-dir", str(out_dir),
+    ]
+    if max_tick is not None:
+        cmd.extend(["--max-tick", str(int(max_tick))])
+    env = dict(os.environ)
+    env.setdefault("PYTHONUNBUFFERED", "1")
+    proc = subprocess.Popen(cmd, cwd=str(Path(__file__).resolve().parents[3]), env=env)
+    _ANALYSIS_JOBS[job_id] = {
+        "pid": proc.pid,
+        "out_dir": str(out_dir),
+        "run_dir": str(run_dir),
+        "run_id": rid,
+        "source": source,
+        "proc": proc,
+    }
+    return {
+        "accepted": True,
+        "job_id": job_id,
+        "pid": proc.pid,
+        "out_dir": str(out_dir),
+        "run_dir": str(run_dir),
+        "run_id": rid,
+        "phase": "QUEUED",
+        "isolates_observer": True,
+    }
+
+
+@app.get("/api/analysis/jobs/{job_id}")
+def analysis_job_status(job_id: str) -> dict[str, Any]:
+    if "/" in job_id or ".." in job_id:
+        return {"error": "invalid job_id"}
+    rec = _ANALYSIS_JOBS.get(job_id)
+    out_dir = Path(rec["out_dir"]) if rec else (_analysis_jobs_root() / job_id)
+    progress_path = out_dir / "progress.json"
+    progress = {}
+    if progress_path.is_file():
+        try:
+            progress = json.loads(progress_path.read_text(encoding="utf-8"))
+        except Exception:
+            progress = {}
+    alive = None
+    if rec and rec.get("proc") is not None:
+        alive = rec["proc"].poll() is None
+        if not alive and progress.get("status") not in ("COMPLETE", "FAILED", "CANCELLED"):
+            progress.setdefault("status", "FAILED")
+            progress.setdefault("phase", "FAILED")
+            progress.setdefault("error", f"analyzer process exited {rec['proc'].returncode}")
+    return {
+        "job_id": job_id,
+        "pid": (rec or {}).get("pid"),
+        "observer_pid": os.getpid(),
+        "alive": alive,
+        "out_dir": str(out_dir),
+        **progress,
+    }
+
+
+@app.post("/api/analysis/jobs/{job_id}/cancel")
+def analysis_job_cancel(job_id: str) -> dict[str, Any]:
+    if "/" in job_id or ".." in job_id:
+        return {"accepted": False, "error": "invalid job_id"}
+    rec = _ANALYSIS_JOBS.get(job_id)
+    out_dir = Path(rec["out_dir"]) if rec else (_analysis_jobs_root() / job_id)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "CANCEL").write_text("1", encoding="utf-8")
+    proc = (rec or {}).get("proc")
+    if proc is not None and proc.poll() is None:
+        try:
+            proc.terminate()
+        except Exception:
+            pass
+    return {"accepted": True, "job_id": job_id, "phase": "CANCELLED"}
+
+
+@app.get("/api/analysis/jobs/{job_id}/result")
+def analysis_job_result(job_id: str) -> dict[str, Any]:
+    if "/" in job_id or ".." in job_id:
+        return {"error": "invalid job_id"}
+    rec = _ANALYSIS_JOBS.get(job_id)
+    out_dir = Path(rec["out_dir"]) if rec else (_analysis_jobs_root() / job_id)
+    summary = out_dir / "analysis_http_summary.json"
+    if not summary.is_file():
+        return {"error": "result not ready", "job_id": job_id, "out_dir": str(out_dir)}
+    data = json.loads(summary.read_text(encoding="utf-8"))
+    data["job_id"] = job_id
+    data["artifacts_dir"] = str(out_dir)
+    data["source"] = (rec or {}).get("source")
+    return data
     pkg["manifest"] = {
         "final_tick": manifest.get("final_tick"),
         "seed": manifest.get("seed"),
         "runtime_type": manifest.get("runtime_type"),
         "termination_reason": manifest.get("termination_reason"),
         "scientific_history": manifest.get("scientific_history"),
+    }
+    v3 = pkg.get("scientific_v3_core") or {}
+    pkg["v3_evidence_health"] = {
+        "writer_attached": None,
+        "archived": v3.get("evidence_version") == "SCIENTIFIC_V3",
+        "status": v3.get("status") or "NOT_RECORDED",
+        "run_dir": str(run_dir),
     }
     return pkg
 
@@ -760,6 +1020,94 @@ def diagnostics_motion_trace(body: ActionTraceBody) -> dict[str, Any]:
     if rt is None:
         return {"error": "no runtime"}
     return rt.set_motion_trace(enabled=bool(body.enabled), mode=str(body.mode or "every_10"))
+
+
+
+
+class ObserverDetailBody(BaseModel):
+    preset: str | None = None
+    products: list[str] | None = None
+    product: str | None = None
+    enabled: bool | None = None
+
+
+@app.get("/api/observer/detail")
+def get_observer_detail() -> dict[str, Any]:
+    sess = get_session()
+    if hasattr(sess, "observer_interest_snapshot"):
+        return sess.observer_interest_snapshot()
+    return {"preset": "NORMAL", "products": [], "note": "interest_unavailable"}
+
+
+@app.post("/api/observer/detail")
+def set_observer_detail(body: ObserverDetailBody) -> dict[str, Any]:
+    """Set Observer display detail (MINIMAL|NORMAL|FULL) or product interest.
+
+    Does NOT change cognition, mechanisms, scientific evidence, or RNG.
+    """
+    sess = get_session()
+    if body.product is not None and body.enabled is not None and hasattr(sess, "update_observer_product"):
+        return sess.update_observer_product(str(body.product), bool(body.enabled))
+    if body.products is not None and hasattr(sess, "set_observer_products"):
+        return sess.set_observer_products(list(body.products))
+    if body.preset and hasattr(sess, "set_observer_detail_preset"):
+        return sess.set_observer_detail_preset(str(body.preset))
+    return {"error": "no_handler"}
+
+@app.get("/api/diagnostics/sensorimotor-consequence")
+def diagnostics_sensorimotor_consequence() -> dict[str, Any]:
+    sess = get_session()
+    if hasattr(sess, "sensorimotor_consequence_panel"):
+        return sess.sensorimotor_consequence_panel()
+    return {"schema": "mm.observer.sensorimotor_consequence.v1", "agents": [], "error": "panel_unavailable"}
+
+
+
+
+
+@app.post("/api/config/psc-motor-resolution")
+def config_psc_motor_resolution(body: PscMotorResolutionBody | None = None) -> dict[str, Any]:
+    """Set PSC motor resolution. Default LOCO_FACTORIZED; OBSERVED_COMPOSITE is EXPERIMENTAL."""
+    body = body or PscMotorResolutionBody()
+    mode = body.mode or body.psc_motor_resolution or "LOCO_FACTORIZED"
+    sess = get_session()
+    if hasattr(sess, "set_psc_motor_resolution"):
+        return sess.set_psc_motor_resolution(str(mode))
+    return {"accepted": False, "reason": "session_unsupported"}
+
+@app.get("/api/config/psc-motor-resolution")
+def get_psc_motor_resolution() -> dict[str, Any]:
+    sess = get_session()
+    rt = getattr(sess, "runtime", None)
+    mode = "LOCO_FACTORIZED"
+    try:
+        cog = getattr(getattr(rt, "config", None), "cognition", None)
+        mode = str(getattr(cog, "psc_motor_resolution", mode) or mode)
+    except Exception:
+        pass
+    return {
+        "psc_motor_resolution": mode,
+        "experimental": mode.upper() == "OBSERVED_COMPOSITE",
+        "label": "EXPERIMENTAL" if str(mode).upper() == "OBSERVED_COMPOSITE" else "DEFAULT",
+        "history_reset": False,
+        "cognition_reset": False,
+        "smc_reset": False,
+        "body_reset": False,
+    }
+
+@app.get("/api/diagnostics/signal-sensorimotor")
+def diagnostics_signal_sensorimotor(include_shadow: bool = False) -> dict[str, Any]:
+    sess = get_session()
+    if hasattr(sess, "signal_sensorimotor_panel"):
+        return sess.signal_sensorimotor_panel(include_shadow=bool(include_shadow))
+    return {"schema": "mm.observer.signal_sensorimotor.v1", "error": "panel_unavailable"}
+
+@app.get("/api/diagnostics/historical-sensorimotor-selection")
+def diagnostics_historical_sensorimotor_selection() -> dict[str, Any]:
+    sess = _session()
+    if hasattr(sess, "historical_sensorimotor_selection_panel"):
+        return sess.historical_sensorimotor_selection_panel()
+    return {"schema": "mm.observer.historical_sensorimotor_selection.v1", "agents": [], "ui_state": "OFF", "error": "panel_unavailable"}
 
 @app.get("/api/diagnostics/why")
 def diagnostics_why() -> dict[str, Any]:
@@ -943,14 +1291,42 @@ def signal_context_episode(episode_id: str) -> dict[str, Any]:
     return get_session().signal_episode_inspect(episode_id)
 
 
+@app.get("/api/signal-context/current")
+def signal_context_current_analysis(
+    max_timeline_rows: int | None = 50000,
+    max_events: int | None = 200000,
+    max_episode_details: int = 40,
+    cutoff_tick: int | None = None,
+) -> dict[str, Any]:
+    """Signal Forensics for the CURRENT RUN scientific evidence package.
+
+    User-triggered only — not wired to LIVE Observer refresh.
+    """
+    try:
+        return get_session().signal_forensics_current_run(
+            cutoff_tick=cutoff_tick,
+            max_timeline_rows=max_timeline_rows,
+            max_events=max_events,
+            max_episode_details=int(max_episode_details),
+        )
+    except FileNotFoundError as exc:
+        return {"accepted": False, "error": str(exc)}
+    except Exception as exc:  # noqa: BLE001
+        return {"accepted": False, "error": str(exc)}
+
+
 @app.get("/api/signal-context/run/{run_id}")
 def signal_context_run_analysis(
     run_id: str,
     max_timeline_rows: int | None = 20000,
     max_events: int | None = 120000,
     max_episode_details: int = 40,
+    reference: bool = False,
 ) -> dict[str, Any]:
-    """Retrospective signal-context analysis (matched controls — expensive)."""
+    """Retrospective signal-context analysis of a SAVED or REFERENCE run.
+
+    Not the primary current-run path. Set reference=true for fixture labeling.
+    """
     from mechanistic_mind.ui.psy_observer_web.run_finalize import default_results_root
     from mechanistic_mind.ui.psy_observer_web.scientific_history import published_run_dir
     from mechanistic_mind.ui.psy_observer_web.signal_context.analyze_run import analyze_signal_run
@@ -961,13 +1337,15 @@ def signal_context_run_analysis(
     if not run_dir.is_dir():
         return {"accepted": False, "error": "run not found", "run_id": run_id}
     try:
+        # No hardcoded focus_ticks — those biased UI toward t687 of seed-17 fixture.
         result = analyze_signal_run(
             run_dir,
             run_id=run_id,
             max_timeline_rows=max_timeline_rows,
             max_events=max_events,
             max_episode_details=int(max_episode_details),
-            focus_ticks=[680, 1200, 2000, 3000, 4500],
+            focus_ticks=None,
+            source_label="REFERENCE_FIXTURE" if reference else "SAVED_RUN",
         )
         return {"accepted": True, **result}
     except FileNotFoundError as exc:
@@ -1138,9 +1516,13 @@ class _Hub:
         self.clients.discard(ws)
         self.busy.discard(ws)
 
-    def offer_text(self, text: str, loop: asyncio.AbstractEventLoop) -> None:
-        """Keep only the latest serialized frame; never block the sim thread."""
-        self.last_text = text
+    def offer_text(self, text: str, loop: asyncio.AbstractEventLoop, *, retain_as_last: bool = True) -> None:
+        """Keep only the latest serialized payload; never block the sim thread.
+
+        Heartbeats must pass retain_as_last=False so reconnect still gets a real frame.
+        """
+        if retain_as_last:
+            self.last_text = text
         self._pending = text
         if not self._flushing:
             self._flushing = True
@@ -1201,7 +1583,17 @@ async def _startup() -> None:
 
         _loop.run_in_executor(None, _serialize_and_offer)
 
+    def _on_heartbeat(hb: dict[str, Any]) -> None:
+        if _loop is None:
+            return
+        try:
+            text = json.dumps({"type": "heartbeat", "data": hb}, default=str)
+        except TypeError:
+            return
+        hub.offer_text(text, _loop, retain_as_last=False)
+
     sess.subscribe(_on_frame)
+    sess.subscribe_heartbeat(_on_heartbeat)
 
 
 @app.on_event("shutdown")
@@ -1221,6 +1613,12 @@ def _shutdown() -> None:
 
 def _serialized_live_frame() -> str:
     return json.dumps({"type": "frame", "data": get_session().current_frame()}, default=str)
+
+
+@app.get("/api/runtime/progress")
+def runtime_progress() -> dict[str, Any]:
+    """Cheap RUNNING progress (COMPUTING_TICK vs dead). No frame build."""
+    return get_session().runtime_progress()
 
 
 @app.websocket("/ws/live")

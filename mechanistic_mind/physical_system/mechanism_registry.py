@@ -194,7 +194,7 @@ MECHANISM_DEFS: list[dict[str, Any]] = [
         "id": "prospective_scenario_competition",
         "config_path": "cognition.prospective_selection",
         "label": "PROSPECTIVE SCENARIO COMPETITION",
-        "description": "Competes supported prospective continuations when multiple exist.",
+        "description": "Competes supported prospective continuations when multiple exist. Recommended: let the organism explore for a while before enabling PSC so sensorimotor and predictive history can form first. PSC can be enabled during a running simulation without resetting the organism (~1000 ticks is a reasonable experimental starting point).",
         "validation": "Prior prospective competition branch.",
         "provenance": "validated_prospective_competition",
         "default_integrated": True,
@@ -242,7 +242,7 @@ MECHANISM_DEFS: list[dict[str, Any]] = [
         ),
         "validation": "World field ecology only; no semantic food labels.",
         "provenance": "beta2_resource_ecology_authority",
-        "default_integrated": False,
+        "default_integrated": True,
         "toggle_semantics": "ENVIRONMENTAL_R_A_ECOLOGY",
     },
     {
@@ -256,7 +256,7 @@ MECHANISM_DEFS: list[dict[str, Any]] = [
         ),
         "validation": "World field ecology only; no semantic food labels.",
         "provenance": "beta2_resource_ecology_authority",
-        "default_integrated": False,
+        "default_integrated": True,
         "toggle_semantics": "ENVIRONMENTAL_R_B_ECOLOGY",
     },
     {
@@ -306,10 +306,72 @@ MECHANISM_DEFS: list[dict[str, Any]] = [
         "id": "experimental_physical_signal",
         "config_path": "physical_signal.mode",
         "label": "EXPERIMENTAL PHYSICAL SIGNAL",
-        "description": "Shared-world FIELD_A/FIELD_B amplitude with decay and neighbor spread. Default OFF. Not EMIT-in-available_actions. Not communication.",
+        "description": "Shared-world FIELD_A/FIELD_B amplitude with decay and neighbor spread. Fresh-experiment default ON. Not EMIT-in-available_actions. Not communication.",
         "validation": "Experimental TwoAgentRuntime signal bridge (mm_two_agent_physical_signals). Unpromoted.",
         "provenance": "mm_two_agent_physical_signals_experiment",
-        "default_integrated": False,
+        "default_integrated": True,
+    },
+    {
+        "id": "oscillatory_signaling",
+        "config_path": "oscillatory_signaling.mode",
+        "label": "PHYSICAL OSCILLATORY SIGNALING",
+        "description": (
+            "Banded oscillatory emission/reception with L/R head-linked receptors. "
+            "Anonymous osc_l_*/osc_r_*. No language, source identity, or source direction. "
+            "Alongside legacy FIELD_A/B. Fresh-experiment default ON."
+        ),
+        "validation": "Experimental physical medium; EXACT_MATCH legacy when OFF.",
+        "provenance": "physical_oscillatory_signaling",
+        "default_integrated": True,
+        "toggle_semantics": "OSCILLATORY_PHYSICAL_SIGNAL",
+    },
+    {
+        "id": "articulated_head",
+        "config_path": "articulated_head.mode",
+        "label": "ARTICULATED HEAD / ACTIVE SENSOR ORIENTATION",
+        "description": (
+            "Bounded neck DOF + NECK_LEFT/RIGHT/HOLD motors. Vision FOV uses head_world_heading. "
+            "No LOOK_AT / TRACK / ATTENTION. Fresh-experiment default ON."
+        ),
+        "validation": "Experimental motor DOF; EXACT_MATCH legacy when OFF.",
+        "provenance": "active_sensor_orientation_push",
+        "default_integrated": True,
+    },
+    {
+        "id": "physical_push",
+        "config_path": "physical_push.mode",
+        "label": "PHYSICAL PUSH / FORCE EXERTION",
+        "description": (
+            "Generic PUSH action arms contact-mediated force along body heading. "
+            "No PUSH_AGENT, no target identity, no action-at-a-distance. Fresh-experiment default ON."
+        ),
+        "validation": "Experimental contact force; same path for agents/Undercover.",
+        "provenance": "active_sensor_orientation_push",
+        "default_integrated": True,
+    },
+    {
+        "id": "physical_vestibular_sensing",
+        "config_path": "vestibular.mode",
+        "label": "PHYSICAL VESTIBULAR SENSING",
+        "description": (
+            "Anonymous vest_0/vest_1 from body angular velocity/acceleration. "
+            "No compass, no absolute heading to cognition. Ablation removes sensor only."
+        ),
+        "validation": "Experimental body-local rotational transducer.",
+        "provenance": "vestibular_proprioception",
+        "default_integrated": True,
+    },
+    {
+        "id": "neck_proprioception",
+        "config_path": "neck_proprioception.mode",
+        "label": "NECK PROPRIOCEPTION",
+        "description": (
+            "Anonymous prop_neck_0/prop_neck_1 from head-relative angle/ω. "
+            "Requires articulated head. Does not expose head_world_heading to cognition."
+        ),
+        "validation": "Experimental neck-state sensing; independent of vestibular.",
+        "provenance": "vestibular_proprioception",
+        "default_integrated": True,
     },
     {
         "id": "predictive_equivalence",
@@ -402,6 +464,57 @@ MECHANISM_DEFS: list[dict[str, Any]] = [
         "default_integrated": False,
     },
     {
+        "id": "sensorimotor_consequence_model",
+        "config_path": "cognition.sensorimotor_consequence_model",
+        "label": "SENSORIMOTOR CONSEQUENCE MODEL",
+        "description": "Action-conditioned learning of accessible sensory consequences of own motors (O,M)→ΔO. No reward, seeking, or target.",
+        "validation": "Demonstrated: ACTION_CONDITIONED_SENSORY_PREDICTION.",
+        "provenance": "mm_sensorimotor_consequence",
+        "default_integrated": True,
+        "ablatable": True,
+    },
+    {
+        "id": "historical_sensorimotor_selection_bridge",
+        "config_path": "cognition.historical_sensorimotor_selection_bridge",
+        "label": "HISTORICAL SENSORIMOTOR SELECTION",
+        "description": "Predicted sensory consequences of candidate actions are queried against the organism's accumulated history; continuation evidence can participate in prospective scenario competition. No reward, goal, or preference scalar.",
+        "validation": "Demonstrated: HISTORICAL_SENSORIMOTOR_SELECTION (WITHHELD causal control).",
+        "provenance": "mm_o_prime_history_bridge",
+        "default_integrated": True,
+        "ablatable": True,
+    },
+
+    {
+        "id": "contextual_predictive_organization",
+        "config_path": "cognition.contextual_predictive_organization",
+        "label": "CONTEXTUAL PREDICTIVE ORGANIZATION",
+        "description": "Reusable higher-order predictive organization from repeated relational experience (4.26). Not place/map/familiar.",
+        "validation": "ASSERTED: CONTEXTUAL_PREDICTIVE_ORGANIZATION; HISTORY_DEPENDENT_CONTEXTUAL_COMPRESSION.",
+        "provenance": "update426_contextual_predictive_organization",
+        "default_integrated": False,
+        "ablatable": True,
+    },
+    {
+        "id": "context_grounded_prospection",
+        "config_path": "cognition.context_grounded_prospection",
+        "label": "CONTEXT-GROUNDED PROSPECTION",
+        "description": "Prospective composition over learned higher-order contextual structures (4.27). Not route/destination/plan.",
+        "validation": "ASSERTED: CONTEXT_GROUNDED_PROSPECTION.",
+        "provenance": "update427_context_grounded_prospection",
+        "default_integrated": False,
+        "ablatable": True,
+    },
+    {
+        "id": "persistent_prospective_control",
+        "config_path": "cognition.persistent_prospective_control",
+        "label": "PERSISTENT PROSPECTIVE CONTROL",
+        "description": "Selected prospective continuation may remain causally relevant across actions while predictive support holds (4.28). No INTENTION variable.",
+        "validation": "ASSERTED: PERSISTENT_PROSPECTIVE_CONTROL; intention-like control SUPPORTED (Observer label only).",
+        "provenance": "update428_persistent_prospective_control",
+        "default_integrated": False,
+        "ablatable": True,
+    },
+    {
         "id": "cognition",
         "config_path": "cognition.cognition_enabled",
         "label": "COGNITION",
@@ -442,6 +555,8 @@ def mechanism_snapshot(config) -> dict[str, Any]:
         "resource_B_transfer": bool(cres.enabled) and bool(cres.transfer_B_enabled),
         "complementary_resource_conversion": bool(cres.enabled) and bool(cres.conversion_enabled),
         "prospective_scenario_competition": bool(cog.cognition_enabled) and psc_on,
+        "sensorimotor_consequence_model": bool(getattr(cog, "sensorimotor_consequence_model", False)),
+        "historical_sensorimotor_selection_bridge": bool(getattr(cog, "historical_sensorimotor_selection_bridge", False)),
         "instrumental_observation": bool(getattr(cog, "instrumental_observation", False)),
         "unknown_action_physical_probe": bool(getattr(cog, "unknown_action_physical_probe", False)),
         "spatiotemporal_climate_ecology": bool(
@@ -473,6 +588,11 @@ def mechanism_snapshot(config) -> dict[str, Any]:
             and getattr(getattr(config, "near_field_exteroception", None), "body_optical_enabled", True)
         ),
         "experimental_physical_signal": str(getattr(getattr(config, "physical_signal", None), "mode", "OFF")).upper() == "EXPERIMENTAL",
+        "oscillatory_signaling": bool(getattr(getattr(config, "oscillatory_signaling", None), "enabled", False)),
+        "articulated_head": bool(getattr(getattr(config, "articulated_head", None), "enabled", False)),
+        "physical_push": bool(getattr(getattr(config, "physical_push", None), "enabled", False)),
+        "physical_vestibular_sensing": bool(getattr(getattr(config, "vestibular", None), "enabled", False)),
+        "neck_proprioception": bool(getattr(getattr(config, "neck_proprioception", None), "enabled", False)),
         "predictive_equivalence": bool(getattr(cog, "predictive_equivalence", False)),
         "predictive_relevance": bool(getattr(cog, "predictive_relevance", False)),
         "temporal_predictive_structure": bool(getattr(cog, "temporal_predictive_structure", False)),
@@ -483,6 +603,9 @@ def mechanism_snapshot(config) -> dict[str, Any]:
         "temporal_prediction_error": bool(getattr(cog, "temporal_prediction_error", False)),
         "predicted_context_prospection": bool(getattr(cog, "predicted_context_prospection", False)),
         "multistep_action_prospection": bool(getattr(cog, "multistep_action_prospection", False)),
+        "contextual_predictive_organization": bool(getattr(cog, "contextual_predictive_organization", False)),
+        "context_grounded_prospection": bool(getattr(cog, "context_grounded_prospection", False)),
+        "persistent_prospective_control": bool(getattr(cog, "persistent_prospective_control", False)),
         "cognition": bool(cog.cognition_enabled),
         "predictive_compression": bool(getattr(cog, "predictive_compression", True)),
         "multiscale_prediction": bool(getattr(cog, "multiscale_prediction", True)) if hasattr(cog, "multiscale_prediction") else None,
@@ -494,6 +617,8 @@ def mechanism_snapshot(config) -> dict[str, Any]:
         "predictive_compression": "COGNITION", "multiscale_prediction": "COGNITION",
         "prospective_composition": "COGNITION", "bounded_memory": "COGNITION",
         "retrieval": "COGNITION", "prospective_scenario_competition": "COGNITION",
+        "sensorimotor_consequence_model": "COGNITION",
+        "historical_sensorimotor_selection_bridge": "COGNITION",
         "instrumental_observation": "COGNITION", "unknown_action_physical_probe": "COGNITION",
         "cognition": "COGNITION",
         "spatiotemporal_climate_ecology": "WORLD",
@@ -503,6 +628,7 @@ def mechanism_snapshot(config) -> dict[str, Any]:
         "illumination_cycle": "SENSORS",
         "physical_body_optical_response": "SENSORS",
         "experimental_physical_signal": "WORLD",
+        "oscillatory_signaling": "WORLD",
         "predictive_equivalence": "COGNITION",
         "predictive_relevance": "COGNITION",
         "temporal_predictive_structure": "COGNITION",
@@ -513,6 +639,9 @@ def mechanism_snapshot(config) -> dict[str, Any]:
         "temporal_prediction_error": "COGNITION",
         "predicted_context_prospection": "COGNITION",
         "multistep_action_prospection": "COGNITION",
+        "contextual_predictive_organization": "COGNITION",
+        "context_grounded_prospection": "COGNITION",
+        "persistent_prospective_control": "COGNITION",
         "body_deformation": "BODY", "distributed_morphology": "BODY",
         "body_orientation": "BODY", "endogenous_motor_coupling": "MOTOR",
         "deformation_work": "WORK", "endogenous_motor_work_accounting": "WORK",
@@ -523,6 +652,9 @@ def mechanism_snapshot(config) -> dict[str, Any]:
     }
     dependencies = {
         "prospective_scenario_competition": ["prospective_composition"],
+        "historical_sensorimotor_selection_bridge": ["sensorimotor_consequence_model", "prospective_composition"],
+        "context_grounded_prospection": ["contextual_predictive_organization", "prospective_composition"],
+        "persistent_prospective_control": ["context_grounded_prospection", "prospective_scenario_competition"],
         "multiscale_prediction": ["bounded_memory"],
         "retrieval": ["bounded_memory"],
         "body_deformation": ["body_orientation"],
@@ -631,6 +763,10 @@ def set_mechanism(config, mechanism_id: str, enabled: bool) -> dict[str, Any]:
             and not config.complementary_resources.transfer_B_enabled
         ):
             config.complementary_resources.mode = "OFF"
+    elif mechanism_id == "sensorimotor_consequence_model":
+        config.cognition.sensorimotor_consequence_model = bool(on)
+    elif mechanism_id == "historical_sensorimotor_selection_bridge":
+        config.cognition.historical_sensorimotor_selection_bridge = bool(on)
     elif mechanism_id == "prospective_scenario_competition":
         config.cognition.prospective_selection = "SCENARIO_COMPETITION" if on else "LEGACY_FIRST"
     elif mechanism_id == "instrumental_observation":
@@ -651,6 +787,9 @@ def set_mechanism(config, mechanism_id: str, enabled: bool) -> dict[str, Any]:
         "temporal_prediction_error",
         "predicted_context_prospection",
         "multistep_action_prospection",
+        "contextual_predictive_organization",
+        "context_grounded_prospection",
+        "persistent_prospective_control",
     }:
         setattr(config.cognition, mechanism_id, on)
     elif mechanism_id == "spatiotemporal_climate_ecology":
@@ -708,11 +847,36 @@ def set_mechanism(config, mechanism_id: str, enabled: bool) -> dict[str, Any]:
         nfe.body_optical_enabled = bool(on)
         if on and not nfe.enabled:
             nfe.mode = "EXPERIMENTAL"
+    elif mechanism_id == "oscillatory_signaling":
+        from mechanistic_mind.physical_system.oscillatory_signaling import OscillatorySignalingConfig
+        if getattr(config, "oscillatory_signaling", None) is None:
+            config.oscillatory_signaling = OscillatorySignalingConfig()
+        config.oscillatory_signaling.mode = "EXPERIMENTAL" if on else "OFF"
     elif mechanism_id == "experimental_physical_signal":
         from mechanistic_mind.physical_system.physical_signal import PhysicalSignalConfig
         if getattr(config, "physical_signal", None) is None:
             config.physical_signal = PhysicalSignalConfig()
         config.physical_signal.mode = "EXPERIMENTAL" if on else "OFF"
+    elif mechanism_id == "articulated_head":
+        from mechanistic_mind.physical_system.articulated_head import ArticulatedHeadConfig
+        if getattr(config, "articulated_head", None) is None:
+            config.articulated_head = ArticulatedHeadConfig()
+        config.articulated_head.mode = "EXPERIMENTAL" if on else "OFF"
+    elif mechanism_id == "physical_push":
+        from mechanistic_mind.physical_system.physical_push import PhysicalPushConfig
+        if getattr(config, "physical_push", None) is None:
+            config.physical_push = PhysicalPushConfig()
+        config.physical_push.mode = "EXPERIMENTAL" if on else "OFF"
+    elif mechanism_id == "physical_vestibular_sensing":
+        from mechanistic_mind.physical_system.vestibular_proprioception import VestibularConfig
+        if getattr(config, "vestibular", None) is None:
+            config.vestibular = VestibularConfig()
+        config.vestibular.mode = "EXPERIMENTAL" if on else "OFF"
+    elif mechanism_id == "neck_proprioception":
+        from mechanistic_mind.physical_system.vestibular_proprioception import NeckProprioceptionConfig
+        if getattr(config, "neck_proprioception", None) is None:
+            config.neck_proprioception = NeckProprioceptionConfig()
+        config.neck_proprioception.mode = "EXPERIMENTAL" if on else "OFF"
     else:
         raise KeyError(f"unknown mechanism: {mechanism_id}")
     return mechanism_snapshot(config)

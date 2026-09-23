@@ -16,6 +16,30 @@ from typing import Any
 from mechanistic_mind.research.predictive_compression import _sig
 
 MAX_CLASSES = 32
+# Production default True. Tests may set False to force full-scan path.
+_USE_CLASS_INDEX = True
+# Dev-only: after index mutations, compare incremental payload to full rebuild.
+# OFF in production. Toggle via set_index_validate().
+_INDEX_VALIDATE = False
+
+
+def set_class_index_enabled(enabled: bool) -> None:
+    global _USE_CLASS_INDEX
+    _USE_CLASS_INDEX = bool(enabled)
+
+
+def class_index_enabled() -> bool:
+    return bool(_USE_CLASS_INDEX)
+
+
+def set_index_validate(enabled: bool) -> None:
+    """Development-only index A/B. Must stay False in production."""
+    global _INDEX_VALIDATE
+    _INDEX_VALIDATE = bool(enabled)
+
+
+def index_validate_enabled() -> bool:
+    return bool(_INDEX_VALIDATE)
 MAX_MEMBERS = 12
 MAX_EPISODES = 256
 MAX_PROV = 16
@@ -250,6 +274,280 @@ def clear_derived_caches(store: dict[str, Any]) -> None:
             cls.pop("_mean_c_cached", None)
             # Keep _mean_c_gen if present so a later mutate still invalidates;
             # without a cached payload there is nothing stale to serve.
+    # Indexes are rebuilt lazily; mark stale so restore/load cannot serve a ghost.
+    invalidate_class_indexes(store)
+
+
+def bump_store_generation(store: dict[str, Any]) -> None:
+    """Mark derived indexes and same-tick retrieve caches stale after mutations."""
+    store["_ix_gen"] = int(store.get("_ix_gen") or 0) + 1
+    store["_retrieve_cache_gen"] = int(store.get("_retrieve_cache_gen") or 0) + 1
+    store.pop("_retrieve_cache", None)
+
+
+def invalidate_class_indexes(store: dict[str, Any]) -> None:
+    """Drop action/member/active indexes (rebuild on next ensure)."""
+    bump_store_generation(store)
+    store.pop("_ix_action", None)
+    store.pop("_ix_member", None)
+    store.pop("_ix_built_gen", None)
+    store.pop("_active_ids", None)
+    store.pop("_active_count", None)
+
+
+def _scan_active_ids(store: dict[str, Any]) -> list[str]:
+    """Canonical ACTIVE id order: ``classes`` insertion order among ACTIVE rows."""
+    out: list[str] = []
+    for cid, cls in (store.get("classes") or {}).items():
+        if isinstance(cls, dict) and cls.get("status") == "ACTIVE":
+            out.append(str(cid))
+    return out
+
+
+def scan_active_class_count(store: dict[str, Any]) -> int:
+    """Reference scan. Tests only — not a hot-path helper."""
+    return len(_scan_active_ids(store))
+
+
+def rebuild_class_indexes(store: dict[str, Any]) -> None:
+    """Rebuild exact action → class-id lists (insertion order) and member-sig map.
+
+    Only ACTIVE classes are indexed. Order of ids under each action matches
+    ``classes`` dict insertion order among ACTIVE rows with that action — the
+    same relative order the legacy full scan would encounter them.
+
+    FORGOTTEN classes remain in ``classes`` (history/snapshot) but are absent
+    from ``_ix_action``, ``_ix_member``, and ``_active_ids``. There is no
+    FORGOTTEN→ACTIVE revival in learn/retrieve.
+    """
+    action_ix: dict[str, list[str]] = {}
+    member_ix: dict[str, str] = {}
+    active_ids: list[str] = []
+    for cid, cls in (store.get("classes") or {}).items():
+        if not isinstance(cls, dict):
+            continue
+        if cls.get("status") != "ACTIVE":
+            continue
+        sid = str(cid)
+        act = str(cls.get("action") or "")
+        action_ix.setdefault(act, []).append(sid)
+        for sig in (cls.get("members") or {}):
+            member_ix[f"{act}\0{sig}"] = sid
+        active_ids.append(sid)
+    store["_ix_action"] = action_ix
+    store["_ix_member"] = member_ix
+    store["_active_ids"] = active_ids
+    store["_active_count"] = len(active_ids)
+    store["_ix_built_gen"] = int(store.get("_ix_gen") or 0)
+
+
+def ensure_class_indexes(store: dict[str, Any]) -> None:
+    if (
+        store.get("_ix_built_gen") != int(store.get("_ix_gen") or 0)
+        or "_ix_action" not in store
+        or "_active_ids" not in store
+    ):
+        rebuild_class_indexes(store)
+
+
+def _mark_indexes_current(store: dict[str, Any]) -> None:
+    """Keep live indexes; bump generation so TPS retrieve memos invalidate."""
+    bump_store_generation(store)
+    store["_ix_built_gen"] = int(store.get("_ix_gen") or 0)
+    store["_active_count"] = len(store.get("_active_ids") or [])
+    if _INDEX_VALIDATE:
+        _validate_indexes_or_raise(store)
+
+
+def capture_index_payload(store: dict[str, Any]) -> dict[str, Any]:
+    """Actual derived index content (not merely counts)."""
+    ensure_class_indexes(store)
+    return {
+        "action": {k: list(v) for k, v in (store.get("_ix_action") or {}).items()},
+        "member": dict(store.get("_ix_member") or {}),
+        "active_ids": list(store.get("_active_ids") or []),
+        "active_count": int(store.get("_active_count") or 0),
+    }
+
+
+def rebuild_reference_index_payload(store: dict[str, Any]) -> dict[str, Any]:
+    """Full-rebuild oracle over the same ``classes`` mapping."""
+    tmp: dict[str, Any] = {
+        "classes": store.get("classes") or {},
+        "_ix_gen": int(store.get("_ix_gen") or 0),
+    }
+    rebuild_class_indexes(tmp)
+    return {
+        "action": {k: list(v) for k, v in (tmp.get("_ix_action") or {}).items()},
+        "member": dict(tmp.get("_ix_member") or {}),
+        "active_ids": list(tmp.get("_active_ids") or []),
+        "active_count": int(tmp.get("_active_count") or 0),
+    }
+
+
+def _validate_indexes_or_raise(store: dict[str, Any]) -> None:
+    got = capture_index_payload(store)
+    ref = rebuild_reference_index_payload(store)
+    if got != ref:
+        raise AssertionError(f"PE incremental indexes diverged from rebuild: {got!r} vs {ref!r}")
+
+
+def active_class_count(store: dict[str, Any]) -> int:
+    """O(1) after indexes are current. Rebuilt from canonical ACTIVE rows if stale."""
+    ensure_class_indexes(store)
+    return int(store.get("_active_count") or 0)
+
+
+def _index_remove_active(store: dict[str, Any], cid: str, cls: dict[str, Any]) -> None:
+    """Drop one ACTIVE class from derived indexes. Canonical row is unchanged."""
+    ensure_class_indexes(store)
+    sid = str(cid)
+    act = str(cls.get("action") or "")
+    lst = (store.get("_ix_action") or {}).get(act)
+    if lst:
+        try:
+            lst.remove(sid)
+        except ValueError:
+            pass
+        if not lst:
+            (store.get("_ix_action") or {}).pop(act, None)
+    member_ix = store.setdefault("_ix_member", {})
+    for sig in (cls.get("members") or {}):
+        key = f"{act}\0{sig}"
+        if member_ix.get(key) == sid:
+            member_ix.pop(key, None)
+    ids = store.setdefault("_active_ids", [])
+    try:
+        ids.remove(sid)
+    except ValueError:
+        pass
+    store["_active_count"] = len(ids)
+
+
+def _index_add_active(store: dict[str, Any], cid: str, cls: dict[str, Any]) -> None:
+    """Append a newly ACTIVE class (insertion-order tail)."""
+    ensure_class_indexes(store)
+    sid = str(cid)
+    ids = store.setdefault("_active_ids", [])
+    if sid in ids:
+        return
+    act = str(cls.get("action") or "")
+    store.setdefault("_ix_action", {}).setdefault(act, []).append(sid)
+    member_ix = store.setdefault("_ix_member", {})
+    for sig in (cls.get("members") or {}):
+        member_ix[f"{act}\0{sig}"] = sid
+    ids.append(sid)
+    store["_active_count"] = len(ids)
+
+
+def _index_refresh_members(store: dict[str, Any], cid: str, cls: dict[str, Any]) -> None:
+    """Rewrite member-sig map for one ACTIVE class after join/split."""
+    ensure_class_indexes(store)
+    sid = str(cid)
+    act = str(cls.get("action") or "")
+    member_ix = store.setdefault("_ix_member", {})
+    stale = [k for k, v in member_ix.items() if v == sid]
+    for k in stale:
+        member_ix.pop(k, None)
+    for sig in (cls.get("members") or {}):
+        member_ix[f"{act}\0{sig}"] = sid
+
+
+def _forget_lowest_support_active(store: dict[str, Any], classes: dict[str, Any]) -> str | None:
+    """ACTIVE→FORGOTTEN using only the ACTIVE id list (max MAX_CLASSES).
+
+    Tie-break: first among minima in ``_active_ids`` order, which matches
+    ``classes`` insertion order among ACTIVE rows (same as the old
+    ``min(classes.items() if ACTIVE)``).
+    """
+    ensure_class_indexes(store)
+    ids = list(store.get("_active_ids") or [])
+    if len(ids) < MAX_CLASSES:
+        return None
+    victim = min(ids, key=lambda cid: int((classes.get(cid) or {}).get("support") or 0))
+    cls = classes.get(victim)
+    if not isinstance(cls, dict):
+        return None
+    _index_remove_active(store, victim, cls)
+    cls["status"] = "FORGOTTEN"
+    store["forgotten"] = int(store.get("forgotten") or 0) + 1
+    return victim
+
+
+def iter_active_classes_for_action(store: dict[str, Any], action: str):
+    """Yield ACTIVE classes for ``action`` in legacy full-scan relative order."""
+    ensure_class_indexes(store)
+    classes = store.get("classes") or {}
+    act = str(action)
+    for cid in (store.get("_ix_action") or {}).get(act) or ():
+        cls = classes.get(cid)
+        if cls is None:
+            continue
+        if cls.get("status") != "ACTIVE":
+            continue
+        if cls.get("action") != act:
+            continue
+        yield cls
+
+
+def find_host_class_by_member_sig(store: dict[str, Any], action: str, sig: str) -> dict[str, Any] | None:
+    """O(1) host lookup for learn; returns None if absent (same as scan miss)."""
+    ensure_class_indexes(store)
+    act = str(action)
+    cid = (store.get("_ix_member") or {}).get(f"{act}\0{sig}")
+    if not cid:
+        return None
+    cls = (store.get("classes") or {}).get(cid)
+    if not isinstance(cls, dict):
+        return None
+    if cls.get("status") != "ACTIVE" or cls.get("action") != act:
+        return None
+    if sig not in (cls.get("members") or {}):
+        return None
+    return cls
+
+
+def index_bucket_stats(store: dict[str, Any]) -> dict[str, Any]:
+    """Debug/bench: bucket occupancy for the action index."""
+    ensure_class_indexes(store)
+    buckets = [len(v) for v in (store.get("_ix_action") or {}).values()]
+    buckets_sorted = sorted(buckets)
+    n = len(buckets_sorted)
+    def pct(p: float) -> int:
+        if not buckets_sorted:
+            return 0
+        i = min(n - 1, max(0, int(round(p * (n - 1)))))
+        return int(buckets_sorted[i])
+    return {
+        "bucket_count": n,
+        "class_count_active": sum(buckets),
+        "mean_bucket": (sum(buckets) / n) if n else 0.0,
+        "median_bucket": pct(0.5),
+        "p95_bucket": pct(0.95),
+        "max_bucket": max(buckets) if buckets else 0,
+        "index_entries_member": len(store.get("_ix_member") or {}),
+    }
+
+
+def _inspect_counter_inc(store: dict[str, Any], n: int) -> None:
+    """Optional bench instrumentation (no scientific effect)."""
+    if store.get("_bench_inspect") is True:
+        store["_bench_classes_inspected"] = int(store.get("_bench_classes_inspected") or 0) + int(n)
+
+
+# Derived index / memo keys — never part of scientific identity.
+_DERIVED_STORE_KEYS = frozenset({
+    "_mean_c_cached",
+    "_mean_c_gen",
+    "_ix_action",
+    "_ix_member",
+    "_ix_gen",
+    "_ix_built_gen",
+    "_active_ids",
+    "_active_count",
+    "_retrieve_cache",
+    "_retrieve_cache_gen",
+})
 
 
 def strip_derived_fields(obj: Any) -> Any:
@@ -258,7 +556,7 @@ def strip_derived_fields(obj: Any) -> Any:
         return {
             k: strip_derived_fields(v)
             for k, v in obj.items()
-            if k not in ("_mean_c_cached", "_mean_c_gen")
+            if k not in _DERIVED_STORE_KEYS
         }
     if isinstance(obj, list):
         return [strip_derived_fields(v) for v in obj]
@@ -290,15 +588,7 @@ def learn(
 
     classes = store.setdefault("classes", {})
     # If this antecedent already belongs to a class, update / maybe split.
-    host = None
-    for cls in classes.values():
-        if cls.get("status") != "ACTIVE":
-            continue
-        if act != cls.get("action"):
-            continue
-        if sig in (cls.get("members") or {}):
-            host = cls
-            break
+    host = find_host_class_by_member_sig(store, act, sig)
     if host is not None:
         mem = host["members"][sig]
         mem["support"] = int(mem.get("support") or 0) + 1
@@ -327,6 +617,7 @@ def learn(
             host["revised_at"] = int(tick)
             store["splits"] = int(store.get("splits") or 0) + 1
             _add_prov(host, "split_member", sig, tick)
+            _index_refresh_members(store, str(host.get("id")), host)
             host = None
         else:
             host["support"] = sum(int(m.get("support") or 0) for m in host["members"].values())
@@ -334,15 +625,17 @@ def learn(
             # Same gen as mid-update recompute; reuse cached aggregation.
             host["mean_c"] = _class_mean_c(host)
             _add_prov(host, "support", sig, tick)
+            _mark_indexes_current(store)
             return {"status": "UPDATED", "class_id": host.get("id")}
 
     # Find a class whose continuation matches this consequent.
     candidates = []
-    for cls in classes.values():
-        if cls.get("status") != "ACTIVE" or cls.get("action") != act:
-            continue
+    scanned = 0
+    for cls in iter_active_classes_for_action(store, act):
+        scanned += 1
         if _linf(crep, _class_mean_c(cls)) <= tau:
             candidates.append(cls)
+    _inspect_counter_inc(store, scanned)
     if candidates:
         cls = max(candidates, key=lambda c: int(c.get("support") or 0))
         members = cls.setdefault("members", {})
@@ -365,15 +658,12 @@ def learn(
         cls["aabb"] = _aabb(members)
         cls["mean_c"] = _class_mean_c(cls)
         _add_prov(cls, "join", sig, tick)
+        _index_refresh_members(store, str(cls.get("id")), cls)
+        _mark_indexes_current(store)
         return {"status": "JOINED", "class_id": cls.get("id")}
 
-    if len([c for c in classes.values() if c.get("status") == "ACTIVE"]) >= MAX_CLASSES:
-        victim = min(
-            (kv for kv in classes.items() if kv[1].get("status") == "ACTIVE"),
-            key=lambda kv: int(kv[1].get("support") or 0),
-        )[0]
-        classes[victim]["status"] = "FORGOTTEN"
-        store["forgotten"] = int(store.get("forgotten") or 0) + 1
+    if active_class_count(store) >= MAX_CLASSES:
+        _forget_lowest_support_active(store, classes)
 
     cid = f"E{int(store.get('next_id') or 1)}"
     store["next_id"] = int(store.get("next_id") or 1) + 1
@@ -401,25 +691,21 @@ def learn(
         "revised_at": None,
         "provenance": [{"type": "formed", "target": sig, "tick": int(tick)}],
     }
+    _index_add_active(store, cid, classes[cid])
+    _mark_indexes_current(store)
     return {"status": "FORMED", "class_id": cid}
 
 
-def retrieve(
+def _retrieve_collect_hits_full_scan(
     store: dict[str, Any],
-    fragment: dict[str, float],
-    action: str,
-    *,
-    count: bool = True,
-) -> dict[str, Any]:
-    """Map a (possibly never-exact) observation to a continuation via class span."""
-    if store.get("enabled") is False:
-        return {"status": "DISABLED", "predicted": {}}
-    if count:
-        store["retrieves"] = int(store.get("retrieves") or 0) + 1
-    frag = _floats(fragment)
-    act = str(action)
-    hits = []
+    frag: dict[str, float],
+    act: str,
+) -> list[dict[str, Any]]:
+    """Legacy full class scan (oracle / debug). Not used in production retrieve."""
+    hits: list[dict[str, Any]] = []
+    n = 0
     for cls in (store.get("classes") or {}).values():
+        n += 1
         if cls.get("status") != "ACTIVE" or cls.get("action") != act:
             continue
         if int(cls.get("support") or 0) < MIN_CLASS_SUPPORT:
@@ -427,6 +713,36 @@ def retrieve(
         aabb = cls.get("aabb") or {}
         if _in_aabb(frag, aabb):
             hits.append(cls)
+    _inspect_counter_inc(store, n)
+    return hits
+
+
+def _retrieve_collect_hits_indexed(
+    store: dict[str, Any],
+    frag: dict[str, float],
+    act: str,
+) -> list[dict[str, Any]]:
+    """Action-bucket candidate narrowing; same matcher as full scan."""
+    hits: list[dict[str, Any]] = []
+    n = 0
+    for cls in iter_active_classes_for_action(store, act):
+        n += 1
+        if int(cls.get("support") or 0) < MIN_CLASS_SUPPORT:
+            continue
+        aabb = cls.get("aabb") or {}
+        if _in_aabb(frag, aabb):
+            hits.append(cls)
+    _inspect_counter_inc(store, n)
+    return hits
+
+
+def _retrieve_from_hits(
+    store: dict[str, Any],
+    frag: dict[str, float],
+    hits: list[dict[str, Any]],
+    *,
+    count: bool,
+) -> dict[str, Any]:
     if not hits:
         return {"status": "NO_MATCH", "predicted": {}, "gate": "not_in_any_class_span"}
     if len(hits) > 1:
@@ -457,6 +773,45 @@ def retrieve(
         "aabb": {k: list(v) for k, v in (cls.get("aabb") or {}).items()},
         "gate": "class_span",
     }
+
+
+def _retrieve_full_scan_reference(
+    store: dict[str, Any],
+    fragment: dict[str, float],
+    action: str,
+    *,
+    count: bool = False,
+) -> dict[str, Any]:
+    """Private oracle: pre-index full-scan retrieve. Tests/debug only."""
+    if store.get("enabled") is False:
+        return {"status": "DISABLED", "predicted": {}}
+    if count:
+        store["retrieves"] = int(store.get("retrieves") or 0) + 1
+    frag = _floats(fragment)
+    act = str(action)
+    hits = _retrieve_collect_hits_full_scan(store, frag, act)
+    return _retrieve_from_hits(store, frag, hits, count=count)
+
+
+def retrieve(
+    store: dict[str, Any],
+    fragment: dict[str, float],
+    action: str,
+    *,
+    count: bool = True,
+) -> dict[str, Any]:
+    """Map a (possibly never-exact) observation to a continuation via class span."""
+    if store.get("enabled") is False:
+        return {"status": "DISABLED", "predicted": {}}
+    if count:
+        store["retrieves"] = int(store.get("retrieves") or 0) + 1
+    frag = _floats(fragment)
+    act = str(action)
+    if _USE_CLASS_INDEX:
+        hits = _retrieve_collect_hits_indexed(store, frag, act)
+    else:
+        hits = _retrieve_collect_hits_full_scan(store, frag, act)
+    return _retrieve_from_hits(store, frag, hits, count=count)
 
 
 def _add_prov(cls: dict[str, Any], typ: str, target: Any, tick: int) -> None:

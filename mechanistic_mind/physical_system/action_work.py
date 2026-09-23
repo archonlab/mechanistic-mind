@@ -11,7 +11,15 @@ from typing import Any
 
 import numpy as np
 
-from .actions import BRIDGE_ID, BRIDGE_MISSING, action_direction
+from .actions import (
+    BRIDGE_ID,
+    BRIDGE_MISSING,
+    BRIDGE_NECK,
+    BRIDGE_PUSH,
+    action_direction,
+    is_push_action,
+    neck_motor_command,
+)
 from .motor_work import ke_increment, scale_positive_ke
 
 
@@ -57,6 +65,40 @@ def request_discrete_action(
             "bridge": BRIDGE_ID,
             "bridge_available": True,
             "direction_frame": "WORLD",
+            "action_dv_requested": [0.0, 0.0],
+            "action_dv_requested_after_vmax": [0.0, 0.0],
+            "action_impulse_requested": [0.0, 0.0],
+            "action_work_signed_requested": 0.0,
+            "action_work_requested": 0.0,
+            "action_negative_work_requested": 0.0,
+            "receipt_id": receipt_id,
+        }
+    neck_u = neck_motor_command(kind)
+    if neck_u is not None:
+        # Neck motors do not produce translational Δv; work cost applied later if enabled.
+        return {
+            "selected_action": kind,
+            "mass": float(mass),
+            "bridge": BRIDGE_NECK,
+            "bridge_available": True,
+            "direction_frame": "BODY_RELATIVE_NECK",
+            "neck_motor": float(neck_u),
+            "action_dv_requested": [0.0, 0.0],
+            "action_dv_requested_after_vmax": [0.0, 0.0],
+            "action_impulse_requested": [0.0, 0.0],
+            "action_work_signed_requested": 0.0,
+            "action_work_requested": 0.0,
+            "action_negative_work_requested": 0.0,
+            "receipt_id": receipt_id,
+        }
+    if is_push_action(kind):
+        return {
+            "selected_action": kind,
+            "mass": float(mass),
+            "bridge": BRIDGE_PUSH,
+            "bridge_available": True,
+            "direction_frame": "BODY_HEADING",
+            "push_exertion": 1.0,
             "action_dv_requested": [0.0, 0.0],
             "action_dv_requested_after_vmax": [0.0, 0.0],
             "action_impulse_requested": [0.0, 0.0],
@@ -132,6 +174,11 @@ def realize_discrete_action(
     dv = scale * dv_req
     body.vx = float(vx0 + dv[0])
     body.vy = float(vy0 + dv[1])
+    # Neck / push motor arming (translational Δv above remains 0 for these).
+    if request.get("bridge") == BRIDGE_NECK and "neck_motor" in request:
+        body.neck_motor = float(request["neck_motor"])
+    if request.get("bridge") == BRIDGE_PUSH and float(request.get("push_exertion") or 0.0) > 0.0:
+        body.push_exertion = float(request["push_exertion"])
     signed_real = ke_increment(mass, vx0, vy0, float(dv[0]), float(dv[1]))
     positive_real = max(0.0, signed_real) if accounting_enabled else 0.0
     budget = w0 if allocated_work is None else min(w0, max(0.0, float(allocated_work)))

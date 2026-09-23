@@ -123,6 +123,17 @@ class PsychologyAnalyzer:
         self._write_json(epochs_path, epochs)
         self._write_json(biography_path, biography)
         write_html_report(report_path, summary, events, epochs, biography)
+        
+        # SCIENTIFIC_V3 CORE reconstruction (additive; NOT_RECORDED if absent)
+        try:
+            from mechanistic_mind.scientific_v3.analyzer_adapter import write_v3_core_reconstruction
+            # Prefer sibling scientific live dir or source parent
+            cand = source_path.parent
+            if (cand / "scientific_spine.jsonl").is_file() or (cand / "scientific_v3_meta.json").is_file():
+                write_v3_core_reconstruction(cand, output / "scientific_v3_core_reconstruction.json")
+        except Exception:
+            pass
+
         return AnalysisResult(source_path, output, summary_path, events_path, epochs_path, biography_path, report_path, timeline_path)
 
     @staticmethod

@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,6 +18,299 @@ SCHEMA = "mm.psychology_observer.physical_run.v1"
 SNAPSHOT_SINGLE = "mm.physical_system.snapshot.v2"
 SNAPSHOT_TWO = "mm.physical_system.two_agent.snapshot.v1"
 RUN_SUBDIR = "psychology_observer/psy_observer_web"
+JSON_NONE_KEY = "null"
+
+
+def json_key(k: Any) -> str:
+    """JSON object keys must be strings. None is encoded as 'null' (json.dumps default)."""
+    if k is None:
+        return JSON_NONE_KEY
+    if isinstance(k, bool):
+        return "true" if k else "false"
+    if isinstance(k, bytes):
+        return k.decode("utf-8", "replace")
+    return str(k)
+
+
+def _sort_tiebreak(x: Any) -> tuple:
+    if x is None:
+        return (0, "")
+    if isinstance(x, bool):
+        return (1, int(x))
+    if isinstance(x, (int, float)) and not isinstance(x, bool):
+        return (2, float(x))
+    return (3, str(x))
+
+
+def json_safe(obj: Any) -> Any:
+    """Make a payload JSON-serializable without turning None *values* into 0.
+
+    Mixed dict keys (int + None) make json.dumps(..., sort_keys=True) raise
+    TypeError: '<' not supported between instances of 'int' and 'NoneType'.
+    """
+    if obj is None or isinstance(obj, (str, int, float, bool)):
+        return obj
+    if isinstance(obj, dict):
+        out: dict[str, Any] = {}
+        for k, v in obj.items():
+            out[json_key(k)] = json_safe(v)
+        return out
+    if isinstance(obj, (list, tuple)):
+        return [json_safe(x) for x in obj]
+    if isinstance(obj, set):
+        items = [json_safe(x) for x in obj]
+        try:
+            items.sort(key=_sort_tiebreak)
+        except TypeError:
+            pass
+        return items
+    return _json_leaf(obj)
+
+
+def json_prepare(obj: Any) -> Any:
+    """Make ``obj`` JSON-serializable, mutating string-key dicts in place.
+
+    Unlike ``json_safe`` this does not copy every mapping when keys are already
+    strings (typical of ``runtime.snapshot()``). Used on the Save & Stop path
+    so aged cognition is not triplicated in RAM.
+    """
+    if obj is None or isinstance(obj, (str, int, float, bool)):
+        return obj
+    if isinstance(obj, dict):
+        need_rekey = False
+        for k in obj:
+            if not isinstance(k, str):
+                need_rekey = True
+                break
+        if need_rekey:
+            return {json_key(k): json_prepare(v) for k, v in obj.items()}
+        for k, v in list(obj.items()):
+            nv = json_prepare(v)
+            if nv is not v:
+                obj[k] = nv
+        return obj
+    if isinstance(obj, (list, tuple)):
+        if isinstance(obj, tuple):
+            return [json_prepare(x) for x in obj]
+        for i, v in enumerate(obj):
+            nv = json_prepare(v)
+            if nv is not v:
+                obj[i] = nv
+        return obj
+    if isinstance(obj, set):
+        items = [json_prepare(x) for x in obj]
+        try:
+            items.sort(key=_sort_tiebreak)
+        except TypeError:
+            pass
+        return items
+    return _json_leaf(obj)
+
+
+def _json_leaf(obj: Any) -> Any:
+    tolist = getattr(obj, "tolist", None)
+    if callable(tolist):
+        try:
+            return json_safe(tolist())
+        except Exception:
+            pass
+    to_dict = getattr(obj, "to_dict", None)
+    if callable(to_dict):
+        try:
+            return json_safe(to_dict())
+        except Exception:
+            pass
+    return str(obj)
+
+
+# Reconstructible P0 / cache keys. Not canonical scientific history.
+# Encoder skips them while walking live cognition so persist does not copy
+# or mutate derived indexes.
+DERIVED_PERSIST_SKIP = frozenset({
+    "_ix_action",
+    "_ix_member",
+    "_ix_gen",
+    "_ix_built_gen",
+    "_active_ids",
+    "_active_count",
+    "_mean_c_cached",
+    "_retrieve_cache",
+    "_retrieve_cache_gen",
+    "_ix_motor",
+    "_ix_loco",
+})
+
+
+def _persist_default(obj: Any) -> Any:
+    if isinstance(obj, tuple):
+        return list(obj)
+    if isinstance(obj, set):
+        items = list(obj)
+        try:
+            items.sort(key=_sort_tiebreak)
+        except TypeError:
+            pass
+        return items
+    tolist = getattr(obj, "tolist", None)
+    if callable(tolist):
+        try:
+            return tolist()
+        except Exception:
+            pass
+    to_dict = getattr(obj, "to_dict", None)
+    if callable(to_dict):
+        try:
+            return to_dict()
+        except Exception:
+            pass
+    return str(obj)
+
+
+def _has_non_str_keys(obj: Any, seen: set[int] | None = None) -> bool:
+    if seen is None:
+        seen = set()
+    if obj is None or isinstance(obj, (str, int, float, bool)):
+        return False
+    oid = id(obj)
+    if oid in seen:
+        return False
+    if isinstance(obj, dict):
+        seen.add(oid)
+        for k, v in obj.items():
+            if not isinstance(k, str):
+                return True
+            if _has_non_str_keys(v, seen):
+                return True
+        return False
+    if isinstance(obj, (list, tuple)):
+        seen.add(oid)
+        return any(_has_non_str_keys(x, seen) for x in obj)
+    return False
+
+
+def dump_persist(obj: Any, fp: Any, *, compact: bool = True) -> None:
+    """Stream JSON to ``fp`` without a full in-memory document string and without mutating ``obj``.
+
+    Production path uses CPython ``json.dump`` (read-only walk). Mixed int/None keys
+    fall back to a non-mutating walker that stringifies keys on the fly.
+    ``json_prepare`` must not be aimed at live cognition.
+    """
+    indent: int | None = None if compact else 2
+    separators = (",", ":") if compact else (", ", ": ")
+    if not _has_non_str_keys(obj):
+        json.dump(
+            obj,
+            fp,
+            ensure_ascii=False,
+            indent=indent,
+            separators=separators,
+            default=_persist_default,
+        )
+        return
+    _dump_persist_walk(obj, fp, compact=compact)
+
+
+def _dump_persist_walk(obj: Any, fp: Any, *, compact: bool) -> None:
+    indent = None if compact else 2
+    colon = ":" if compact else ": "
+    comma = "," if compact else ", "
+    default = str
+
+    def encode_one(value: Any, level: int) -> None:
+        if value is None:
+            fp.write("null")
+            return
+        if value is True:
+            fp.write("true")
+            return
+        if value is False:
+            fp.write("false")
+            return
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            fp.write(json.dumps(value, allow_nan=True))
+            return
+        if isinstance(value, str):
+            fp.write(json.dumps(value, ensure_ascii=False))
+            return
+        if isinstance(value, dict):
+            items = []
+            for k, v in value.items():
+                if k in DERIVED_PERSIST_SKIP:
+                    continue
+                items.append((json_key(k), v))
+            fp.write("{")
+            if not items:
+                fp.write("}")
+                return
+            nl = "\n" + (" " * (indent * (level + 1))) if indent else ""
+            end = "\n" + (" " * (indent * level)) if indent else ""
+            first = True
+            for ks, v in items:
+                if first:
+                    first = False
+                else:
+                    fp.write(comma)
+                if indent:
+                    fp.write(nl)
+                fp.write(json.dumps(ks, ensure_ascii=False))
+                fp.write(colon)
+                encode_one(v, level + 1)
+            if indent:
+                fp.write(end)
+            fp.write("}")
+            return
+        if isinstance(value, (list, tuple)):
+            fp.write("[")
+            if not value:
+                fp.write("]")
+                return
+            nl = "\n" + (" " * (indent * (level + 1))) if indent else ""
+            end = "\n" + (" " * (indent * level)) if indent else ""
+            first = True
+            for v in value:
+                if first:
+                    first = False
+                else:
+                    fp.write(comma)
+                if indent:
+                    fp.write(nl)
+                encode_one(v, level + 1)
+            if indent:
+                fp.write(end)
+            fp.write("]")
+            return
+        if isinstance(value, set):
+            items = list(value)
+            try:
+                items.sort(key=_sort_tiebreak)
+            except TypeError:
+                pass
+            encode_one(items, level)
+            return
+        tolist = getattr(value, "tolist", None)
+        if callable(tolist):
+            try:
+                encode_one(tolist(), level)
+                return
+            except Exception:
+                pass
+        fp.write(json.dumps(default(value), ensure_ascii=False))
+
+    encode_one(obj, 0)
+
+
+def _json_dump(path: Path, payload: Any, *, compact: bool = False) -> None:
+    """Stream JSON to ``.part`` then ``os.replace``. Do not build a full in-memory string.
+
+    Does not call ``json_prepare`` on ``payload`` (that mutates nested dicts).
+    Compact mode is for aged runtime snapshots; small metadata may stay pretty.
+    """
+    tmp = path.with_name(path.name + ".part")
+    with tmp.open("w", encoding="utf-8") as fh:
+        dump_persist(payload, fh, compact=compact)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, path)
 
 
 def project_root() -> Path:
@@ -34,13 +328,6 @@ def default_results_root() -> Path:
 def new_run_id(*, now: datetime | None = None) -> str:
     stamp = (now or datetime.now(timezone.utc)).strftime("%Y%m%dT%H%M%S.%fZ")
     return f"psyweb-{stamp}-{uuid.uuid4().hex[:8]}"
-
-
-def _json_dump(path: Path, payload: Any) -> None:
-    path.write_text(
-        json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2, default=str),
-        encoding="utf-8",
-    )
 
 
 def _row_ticks(rows: list[dict[str, Any]], key: str = "tick") -> list[int]:
@@ -295,7 +582,12 @@ def write_finalized_run(
     phases: list[str] = ["flushing_telemetry"]
 
     try:
-        snapshot = runtime.snapshot()
+        t_cap0 = time.perf_counter()
+        try:
+            snapshot = runtime.snapshot(persist=True)  # type: ignore[call-arg]
+        except TypeError:
+            snapshot = runtime.snapshot()
+        t_cap1 = time.perf_counter()
         phases.append("saving_snapshot")
         events = collect_structured_events(runtime)
         integrity_errors = validate_persistence_boundary(
@@ -318,15 +610,17 @@ def write_finalized_run(
                 details={"errors": integrity_errors},
             )
 
-        _json_dump(tmp_dir / "physical_system_snapshot.json", snapshot)
+        t_dump0 = time.perf_counter()
+        _json_dump(tmp_dir / "physical_system_snapshot.json", snapshot, compact=True)
+        t_dump1 = time.perf_counter()
         _json_dump(tmp_dir / "structured_events.json", {
             "schema": "mm.psy_observer_web.structured_events.v1",
             "events": events,
             "agent_count": len(getattr(runtime, "slots", None) or [runtime]),
-        })
+        }, compact=True)
 
         (tmp_dir / "session_timeline.jsonl").write_text(
-            "".join(json.dumps(row, ensure_ascii=False, default=str) + "\n" for row in timeline),
+            "".join(json.dumps(json_safe(row), ensure_ascii=False, default=str) + "\n" for row in timeline),
             encoding="utf-8",
         )
         _json_dump(tmp_dir / "session_telemetry.json", {
@@ -375,6 +669,20 @@ def write_finalized_run(
             artifacts["scientific_timeline"] = "scientific_timeline.jsonl"
             artifacts["scientific_events"] = "scientific_events.jsonl"
             artifacts["scientific_meta"] = "scientific_meta.json"
+        # SCIENTIFIC_V3 CORE — record if present after copy
+        for v3_key, v3_name in (
+            ("scientific_v3_meta", "scientific_v3_meta.json"),
+            ("identity_map", "identity_map.json"),
+            ("scientific_spine", "scientific_spine.jsonl"),
+            ("scientific_observations", "scientific_observations.jsonl"),
+            ("scientific_decisions", "scientific_decisions.jsonl"),
+            ("scientific_motors", "scientific_motors.jsonl"),
+            ("scientific_consequences", "scientific_consequences.jsonl"),
+        ):
+            if (tmp_dir / v3_name).is_file():
+                artifacts[v3_key] = v3_name
+                caps = dict(caps)
+                caps["scientific_v3_core"] = True
         manifest = {
             "schema": SCHEMA,
             "run_id": rid,
@@ -428,9 +736,10 @@ def write_finalized_run(
         }
         _json_dump(tmp_dir / "run.json", manifest)
 
-        # Re-read written boundary before publish (defense in depth)
+        # Re-read *small* run.json only. Do not json.loads the snapshot file
+        # (that re-materialized the aged graph and contributed to the 14 GB OOM).
         written_manifest = json.loads((tmp_dir / "run.json").read_text(encoding="utf-8"))
-        written_snap = json.loads((tmp_dir / "physical_system_snapshot.json").read_text(encoding="utf-8"))
+        snap_path = tmp_dir / "physical_system_snapshot.json"
         if int(written_manifest.get("final_tick", -1)) != live_tick:
             shutil.rmtree(tmp_dir, ignore_errors=True)
             return _integrity_failure(
@@ -441,12 +750,22 @@ def write_finalized_run(
                 run_dir=None,
                 phases=phases + ["post_write_validation_failed"],
             )
-        if int(written_snap.get("tick", -1)) != live_tick:
+        if not snap_path.is_file() or snap_path.stat().st_size < 2:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            return _integrity_failure(
+                error="persistence_integrity_error: snapshot file missing or empty after write",
+                live_tick=live_tick,
+                captured_tick=int(snapshot.get("tick", -1)),
+                run_id=rid,
+                run_dir=None,
+                phases=phases + ["post_write_validation_failed"],
+            )
+        if int(snapshot.get("tick", -1)) != live_tick:
             shutil.rmtree(tmp_dir, ignore_errors=True)
             return _integrity_failure(
                 error="persistence_integrity_error: written snapshot tick mismatch",
                 live_tick=live_tick,
-                captured_tick=int(written_snap.get("tick", -1)),
+                captured_tick=int(snapshot.get("tick", -1)),
                 run_id=rid,
                 run_dir=None,
                 phases=phases + ["post_write_validation_failed"],
@@ -477,6 +796,10 @@ def write_finalized_run(
             "runtime_generation": identity.get("runtime_generation"),
             "agent_count": agent_count,
             "scientific_history": manifest.get("scientific_history"),
+            "persist_timings": {
+                "capture_s": round(t_cap1 - t_cap0, 6),
+                "snapshot_dump_s": round(t_dump1 - t_dump0, 6),
+            },
             "integrity": {
                 "captured_live_tick": live_tick,
                 "snapshot_tick": live_tick,
@@ -486,6 +809,9 @@ def write_finalized_run(
                 "structured_events_max_tick": max(ev_ticks) if ev_ticks else None,
             },
         }
+    except MemoryError:
+        # Leave tmp dir for forensics (Beta 3 OOM left an empty .tmp-* directory).
+        raise
     except Exception:
         shutil.rmtree(tmp_dir, ignore_errors=True)
         raise

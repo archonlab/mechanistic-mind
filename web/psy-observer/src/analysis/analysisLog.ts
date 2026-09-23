@@ -67,7 +67,19 @@ export function formatAnalysisLog(analysis: RunAnalysis): string {
   for (const a of analysis.agents) {
     lines.push(a.agent_id.toUpperCase());
     lines.push(`  Seed: ${show(a.seed)}  Body: ${a.body_id}  Ticks observed (canonical action ticks): ${a.ticks_observed}`);
-    lines.push(`  TICK-LEVEL ACTION OCCUPANCY (one canonical action per simulation tick):`);
+    const cm = (analysis as any).composite_motor;
+    if (cm?.authoritative) {
+      const ag = cm.agents?.[a.agent_id];
+      lines.push(`  COMPOSITE MOTOR FORENSICS (authoritative; schema=${cm.schema}):`);
+      if (ag) {
+        lines.push(`    locomotion ticks: ${ag.locomotion_ticks}  neck-control: ${ag.neck_control_ticks}  osc-control: ${ag.oscillator_control_ticks}`);
+        lines.push(`    emission triggers: ${ag.emission_trigger_ticks}  emission active ticks: ${ag.control_vs_effector?.emission_active_ticks}`);
+        lines.push(`    push ticks: ${ag.push_ticks}  WAIT/no-intervention: ${ag.wait_no_intervention_ticks}`);
+        lines.push(`    combinations: ${JSON.stringify(ag.combinations)}`);
+      }
+      lines.push(`  LEGACY PROJECTION (canonical one-label occupancy — not authoritative under COMPOSITE_MOTOR_V1):`);
+    }
+    lines.push(`  TICK-LEVEL ACTION OCCUPANCY (one canonical action per simulation tick${cm?.authoritative ? ' — LEGACY PROJECTION' : ''}):`);
     lines.push(`    WAIT ticks: ${show(a.actions.wait_count)} (${show(a.actions.wait_pct)}%)  MOVE ticks: ${show(a.actions.move_count)} (${show(a.actions.move_pct)}%)`);
     lines.push(`    Occupancy total: ${a.actions.occupancy_total}  (must be ≤ ticks observed; OBSERVED-TICK STATISTIC)`);
     lines.push(`    MOVE distribution: ${show(a.actions.move_distribution)}`);
@@ -79,8 +91,18 @@ export function formatAnalysisLog(analysis: RunAnalysis): string {
       lines.push(`  CUMULATIVE RUNTIME ACTION COUNTS (cognition metrics; not tick-level occupancy merge):`);
       lines.push(`    ${JSON.stringify(a.cumulative_runtime_action_counts)}`);
     }
-    lines.push(`  STRUCTURED COGNITIVE EVENTS (independent of runtime aggregates):`);
-    lines.push(`    SCENARIO_SELECTED: ${show(a.cognition.scenario_selected)} (WAIT ${show(a.cognition.scenario_selected_wait)} / MOVE ${show(a.cognition.scenario_selected_move)})`);
+    lines.push(`  STRUCTURED COGNITIVE EVENTS / LEGACY STRUCTURED EVENT COUNTS (compatibility; not authoritative under SCIENTIFIC_V3):`);
+    lines.push(`    SCENARIO_SELECTED event rows: ${show(a.cognition.scenario_selected)} (WAIT ${show(a.cognition.scenario_selected_wait)} / MOVE ${show(a.cognition.scenario_selected_move)})`);
+    {
+      const v3 = (analysis as any).scientific_v3_core;
+      const v3Dec = Number(v3?.decision_receipts || 0);
+      if (v3 && v3.evidence_version === 'SCIENTIFIC_V3' && v3Dec > 0) {
+        lines.push(`  SCIENTIFIC_V3 DECISION EVIDENCE (authoritative):`);
+        lines.push(`    DecisionReceipts: ${v3Dec}`);
+        lines.push(`    Coverage: ${show(v3.decision_coverage || 'COMPLETE')}`);
+        lines.push(`    Note: SCENARIO_SELECTED=0 does NOT mean cognition/decision evidence is absent.`);
+      }
+    }
     lines.push(`    Cognitive WAIT selections: ${show(a.cognition.cognitive_wait_selections)}  Fallback WAIT: ${show(a.cognition.fallback_wait_selections)}`);
     lines.push(`    Action sources (tick-level when from timeline): ${show(a.cognition.selected_action_sources)}`);
     lines.push(`  MOVEMENT: distance(${show((a.movement as any).distance_metric)}) ${show(a.movement.distance_travelled)}  path_euclid ${show((a.movement as any).path_length_euclidean)}  net_wrap_observed ${show(a.movement.net_displacement)}  unwrapped_net ${show((a.movement as any).unwrapped_net_displacement)}  unwrappedΔ (${show((a.movement as any).unwrapped_dx)}, ${show((a.movement as any).unwrapped_dy)})  max_exc ${show((a.movement as any).max_excursion_from_start)}  mean_speed ${show(a.movement.mean_speed)}  max_speed ${show(a.movement.max_speed)}`);
@@ -189,6 +211,46 @@ export function formatAnalysisLog(analysis: RunAnalysis): string {
   }
   lines.push('');
 
+  const br = (analysis as any).behavioral_reconstruction;
+  lines.push('BEHAVIORAL RECONSTRUCTION');
+  if (br && typeof br.report_text === 'string' && br.report_text.trim()) {
+    // report_text already starts with the section title — avoid duplicating header body
+    const body = br.report_text.replace(/^BEHAVIORAL RECONSTRUCTION\s*=*\s*/i, '').trimEnd();
+    lines.push(body);
+  } else if (br && br.status === 'NOT_RECORDED') {
+    lines.push('  status: NOT_RECORDED');
+    lines.push('  note: SCIENTIFIC_V3 CORE absent — O→D→M→C links NOT_RECORDED (not zero). V2 analysis remains below.');
+  } else {
+    lines.push('  status: NOT_AVAILABLE');
+    lines.push('  note: Behavioral Reconstruction payload not present in evidence package.');
+  }
+  lines.push('');
+  if (br && typeof br.sensorimotor_report_text === 'string' && br.sensorimotor_report_text.trim()) {
+    lines.push(br.sensorimotor_report_text.trimEnd());
+    lines.push('');
+  } else if (br && br.status === 'AVAILABLE') {
+    lines.push('SENSORIMOTOR CONSEQUENCE ANALYSIS');
+    lines.push('  status: NOT_AVAILABLE in this package (rebuild Analyzer Next / re-analyze).');
+    lines.push('');
+  }
+
+  const acm = (br as any)?.action_conditioned_model_report_text
+    || (analysis as any).behavioral_reconstruction?.action_conditioned_model_report_text
+    || (analysis as any).action_conditioned_model_report_text;
+  if (acm && typeof acm === 'string' && acm.trim()) {
+    lines.push(acm.trimEnd());
+    lines.push('');
+  } else {
+    lines.push('ACTION-CONDITIONED SENSORIMOTOR MODEL');
+    lines.push('  status: NOT_RECORDED');
+    lines.push('  note: No sensorimotor consequence model telemetry in this analysis package.');
+    lines.push('');
+  }
+
+  lines.push('HISTORICAL SENSORIMOTOR SELECTION');
+  lines.push('  status: NOT_RECORDED in ordinary run packages (see dedicated investigation report).');
+  lines.push('');
+
   lines.push('SIGNAL FORENSICS');
   lines.push('  Physical signals ≠ messages. Emission ≠ intentional emission. Reception ≠ interpretation.');
   lines.push(`  Coverage: ${analysis.coverage.signals}`);
@@ -197,6 +259,42 @@ export function formatAnalysisLog(analysis: RunAnalysis): string {
 
   const vfLines = formatVisualForensicsSection(analysis.vision_forensics);
   lines.push(...vfLines);
+  lines.push('');
+
+  const v3 = (analysis as any).scientific_v3_core;
+  lines.push('SCIENTIFIC_V3 CORE RECONSTRUCTION');
+  if (!v3 || v3.status === 'NOT_RECORDED' || v3.evidence_version !== 'SCIENTIFIC_V3') {
+    lines.push('  status: NOT_RECORDED');
+    lines.push('  note: No SCIENTIFIC_V3 CORE package in this run directory (V2-only or pre-V3). Not fabricated from V2.');
+  } else {
+    lines.push(`  status: ${show(v3.status || 'AVAILABLE')}`);
+    lines.push(`  schema_version: ${show(v3.schema_version)}`);
+    lines.push(`  evidence_tier: ${show(v3.evidence_tier)}`);
+    lines.push(`  identity_coverage: ${show(v3.identity_coverage)}`);
+    lines.push(`  observation_coverage: ${show(v3.observation_coverage)}`);
+    lines.push(`  decision_coverage: ${show(v3.decision_coverage)}`);
+    lines.push(`  motor_coverage: ${show(v3.motor_coverage)}`);
+    lines.push(`  consequence_coverage: ${show(v3.consequence_coverage)}`);
+    lines.push(`  identity_bodies: ${show(v3.identity_bodies)}`);
+    lines.push(`  ticks_expected (autonomous spines): ${show(v3.ticks_expected)}`);
+    lines.push(`  observation_receipts: ${show(v3.observation_receipts)}`);
+    lines.push(`  decision_receipts: ${show(v3.decision_receipts)}`);
+    lines.push(`  motor_receipts: ${show(v3.motor_receipts)}`);
+    lines.push(`  consequence_receipts: ${show(v3.consequence_receipts)}`);
+    lines.push(`  complete O→D→M→C chains: ${show(v3.complete_odmc_chains)}`);
+    lines.push(`  incomplete O→D→M→C chains: ${show(v3.incomplete_odmc_chains)}`);
+    lines.push(`  chain completeness: ${show(v3.chain_completeness_pct)}%`);
+    lines.push(`  tick range: ${show(v3.tick_range)}`);
+    if (Array.isArray(v3.identity_mapping) && v3.identity_mapping.length) {
+      lines.push('  identity mapping:');
+      for (const b of v3.identity_mapping) {
+        lines.push(`    body=${b.physical_body_id} cog=${show(b.cognitive_agent_id)} ctrl=${show(b.controller_type)} role=${show(b.role_label)}`);
+      }
+    }
+    const broken = v3.broken_chains_by_reason || {};
+    lines.push(`  broken chains by reason: ${JSON.stringify(broken)}`);
+    if (v3.health) lines.push(`  writer health: ${JSON.stringify(v3.health)}`);
+  }
   lines.push('');
 
   lines.push('SCIENTIFIC BOUNDARY');

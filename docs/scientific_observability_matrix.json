@@ -1,0 +1,1807 @@
+{
+  "schema": "mm.scientific_observability_matrix.v1",
+  "audit_date": "2026-09-21T05:27:10.964831+00:00",
+  "runtime_version_at_audit": "MM_1_0_TIKTAALIK",
+  "example_run_id": "psyweb-20260921T041444.727355Z-ec8b45bc",
+  "mechanism_count": 46,
+  "families": [
+    "ACTION_MOTOR",
+    "COGNITIVE",
+    "PHYSICAL_WORLD",
+    "SENSORY",
+    "SIGNAL_INTERACTION"
+  ],
+  "timeline_v2_fields": [
+    "tick",
+    "agent_id",
+    "body_id",
+    "agent_seed",
+    "schema",
+    "telemetry_tier",
+    "x",
+    "y",
+    "vx",
+    "vy",
+    "speed",
+    "theta",
+    "omega",
+    "body_alpha",
+    "head_omega",
+    "head_relative_angle",
+    "head_world_heading",
+    "action",
+    "action_source",
+    "contact",
+    "observer_undercover",
+    "resource_A",
+    "resource_B",
+    "work",
+    "work_action_allocated",
+    "vest_0",
+    "vest_1",
+    "prop_neck_0",
+    "prop_neck_1",
+    "osc_amplitude",
+    "osc_frequency",
+    "osc_emit_active",
+    "osc_emit_remaining",
+    "osc_l_energy",
+    "osc_r_energy",
+    "vision_optical",
+    "prediction_count",
+    "prospective_compositions"
+  ],
+  "timeline_field_provenance": {
+    "x": "PHYSICAL_GROUND_TRUTH",
+    "y": "PHYSICAL_GROUND_TRUTH",
+    "vx": "PHYSICAL_GROUND_TRUTH",
+    "vy": "PHYSICAL_GROUND_TRUTH",
+    "speed": "DERIVED_ANALYSIS",
+    "theta": "PHYSICAL_GROUND_TRUTH",
+    "omega": "PHYSICAL_GROUND_TRUTH",
+    "body_alpha": "PHYSICAL_GROUND_TRUTH",
+    "head_omega": "PHYSICAL_GROUND_TRUTH",
+    "head_relative_angle": "PHYSICAL_GROUND_TRUTH",
+    "head_world_heading": "PHYSICAL_GROUND_TRUTH",
+    "action": "ACTION_SELECTION",
+    "action_source": "ACTION_SELECTION",
+    "contact": "PHYSICAL_GROUND_TRUTH",
+    "observer_undercover": "EXPERIMENTER_CONTROL",
+    "resource_A": "PHYSICAL_GROUND_TRUTH",
+    "resource_B": "PHYSICAL_GROUND_TRUTH",
+    "work": "PHYSICAL_GROUND_TRUTH",
+    "work_action_allocated": "PHYSICAL_GROUND_TRUTH",
+    "vest_0": "AGENT_ACCESSIBLE",
+    "vest_1": "AGENT_ACCESSIBLE",
+    "prop_neck_0": "AGENT_ACCESSIBLE",
+    "prop_neck_1": "AGENT_ACCESSIBLE",
+    "osc_amplitude": "PHYSICAL_GROUND_TRUTH",
+    "osc_frequency": "PHYSICAL_GROUND_TRUTH",
+    "osc_emit_active": "PHYSICAL_GROUND_TRUTH",
+    "osc_emit_remaining": "PHYSICAL_GROUND_TRUTH",
+    "osc_l_energy": "AGENT_ACCESSIBLE",
+    "osc_r_energy": "AGENT_ACCESSIBLE",
+    "vision_optical": "MIXED_AGENT_AND_GT",
+    "prediction_count": "COGNITIVE_INTERNAL",
+    "prospective_compositions": "COGNITIVE_INTERNAL"
+  },
+  "runtime_structured_event_types": [
+    "BODY_ROTATED",
+    "BODY_MOVED",
+    "BODY_DEFORMED",
+    "SITE_GEOMETRY_CHANGED",
+    "LOCAL_MATERIAL_CHANGED",
+    "INTERNAL_STATE_CHANGED",
+    "ENVIRONMENT_EXPOSURE_CHANGED",
+    "SCENARIO_SUPPORTED",
+    "SCENARIO_SELECTED",
+    "PREDICTION_MATCHED",
+    "PREDICTION_VIOLATED",
+    "OBJECT_CONTACT",
+    "OBSERVATION_ACQUIRED",
+    "WORK_TRANSFERRED",
+    "DEFORMATION_POWERED",
+    "DEFORMATION_EXTERNALLY_FORCED",
+    "DEFORMATION_RELAXED",
+    "DEFORMATION_WORK_LIMITED",
+    "WORK_RESERVOIR_DEPLETED",
+    "STORED_MECHANICAL_ENERGY_RELEASED",
+    "RESOURCE_TRANSFER_STARTED",
+    "RESOURCE_TRANSFERRED",
+    "RESOURCE_SOURCE_DEPLETED",
+    "BODY_RESOURCE_CAPACITY_REACHED",
+    "RESOURCE_CONVERTED_TO_WORK",
+    "WORK_RESERVOIR_REPLENISHED",
+    "RESOURCE_A_TRANSFERRED",
+    "RESOURCE_B_TRANSFERRED",
+    "RESOURCE_A_CAPACITY_REACHED",
+    "RESOURCE_B_CAPACITY_REACHED",
+    "RESOURCE_A_LIMITING",
+    "RESOURCE_B_LIMITING",
+    "COMPLEMENTARY_CONVERSION",
+    "COMPLEMENTARY_CONVERSION_STOPPED",
+    "RESOURCE_A_DEPLETED",
+    "RESOURCE_B_DEPLETED",
+    "MOTOR_DRIVE_GENERATED",
+    "MOTOR_WORK_REQUESTED",
+    "MOTOR_WORK_REALIZED",
+    "MOTOR_WORK_LIMITED",
+    "MOTOR_WORK_UNAVAILABLE",
+    "WORK_ALLOCATED_TO_MOTOR",
+    "DISCRETE_ACTION_SELECTED",
+    "ACTION_WORK_REQUESTED",
+    "ACTION_WORK_ALLOCATED",
+    "ACTION_WORK_REALIZED",
+    "ACTION_WORK_LIMITED",
+    "ACTION_WORK_UNAVAILABLE",
+    "ACTION_PHYSICAL_REALIZATION",
+    "PHYSICAL_SIGNAL_EMITTED",
+    "PHYSICAL_SIGNAL_RECEIVED",
+    "NECK_MOTOR_APPLIED",
+    "PUSH_FORCE_APPLIED",
+    "PUSH_NO_CONTACT"
+  ],
+  "v2_analyzer_exhaustive_event_prefixes": [
+    "SCENARIO_",
+    "DISCRETE_ACTION_",
+    "PREDICTION_",
+    "OBSERVATION_ACQUIRED",
+    "DEFORM",
+    "WORK_LIMIT",
+    "WORK_UNAVAILABLE",
+    "LIMITING",
+    "CONVERSION",
+    "RESOURCE_CONVERTED",
+    "PHYSICAL_SIGNAL_",
+    "SIGNAL_",
+    "WORLD_INTERVENTION",
+    "EXPERIMENTER_",
+    "CONTACT",
+    "NECK_",
+    "PUSH_"
+  ],
+  "v2_omitted_examples_mean_NOT_RECORDED": [
+    "BODY_MOVED",
+    "BODY_ROTATED",
+    "ENVIRONMENTAL_FORCE",
+    "FORCE_APPLIED",
+    "INTERNAL_MEDIUM_UPDATE",
+    "LOCAL_MATERIAL_CHANGED",
+    "MOTOR_IMPULSE",
+    "RESOURCE_TRANSFER",
+    "SITE_GEOMETRY_CHANGED",
+    "WORK_ALLOCATED",
+    "WORK_TRANSFERRED"
+  ],
+  "mechanisms": [
+    {
+      "mechanism_id": "discrete_action_bridge",
+      "mechanism_family": "ACTION_MOTOR",
+      "label": "DISCRETE ACTION BRIDGE",
+      "description": "Maps WAIT/MOVE strings to requested world-frame physical intervention.",
+      "validation": "Implemented bridge; TAKE/RELEASE/CONTACT/EMIT remain unavailable.",
+      "provenance_tag": "baseline_action_bridge",
+      "config_path": null,
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [],
+      "observer_gt_fields": [],
+      "events_emitted_runtime": [],
+      "timeline_fields_v2": [],
+      "analyzer_consumers": [],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "shared_work_allocation",
+      "mechanism_family": "PHYSICAL_WORLD",
+      "label": "SHARED WORK ALLOCATION",
+      "description": "Proportional positive-work allocation across action, motor and deformation.",
+      "validation": "Validated as part of motor/action work accounting.",
+      "provenance_tag": "mm_discrete_action_work_experiment",
+      "config_path": null,
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [],
+      "observer_gt_fields": [],
+      "events_emitted_runtime": [],
+      "timeline_fields_v2": [],
+      "analyzer_consumers": [],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "environmental_site_mechanics",
+      "mechanism_family": "PHYSICAL_WORLD",
+      "label": "ENVIRONMENTAL SITE MECHANICS",
+      "description": "Actual local environment sampling, force composition and torque path.",
+      "validation": "Validated morphology/orientation mechanics.",
+      "provenance_tag": "validated_orientation_experiment",
+      "config_path": null,
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [],
+      "observer_gt_fields": [],
+      "events_emitted_runtime": [],
+      "timeline_fields_v2": [],
+      "analyzer_consumers": [],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "predictive_compression",
+      "mechanism_family": "COGNITIVE",
+      "label": "PREDICTIVE COMPRESSION",
+      "description": "Retains bounded observation-action predictive structures.",
+      "validation": "Existing cognition mechanism; enabled state does not imply a physical bridge.",
+      "provenance_tag": "baseline_cognition",
+      "config_path": "cognition.predictive_compression",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [
+        "observation channels feeding cognition"
+      ],
+      "observer_gt_fields": [
+        "cognitive metrics aggregates"
+      ],
+      "events_emitted_runtime": [
+        "SCENARIO_*",
+        "PREDICTION_*",
+        "OBSERVATION_ACQUIRED",
+        "DISCRETE_ACTION_SELECTED"
+      ],
+      "timeline_fields_v2": [
+        "prediction_count",
+        "prospective_compositions",
+        "action",
+        "action_source"
+      ],
+      "analyzer_consumers": [
+        "cognition aggregates",
+        "structured cognitive event counts (often 0/NOT AVAILABLE)"
+      ],
+      "temporal_resolution": "pre-action cognition \u2192 selection; aggregates are cumulative counters not tick graphs",
+      "coverage_limitations": [
+        "Rich SCENARIO graphs compacted/checkpointed; structured SCENARIO_SELECTED often unavailable in Analyzer for V2 runs"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "multiscale_prediction",
+      "mechanism_family": "COGNITIVE",
+      "label": "MULTISCALE PREDICTION",
+      "description": "Organizes retained predictive structures across scales.",
+      "validation": "Existing cognition mechanism.",
+      "provenance_tag": "baseline_cognition",
+      "config_path": "cognition.multiscale_prediction",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [
+        "observation channels feeding cognition"
+      ],
+      "observer_gt_fields": [
+        "cognitive metrics aggregates"
+      ],
+      "events_emitted_runtime": [
+        "SCENARIO_*",
+        "PREDICTION_*",
+        "OBSERVATION_ACQUIRED",
+        "DISCRETE_ACTION_SELECTED"
+      ],
+      "timeline_fields_v2": [
+        "prediction_count",
+        "prospective_compositions",
+        "action",
+        "action_source"
+      ],
+      "analyzer_consumers": [
+        "cognition aggregates",
+        "structured cognitive event counts (often 0/NOT AVAILABLE)"
+      ],
+      "temporal_resolution": "pre-action cognition \u2192 selection; aggregates are cumulative counters not tick graphs",
+      "coverage_limitations": [
+        "Rich SCENARIO graphs compacted/checkpointed; structured SCENARIO_SELECTED often unavailable in Analyzer for V2 runs"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "prospective_composition",
+      "mechanism_family": "COGNITIVE",
+      "label": "PROSPECTIVE COMPOSITION",
+      "description": "Composes supported future action continuations.",
+      "validation": "Existing cognition mechanism.",
+      "provenance_tag": "baseline_cognition",
+      "config_path": "cognition.prospective_composition",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [
+        "observation channels feeding cognition"
+      ],
+      "observer_gt_fields": [
+        "cognitive metrics aggregates"
+      ],
+      "events_emitted_runtime": [
+        "SCENARIO_*",
+        "PREDICTION_*",
+        "OBSERVATION_ACQUIRED",
+        "DISCRETE_ACTION_SELECTED"
+      ],
+      "timeline_fields_v2": [
+        "prediction_count",
+        "prospective_compositions",
+        "action",
+        "action_source"
+      ],
+      "analyzer_consumers": [
+        "cognition aggregates",
+        "structured cognitive event counts (often 0/NOT AVAILABLE)"
+      ],
+      "temporal_resolution": "pre-action cognition \u2192 selection; aggregates are cumulative counters not tick graphs",
+      "coverage_limitations": [
+        "Rich SCENARIO graphs compacted/checkpointed; structured SCENARIO_SELECTED often unavailable in Analyzer for V2 runs"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "bounded_memory",
+      "mechanism_family": "COGNITIVE",
+      "label": "BOUNDED MEMORY",
+      "description": "Bounds retained cognitive stores.",
+      "validation": "Existing cognition mechanism.",
+      "provenance_tag": "baseline_cognition",
+      "config_path": "cognition.bounded_memory",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [
+        "observation channels feeding cognition"
+      ],
+      "observer_gt_fields": [
+        "cognitive metrics aggregates"
+      ],
+      "events_emitted_runtime": [
+        "SCENARIO_*",
+        "PREDICTION_*",
+        "OBSERVATION_ACQUIRED",
+        "DISCRETE_ACTION_SELECTED"
+      ],
+      "timeline_fields_v2": [
+        "prediction_count",
+        "prospective_compositions",
+        "action",
+        "action_source"
+      ],
+      "analyzer_consumers": [
+        "cognition aggregates",
+        "structured cognitive event counts (often 0/NOT AVAILABLE)"
+      ],
+      "temporal_resolution": "pre-action cognition \u2192 selection; aggregates are cumulative counters not tick graphs",
+      "coverage_limitations": [
+        "Rich SCENARIO graphs compacted/checkpointed; structured SCENARIO_SELECTED often unavailable in Analyzer for V2 runs"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "retrieval",
+      "mechanism_family": "COGNITIVE",
+      "label": "RETRIEVAL",
+      "description": "Queries retained predictive structures for the current observation.",
+      "validation": "Existing cognition mechanism.",
+      "provenance_tag": "baseline_cognition",
+      "config_path": "cognition.retrieval",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [
+        "observation channels feeding cognition"
+      ],
+      "observer_gt_fields": [
+        "cognitive metrics aggregates"
+      ],
+      "events_emitted_runtime": [
+        "SCENARIO_*",
+        "PREDICTION_*",
+        "OBSERVATION_ACQUIRED",
+        "DISCRETE_ACTION_SELECTED"
+      ],
+      "timeline_fields_v2": [
+        "prediction_count",
+        "prospective_compositions",
+        "action",
+        "action_source"
+      ],
+      "analyzer_consumers": [
+        "cognition aggregates",
+        "structured cognitive event counts (often 0/NOT AVAILABLE)"
+      ],
+      "temporal_resolution": "pre-action cognition \u2192 selection; aggregates are cumulative counters not tick graphs",
+      "coverage_limitations": [
+        "Rich SCENARIO graphs compacted/checkpointed; structured SCENARIO_SELECTED often unavailable in Analyzer for V2 runs"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "body_deformation",
+      "mechanism_family": "PHYSICAL_WORLD",
+      "label": "BODY DEFORMATION",
+      "description": "Local B_site drives bounded radial body-local site displacement; geometry then changes ordinary mechanics.",
+      "validation": "Validated: B_site\u2192deformation\u2192geometry\u2192exposure/force/torque with matched ablations (mm_body_deformation).",
+      "provenance_tag": "mm_body_deformation_experiment",
+      "config_path": "body_deformation",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [],
+      "observer_gt_fields": [],
+      "events_emitted_runtime": [
+        "BODY_DEFORMED",
+        "DEFORM_*"
+      ],
+      "timeline_fields_v2": [
+        "body_alpha"
+      ],
+      "analyzer_consumers": [
+        "deform_events (often NOT AVAILABLE)"
+      ],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [
+        "deform event presence depends on emission; Analyzer may report NOT AVAILABLE"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "deformation_work",
+      "mechanism_family": "PHYSICAL_WORLD",
+      "label": "DEFORMATION WORK TRANSFER",
+      "description": "Finite abstract mechanical work reservoir pays F\u00b7dx for internally powered deformation; env can still deform a depleted body.",
+      "validation": "Validated: finite mechanical_work_reservoir pays F\u00b7dx; depletion, ablation, isolated-momentum, and passive-env gates (mm_deformation_work).",
+      "provenance_tag": "mm_deformation_work_experiment",
+      "config_path": "deformation_work",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [],
+      "observer_gt_fields": [],
+      "events_emitted_runtime": [],
+      "timeline_fields_v2": [],
+      "analyzer_consumers": [],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "environmental_resource_transfer",
+      "mechanism_family": "PHYSICAL_WORLD",
+      "label": "ENVIRONMENTAL RESOURCE TRANSFER",
+      "description": "Site-local transferable_resource from planet.R into R_site; source cell depletes.",
+      "validation": "Validated: site-local planet.R \u2192 R_site with source depletion and transfer ablation (mm_environmental_work_resource).",
+      "provenance_tag": "mm_environmental_work_resource_experiment",
+      "config_path": "environmental_resource.transfer_enabled",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [],
+      "observer_gt_fields": [],
+      "events_emitted_runtime": [],
+      "timeline_fields_v2": [],
+      "analyzer_consumers": [],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "resource_to_work_conversion",
+      "mechanism_family": "PHYSICAL_WORLD",
+      "label": "RESOURCE TO WORK CONVERSION",
+      "description": "Finite-rate conversion of body-local transferable_resource into mechanical_work_reservoir.",
+      "validation": "Validated: R_site conversion credits mechanical_work_reservoir; conversion ablation removes replenishment (mm_environmental_work_resource).",
+      "provenance_tag": "mm_environmental_work_resource_experiment",
+      "config_path": "environmental_resource.conversion_enabled",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [],
+      "observer_gt_fields": [],
+      "events_emitted_runtime": [
+        "RESOURCE_*",
+        "CONVERSION",
+        "COMPLEMENTARY_CONVERSION",
+        "WORK_*"
+      ],
+      "timeline_fields_v2": [
+        "resource_A",
+        "resource_B",
+        "work"
+      ],
+      "analyzer_consumers": [
+        "resource min/max/start/end"
+      ],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [
+        "transfer/conversion events Analyzer-exhaustive when emitted; GEO work ecology checkpoint-only"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "resource_A_transfer",
+      "mechanism_family": "PHYSICAL_WORLD",
+      "label": "RESOURCE A TRANSFER",
+      "description": "Site-local transfer of retained stock planet.R_A into R_A_site.",
+      "validation": "Validated: independent A transfer with source depletion (mm_complementary_resources).",
+      "provenance_tag": "mm_complementary_resources_experiment",
+      "config_path": "complementary_resources.transfer_A_enabled",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [],
+      "observer_gt_fields": [],
+      "events_emitted_runtime": [
+        "RESOURCE_*",
+        "CONVERSION",
+        "COMPLEMENTARY_CONVERSION",
+        "WORK_*"
+      ],
+      "timeline_fields_v2": [
+        "resource_A",
+        "resource_B",
+        "work"
+      ],
+      "analyzer_consumers": [
+        "resource min/max/start/end"
+      ],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [
+        "transfer/conversion events Analyzer-exhaustive when emitted; GEO work ecology checkpoint-only"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "resource_B_transfer",
+      "mechanism_family": "PHYSICAL_WORLD",
+      "label": "RESOURCE B TRANSFER",
+      "description": "Site-local transfer of volatile stock planet.R_B into R_B_site.",
+      "validation": "Validated: independent B transfer with source depletion (mm_complementary_resources).",
+      "provenance_tag": "mm_complementary_resources_experiment",
+      "config_path": "complementary_resources.transfer_B_enabled",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [],
+      "observer_gt_fields": [],
+      "events_emitted_runtime": [
+        "RESOURCE_*",
+        "CONVERSION",
+        "COMPLEMENTARY_CONVERSION",
+        "WORK_*"
+      ],
+      "timeline_fields_v2": [
+        "resource_A",
+        "resource_B",
+        "work"
+      ],
+      "analyzer_consumers": [
+        "resource min/max/start/end"
+      ],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [
+        "transfer/conversion events Analyzer-exhaustive when emitted; GEO work ecology checkpoint-only"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "complementary_resource_conversion",
+      "mechanism_family": "PHYSICAL_WORLD",
+      "label": "COMPLEMENTARY RESOURCE CONVERSION",
+      "description": "Joint A+B conversion into mechanical_work_reservoir; limited by the scarcer required stock.",
+      "validation": "Validated: conversion requires both A and B; excess of one cannot replace zero of the other (mm_complementary_resources).",
+      "provenance_tag": "mm_complementary_resources_experiment",
+      "config_path": "complementary_resources.conversion_enabled",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [],
+      "observer_gt_fields": [],
+      "events_emitted_runtime": [],
+      "timeline_fields_v2": [],
+      "analyzer_consumers": [],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "distributed_morphology",
+      "mechanism_family": "PHYSICAL_WORLD",
+      "label": "DISTRIBUTED MORPHOLOGY",
+      "description": "Local B_site modulates mechanical susceptibility to local environment.",
+      "validation": "Validated: same env + different B_site \u2192 different force/path (mm_body_morphology_mechanics).",
+      "provenance_tag": "validated_morphology_experiment",
+      "config_path": "morphology_mechanics",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [],
+      "observer_gt_fields": [
+        "pose",
+        "orientation",
+        "velocity"
+      ],
+      "events_emitted_runtime": [
+        "BODY_MOVED",
+        "BODY_ROTATED",
+        "LOCAL_MATERIAL_CHANGED",
+        "MOTOR_DRIVE_GENERATED"
+      ],
+      "timeline_fields_v2": [
+        "vx",
+        "vy"
+      ],
+      "analyzer_consumers": [
+        "movement/speed aggregates"
+      ],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [
+        "B_site / site forces not on V2 timeline; BODY_MOVED/LOCAL_MATERIAL OMITTED in V2"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "body_orientation",
+      "mechanism_family": "PHYSICAL_WORLD",
+      "label": "BODY ORIENTATION",
+      "description": "Physical theta/omega; site forces produce torque and rotate footprint sampling.",
+      "validation": "Validated: env asymmetry \u2192 torque \u2192 theta \u2192 exposure (mm_body_orientation).",
+      "provenance_tag": "validated_orientation_experiment",
+      "config_path": "body_orientation",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [],
+      "observer_gt_fields": [
+        "pose",
+        "orientation",
+        "velocity"
+      ],
+      "events_emitted_runtime": [
+        "BODY_MOVED",
+        "BODY_ROTATED",
+        "LOCAL_MATERIAL_CHANGED",
+        "MOTOR_DRIVE_GENERATED"
+      ],
+      "timeline_fields_v2": [
+        "theta",
+        "omega",
+        "vx",
+        "vy",
+        "speed"
+      ],
+      "analyzer_consumers": [
+        "movement/speed aggregates"
+      ],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [
+        "theta/omega on timeline; torque/site exposures NOT every-tick; BODY_ROTATED OMITTED in V2"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "endogenous_motor_coupling",
+      "mechanism_family": "ACTION_MOTOR",
+      "label": "ENDOGENOUS MOTOR",
+      "description": "Continuous motor_u from ||\u0394c|| \u00d7 local physical asymmetry (not discrete MOVE).",
+      "validation": "Validated: zero-flow + WAIT still yields endogenous motion (mm_endogenous_motor_coupling).",
+      "provenance_tag": "validated_endogenous_motor_experiment",
+      "config_path": "endogenous_motor",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [],
+      "observer_gt_fields": [
+        "pose",
+        "orientation",
+        "velocity"
+      ],
+      "events_emitted_runtime": [
+        "BODY_MOVED",
+        "BODY_ROTATED",
+        "LOCAL_MATERIAL_CHANGED",
+        "MOTOR_DRIVE_GENERATED"
+      ],
+      "timeline_fields_v2": [
+        "vx",
+        "vy"
+      ],
+      "analyzer_consumers": [
+        "movement/speed aggregates"
+      ],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [
+        "motor_u / force_contributions not on V2 timeline; MOTOR_* events may be sparse/omitted"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "endogenous_motor_work_accounting",
+      "mechanism_family": "PHYSICAL_WORLD",
+      "label": "ENDOGENOUS MOTOR WORK ACCOUNTING",
+      "description": "Realized motor \u0394v/force is limited by mechanical_work_reservoir; drive generation is unchanged.",
+      "validation": "Validated: drive persists when depleted; positive \u0394KE debits shared reservoir; abundant work matches historical motor (mm_motor_work_accounting).",
+      "provenance_tag": "mm_motor_work_accounting_experiment",
+      "config_path": "endogenous_motor_work",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [],
+      "observer_gt_fields": [],
+      "events_emitted_runtime": [],
+      "timeline_fields_v2": [],
+      "analyzer_consumers": [],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "discrete_action_work_accounting",
+      "mechanism_family": "PHYSICAL_WORLD",
+      "label": "DISCRETE ACTION WORK ACCOUNTING",
+      "description": "Selected MOVE remains cognitive; its center-applied world-frame \u0394v is physically limited by the shared work reservoir.",
+      "validation": "Validated: selected-vs-realized separation, KE-based debit, three-way allocation, cross-term ledger, and historical ablation (mm_discrete_action_work).",
+      "provenance_tag": "mm_discrete_action_work_experiment",
+      "config_path": "discrete_action_work",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [],
+      "observer_gt_fields": [],
+      "events_emitted_runtime": [],
+      "timeline_fields_v2": [],
+      "analyzer_consumers": [],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "prospective_scenario_competition",
+      "mechanism_family": "COGNITIVE",
+      "label": "PROSPECTIVE SCENARIO COMPETITION",
+      "description": "Competes supported prospective continuations when multiple exist.",
+      "validation": "Prior prospective competition branch.",
+      "provenance_tag": "validated_prospective_competition",
+      "config_path": "cognition.prospective_selection",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [
+        "observation channels feeding cognition"
+      ],
+      "observer_gt_fields": [
+        "cognitive metrics aggregates"
+      ],
+      "events_emitted_runtime": [
+        "SCENARIO_*",
+        "PREDICTION_*",
+        "OBSERVATION_ACQUIRED",
+        "DISCRETE_ACTION_SELECTED"
+      ],
+      "timeline_fields_v2": [
+        "prediction_count",
+        "prospective_compositions",
+        "action",
+        "action_source"
+      ],
+      "analyzer_consumers": [
+        "cognition aggregates",
+        "structured cognitive event counts (often 0/NOT AVAILABLE)"
+      ],
+      "temporal_resolution": "pre-action cognition \u2192 selection; aggregates are cumulative counters not tick graphs",
+      "coverage_limitations": [
+        "Rich SCENARIO graphs compacted/checkpointed; structured SCENARIO_SELECTED often unavailable in Analyzer for V2 runs"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "instrumental_observation",
+      "mechanism_family": "COGNITIVE",
+      "label": "INSTRUMENTAL OBSERVATION",
+      "description": "Learned instrumental store (prediction match/use).",
+      "validation": "Existing cognition switch.",
+      "provenance_tag": "baseline_cognition",
+      "config_path": "cognition.instrumental_observation",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [
+        "observation channels feeding cognition"
+      ],
+      "observer_gt_fields": [
+        "cognitive metrics aggregates"
+      ],
+      "events_emitted_runtime": [
+        "SCENARIO_*",
+        "PREDICTION_*",
+        "OBSERVATION_ACQUIRED",
+        "DISCRETE_ACTION_SELECTED"
+      ],
+      "timeline_fields_v2": [
+        "prediction_count",
+        "prospective_compositions",
+        "action",
+        "action_source"
+      ],
+      "analyzer_consumers": [
+        "cognition aggregates",
+        "structured cognitive event counts (often 0/NOT AVAILABLE)"
+      ],
+      "temporal_resolution": "pre-action cognition \u2192 selection; aggregates are cumulative counters not tick graphs",
+      "coverage_limitations": [
+        "Rich SCENARIO graphs compacted/checkpointed; structured SCENARIO_SELECTED often unavailable in Analyzer for V2 runs"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "unknown_action_physical_probe",
+      "mechanism_family": "ACTION_MOTOR",
+      "label": "UNKNOWN ACTION PHYSICAL PROBE",
+      "description": "Experimental detection of available first-actions lacking MATCH/support. Does not select. Default OFF. DESIGN_BOUNDARY on arbitration.",
+      "validation": "Detection-only; selection unchanged (mm_unknown_action_probe).",
+      "provenance_tag": "mm_unknown_action_probe_experiment",
+      "config_path": "cognition.unknown_action_physical_probe",
+      "default_integrated": false,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [],
+      "observer_gt_fields": [],
+      "events_emitted_runtime": [],
+      "timeline_fields_v2": [],
+      "analyzer_consumers": [],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "spatiotemporal_climate_ecology",
+      "mechanism_family": "PHYSICAL_WORLD",
+      "label": "SPATIOTEMPORAL CLIMATE ECOLOGY",
+      "description": "Climate dynamics gate only: latitudinal T_eq, seasonal cycle, climate insolation. Does NOT gate R_A/R_B environmental ecology (see resource_ecology_A / resource_ecology_B). Flipping OFF ablates climate temporal dynamics while leaving resource fields intact.",
+      "validation": "World physics only; cognition unchanged (mm_seasonal_resource_ecology).",
+      "provenance_tag": "mm_seasonal_resource_ecology_experiment",
+      "config_path": "planet.climate_ecology.enabled",
+      "default_integrated": false,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [],
+      "observer_gt_fields": [],
+      "events_emitted_runtime": [],
+      "timeline_fields_v2": [],
+      "analyzer_consumers": [],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "resource_ecology_A",
+      "mechanism_family": "PHYSICAL_WORLD",
+      "label": "RESOURCE ECOLOGY A",
+      "description": "Environmental production, persistence and regeneration of R_A. Independent of climate dynamics and of R_B ecology. Does not erase agent-body R_A_site inventory.",
+      "validation": "World field ecology only; no semantic food labels.",
+      "provenance_tag": "beta2_resource_ecology_authority",
+      "config_path": "planet.climate_ecology.resource_ecology_A_enabled",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [],
+      "observer_gt_fields": [],
+      "events_emitted_runtime": [
+        "RESOURCE_*",
+        "CONVERSION",
+        "COMPLEMENTARY_CONVERSION",
+        "WORK_*"
+      ],
+      "timeline_fields_v2": [
+        "resource_A",
+        "resource_B",
+        "work"
+      ],
+      "analyzer_consumers": [
+        "resource min/max/start/end"
+      ],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [
+        "transfer/conversion events Analyzer-exhaustive when emitted; GEO work ecology checkpoint-only"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "resource_ecology_B",
+      "mechanism_family": "PHYSICAL_WORLD",
+      "label": "RESOURCE ECOLOGY B",
+      "description": "Environmental production, persistence and regeneration of R_B. Independent of climate dynamics and of R_A ecology. Does not erase agent-body R_B_site inventory.",
+      "validation": "World field ecology only; no semantic food labels.",
+      "provenance_tag": "beta2_resource_ecology_authority",
+      "config_path": "planet.climate_ecology.resource_ecology_B_enabled",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [],
+      "observer_gt_fields": [],
+      "events_emitted_runtime": [
+        "RESOURCE_*",
+        "CONVERSION",
+        "COMPLEMENTARY_CONVERSION",
+        "WORK_*"
+      ],
+      "timeline_fields_v2": [
+        "resource_A",
+        "resource_B",
+        "work"
+      ],
+      "analyzer_consumers": [
+        "resource min/max/start/end"
+      ],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [
+        "transfer/conversion events Analyzer-exhaustive when emitted; GEO work ecology checkpoint-only"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "physical_near_field_vision",
+      "mechanism_family": "SENSORY",
+      "label": "PHYSICAL NEAR-FIELD VISION",
+      "description": "Bounded Moore R=1 \u00d7 body-oriented FOV 120\u00b0 \u00d7 surface_response \u2192 anonymous exo_0/1/2. OFF removes visual contribution from cognition only; does not erase surface, terrain, illumination field, physics, or history. ACTIVE_SENSOR_ORIENTATION = NOT_AVAILABLE (no LOOK/TURN).",
+      "validation": "Validated: PHYSICAL_PERCEPTION_01 / DIRECTIONAL_NEAR_FIELD_VISION_01 (P1\u2013P22).",
+      "provenance_tag": "physical_perception_01",
+      "config_path": "near_field_exteroception.perception_enabled",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [
+        "exo_L/F/R (near-field)"
+      ],
+      "observer_gt_fields": [
+        "optical contribution breakdown"
+      ],
+      "events_emitted_runtime": [],
+      "timeline_fields_v2": [
+        "vision_optical"
+      ],
+      "analyzer_consumers": [
+        "vision forensics exposure episodes"
+      ],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [
+        "vision_optical on timeline is compact VF fields; full optical dump checkpoint-only"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "illumination_cycle",
+      "mechanism_family": "PHYSICAL_WORLD",
+      "label": "ILLUMINATION CYCLE",
+      "description": "Physical illumination dynamics (period=240). Modulates visual signal strength only. Does not generate work, alter terrain, or inject DAY/NIGHT semantics into cognition. LIVE OFF freezes intensity at current physical value.",
+      "validation": "Validated: ILLUMINATION_CYCLE_01 (period 240 selected).",
+      "provenance_tag": "illumination_cycle_01",
+      "config_path": "near_field_exteroception.illumination_enabled",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [],
+      "observer_gt_fields": [],
+      "events_emitted_runtime": [],
+      "timeline_fields_v2": [],
+      "analyzer_consumers": [],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "physical_body_optical_response",
+      "mechanism_family": "SENSORY",
+      "label": "PHYSICAL BODY OPTICAL RESPONSE",
+      "description": "Physical bodies contribute to local optical structure available to near-field vision. Anonymous material optical_response composed with environmental surface_response. Not agent recognition, not social vision, not experimenter detection.",
+      "validation": "Validated composition with PHYSICAL_PERCEPTION_01 filtering (FOV/illumination).",
+      "provenance_tag": "visible_physical_bodies_beta2",
+      "config_path": "near_field_exteroception.body_optical_enabled",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [
+        "exo_L/F/R (near-field)"
+      ],
+      "observer_gt_fields": [
+        "optical contribution breakdown"
+      ],
+      "events_emitted_runtime": [],
+      "timeline_fields_v2": [
+        "vision_optical"
+      ],
+      "analyzer_consumers": [
+        "vision forensics exposure episodes"
+      ],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [
+        "vision_optical on timeline is compact VF fields; full optical dump checkpoint-only"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "experimental_physical_signal",
+      "mechanism_family": "SIGNAL_INTERACTION",
+      "label": "EXPERIMENTAL PHYSICAL SIGNAL",
+      "description": "Shared-world FIELD_A/FIELD_B amplitude with decay and neighbor spread. Fresh-experiment default ON. Not EMIT-in-available_actions. Not communication.",
+      "validation": "Experimental TwoAgentRuntime signal bridge (mm_two_agent_physical_signals). Unpromoted.",
+      "provenance_tag": "mm_two_agent_physical_signals_experiment",
+      "config_path": "physical_signal.mode",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [],
+      "observer_gt_fields": [],
+      "events_emitted_runtime": [
+        "PHYSICAL_SIGNAL_EMITTED",
+        "PHYSICAL_SIGNAL_RECEIVED",
+        "CONTACT",
+        "PUSH_*"
+      ],
+      "timeline_fields_v2": [
+        "contact"
+      ],
+      "analyzer_consumers": [
+        "signal forensics",
+        "composite motor \u00d7 OSC"
+      ],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [
+        "signal events dominate event log volume; attribution often mixed/not_unique"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "oscillatory_signaling",
+      "mechanism_family": "SIGNAL_INTERACTION",
+      "label": "PHYSICAL OSCILLATORY SIGNALING",
+      "description": "Banded oscillatory emission/reception with L/R head-linked receptors. Anonymous osc_l_*/osc_r_*. No language, source identity, or source direction. Alongside legacy FIELD_A/B. Fresh-experiment default ON.",
+      "validation": "Experimental physical medium; EXACT_MATCH legacy when OFF.",
+      "provenance_tag": "physical_oscillatory_signaling",
+      "config_path": "oscillatory_signaling.mode",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [],
+      "observer_gt_fields": [],
+      "events_emitted_runtime": [
+        "PHYSICAL_SIGNAL_EMITTED",
+        "PHYSICAL_SIGNAL_RECEIVED",
+        "CONTACT",
+        "PUSH_*"
+      ],
+      "timeline_fields_v2": [
+        "contact",
+        "osc_*"
+      ],
+      "analyzer_consumers": [
+        "signal forensics",
+        "composite motor \u00d7 OSC"
+      ],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [
+        "signal events dominate event log volume; attribution often mixed/not_unique"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "articulated_head",
+      "mechanism_family": "SENSORY",
+      "label": "ARTICULATED HEAD / ACTIVE SENSOR ORIENTATION",
+      "description": "Bounded neck DOF + NECK_LEFT/RIGHT/HOLD motors. Vision FOV uses head_world_heading. No LOOK_AT / TRACK / ATTENTION. Fresh-experiment default ON.",
+      "validation": "Experimental motor DOF; EXACT_MATCH legacy when OFF.",
+      "provenance_tag": "active_sensor_orientation_push",
+      "config_path": "articulated_head.mode",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [
+        "prop_neck_*"
+      ],
+      "observer_gt_fields": [],
+      "events_emitted_runtime": [
+        "NECK_TORQUE_APPLIED",
+        "NECK_MOTOR_APPLIED"
+      ],
+      "timeline_fields_v2": [
+        "prop_neck_0",
+        "prop_neck_1",
+        "head_relative_angle",
+        "head_world_heading",
+        "head_omega"
+      ],
+      "analyzer_consumers": [],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "physical_push",
+      "mechanism_family": "SIGNAL_INTERACTION",
+      "label": "PHYSICAL PUSH / FORCE EXERTION",
+      "description": "Generic PUSH action arms contact-mediated force along body heading. No PUSH_AGENT, no target identity, no action-at-a-distance. Fresh-experiment default ON.",
+      "validation": "Experimental contact force; same path for agents/Undercover.",
+      "provenance_tag": "active_sensor_orientation_push",
+      "config_path": "physical_push.mode",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [],
+      "observer_gt_fields": [],
+      "events_emitted_runtime": [
+        "PUSH_FORCE_APPLIED",
+        "PUSH_NO_CONTACT",
+        "PUSH_EXERTED",
+        "CONTACT"
+      ],
+      "timeline_fields_v2": [
+        "contact"
+      ],
+      "analyzer_consumers": [
+        "signal forensics",
+        "composite motor \u00d7 OSC"
+      ],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [
+        "signal events dominate event log volume; attribution often mixed/not_unique"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "physical_vestibular_sensing",
+      "mechanism_family": "SENSORY",
+      "label": "PHYSICAL VESTIBULAR SENSING",
+      "description": "Anonymous vest_0/vest_1 from body angular velocity/acceleration. No compass, no absolute heading to cognition. Ablation removes sensor only.",
+      "validation": "Experimental body-local rotational transducer.",
+      "provenance_tag": "vestibular_proprioception",
+      "config_path": "vestibular.mode",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [
+        "vest_*"
+      ],
+      "observer_gt_fields": [],
+      "events_emitted_runtime": [],
+      "timeline_fields_v2": [
+        "vest_0",
+        "vest_1"
+      ],
+      "analyzer_consumers": [],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "neck_proprioception",
+      "mechanism_family": "SENSORY",
+      "label": "NECK PROPRIOCEPTION",
+      "description": "Anonymous prop_neck_0/prop_neck_1 from head-relative angle/\u03c9. Requires articulated head. Does not expose head_world_heading to cognition.",
+      "validation": "Experimental neck-state sensing; independent of vestibular.",
+      "provenance_tag": "vestibular_proprioception",
+      "config_path": "neck_proprioception.mode",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [
+        "prop_neck_*"
+      ],
+      "observer_gt_fields": [],
+      "events_emitted_runtime": [
+        "NECK_TORQUE_APPLIED",
+        "NECK_MOTOR_APPLIED"
+      ],
+      "timeline_fields_v2": [
+        "prop_neck_0",
+        "prop_neck_1",
+        "head_relative_angle",
+        "head_world_heading",
+        "head_omega"
+      ],
+      "analyzer_consumers": [],
+      "temporal_resolution": "mechanism-dependent",
+      "coverage_limitations": [],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "predictive_equivalence",
+      "mechanism_family": "COGNITIVE",
+      "label": "PREDICTIVE EQUIVALENCE",
+      "description": "Experimental: group continuous observations by experienced continuations. Complements exact SHA. Default OFF. Unpromoted.",
+      "validation": "Experimental (mm_predictive_equivalence). Does not replace raw observation identity.",
+      "provenance_tag": "mm_predictive_equivalence_experiment",
+      "config_path": "cognition.predictive_equivalence",
+      "default_integrated": false,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [
+        "observation channels feeding cognition"
+      ],
+      "observer_gt_fields": [
+        "cognitive metrics aggregates"
+      ],
+      "events_emitted_runtime": [
+        "SCENARIO_*",
+        "PREDICTION_*",
+        "OBSERVATION_ACQUIRED",
+        "DISCRETE_ACTION_SELECTED"
+      ],
+      "timeline_fields_v2": [
+        "prediction_count",
+        "prospective_compositions",
+        "action",
+        "action_source"
+      ],
+      "analyzer_consumers": [
+        "cognition aggregates",
+        "structured cognitive event counts (often 0/NOT AVAILABLE)"
+      ],
+      "temporal_resolution": "pre-action cognition \u2192 selection; aggregates are cumulative counters not tick graphs",
+      "coverage_limitations": [
+        "Rich SCENARIO graphs compacted/checkpointed; structured SCENARIO_SELECTED often unavailable in Analyzer for V2 runs"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "predictive_relevance",
+      "mechanism_family": "COGNITIVE",
+      "label": "PREDICTIVE RELEVANCE",
+      "description": "Experimental: relation-specific relevant keys for partial retrieval. Default OFF. Not a global mask. Not attention.",
+      "validation": "Experimental (mm_predictive_relevance). Complements predictive_equivalence.",
+      "provenance_tag": "mm_predictive_relevance_experiment",
+      "config_path": "cognition.predictive_relevance",
+      "default_integrated": false,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [
+        "observation channels feeding cognition"
+      ],
+      "observer_gt_fields": [
+        "cognitive metrics aggregates"
+      ],
+      "events_emitted_runtime": [
+        "SCENARIO_*",
+        "PREDICTION_*",
+        "OBSERVATION_ACQUIRED",
+        "DISCRETE_ACTION_SELECTED"
+      ],
+      "timeline_fields_v2": [
+        "prediction_count",
+        "prospective_compositions",
+        "action",
+        "action_source"
+      ],
+      "analyzer_consumers": [
+        "cognition aggregates",
+        "structured cognitive event counts (often 0/NOT AVAILABLE)"
+      ],
+      "temporal_resolution": "pre-action cognition \u2192 selection; aggregates are cumulative counters not tick graphs",
+      "coverage_limitations": [
+        "Rich SCENARIO graphs compacted/checkpointed; structured SCENARIO_SELECTED often unavailable in Analyzer for V2 runs"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "temporal_predictive_structure",
+      "mechanism_family": "COGNITIVE",
+      "label": "TEMPORAL PREDICTIVE STRUCTURE",
+      "description": "Experimental: trajectory-conditioned prediction from ordinary recent fragments (successive differences). Default OFF. No CLOCK. Unpromoted.",
+      "validation": "Experimental (mm_temporal_predictive_structure). Complements snapshot SHA/PE.",
+      "provenance_tag": "mm_temporal_predictive_structure_experiment",
+      "config_path": "cognition.temporal_predictive_structure",
+      "default_integrated": false,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [
+        "observation channels feeding cognition"
+      ],
+      "observer_gt_fields": [
+        "cognitive metrics aggregates"
+      ],
+      "events_emitted_runtime": [
+        "SCENARIO_*",
+        "PREDICTION_*",
+        "OBSERVATION_ACQUIRED",
+        "DISCRETE_ACTION_SELECTED"
+      ],
+      "timeline_fields_v2": [
+        "prediction_count",
+        "prospective_compositions",
+        "action",
+        "action_source"
+      ],
+      "analyzer_consumers": [
+        "cognition aggregates",
+        "structured cognitive event counts (often 0/NOT AVAILABLE)"
+      ],
+      "temporal_resolution": "pre-action cognition \u2192 selection; aggregates are cumulative counters not tick graphs",
+      "coverage_limitations": [
+        "Rich SCENARIO graphs compacted/checkpointed; structured SCENARIO_SELECTED often unavailable in Analyzer for V2 runs"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "temporal_prospection_bridge",
+      "mechanism_family": "COGNITIVE",
+      "label": "TEMPORAL PROSPECTION BRIDGE",
+      "description": "Experimental adapter: TPS MATCH \u2192 4.23 first-step roots. Default OFF. Does not predict or select.",
+      "validation": "Experimental (mm_temporal_prospection_bridge). Transport only.",
+      "provenance_tag": "mm_temporal_prospection_bridge_experiment",
+      "config_path": "cognition.temporal_prospection_bridge",
+      "default_integrated": false,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [
+        "observation channels feeding cognition"
+      ],
+      "observer_gt_fields": [
+        "cognitive metrics aggregates"
+      ],
+      "events_emitted_runtime": [
+        "SCENARIO_*",
+        "PREDICTION_*",
+        "OBSERVATION_ACQUIRED",
+        "DISCRETE_ACTION_SELECTED"
+      ],
+      "timeline_fields_v2": [
+        "prediction_count",
+        "prospective_compositions",
+        "action",
+        "action_source"
+      ],
+      "analyzer_consumers": [
+        "cognition aggregates",
+        "structured cognitive event counts (often 0/NOT AVAILABLE)"
+      ],
+      "temporal_resolution": "pre-action cognition \u2192 selection; aggregates are cumulative counters not tick graphs",
+      "coverage_limitations": [
+        "Rich SCENARIO graphs compacted/checkpointed; structured SCENARIO_SELECTED often unavailable in Analyzer for V2 runs"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "predictive_conflict",
+      "mechanism_family": "COGNITIVE",
+      "label": "PREDICTIVE CONFLICT",
+      "description": "Experimental: content-based identity for incompatible same-action futures. Default OFF. Does not select or invent confidence.",
+      "validation": "Experimental (mm_predictive_conflict). Scenario identity, not action arbitration.",
+      "provenance_tag": "mm_predictive_conflict_experiment",
+      "config_path": "cognition.predictive_conflict",
+      "default_integrated": false,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [
+        "observation channels feeding cognition"
+      ],
+      "observer_gt_fields": [
+        "cognitive metrics aggregates"
+      ],
+      "events_emitted_runtime": [
+        "SCENARIO_*",
+        "PREDICTION_*",
+        "OBSERVATION_ACQUIRED",
+        "DISCRETE_ACTION_SELECTED"
+      ],
+      "timeline_fields_v2": [
+        "prediction_count",
+        "prospective_compositions",
+        "action",
+        "action_source"
+      ],
+      "analyzer_consumers": [
+        "cognition aggregates",
+        "structured cognitive event counts (often 0/NOT AVAILABLE)"
+      ],
+      "temporal_resolution": "pre-action cognition \u2192 selection; aggregates are cumulative counters not tick graphs",
+      "coverage_limitations": [
+        "Rich SCENARIO graphs compacted/checkpointed; structured SCENARIO_SELECTED often unavailable in Analyzer for V2 runs"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "future_sensitive_action",
+      "mechanism_family": "COGNITIVE",
+      "label": "FUTURE-SENSITIVE ACTION",
+      "description": "Experimental adapter: content-identified scenarios enter existing competition. Default OFF. Not a new policy, reward, or utility.",
+      "validation": "Experimental (mm_future_sensitive_action). Preserves discarded prospective identity.",
+      "provenance_tag": "mm_future_sensitive_action_experiment",
+      "config_path": "cognition.future_sensitive_action",
+      "default_integrated": false,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [
+        "observation channels feeding cognition"
+      ],
+      "observer_gt_fields": [
+        "cognitive metrics aggregates"
+      ],
+      "events_emitted_runtime": [
+        "SCENARIO_*",
+        "PREDICTION_*",
+        "OBSERVATION_ACQUIRED",
+        "DISCRETE_ACTION_SELECTED"
+      ],
+      "timeline_fields_v2": [
+        "prediction_count",
+        "prospective_compositions",
+        "action",
+        "action_source"
+      ],
+      "analyzer_consumers": [
+        "cognition aggregates",
+        "structured cognitive event counts (often 0/NOT AVAILABLE)"
+      ],
+      "temporal_resolution": "pre-action cognition \u2192 selection; aggregates are cumulative counters not tick graphs",
+      "coverage_limitations": [
+        "Rich SCENARIO graphs compacted/checkpointed; structured SCENARIO_SELECTED often unavailable in Analyzer for V2 runs"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "prediction_error_revision",
+      "mechanism_family": "COGNITIVE",
+      "label": "PREDICTION ERROR REVISION",
+      "description": "Experimental: mismatch vs issued prediction can invalidate current MATCH. Default OFF. Does not rewrite history, punish, or select.",
+      "validation": "Experimental (mm_prediction_error_revision). Predictive validity, not reward.",
+      "provenance_tag": "mm_prediction_error_revision_experiment",
+      "config_path": "cognition.prediction_error_revision",
+      "default_integrated": false,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [
+        "observation channels feeding cognition"
+      ],
+      "observer_gt_fields": [
+        "cognitive metrics aggregates"
+      ],
+      "events_emitted_runtime": [
+        "SCENARIO_*",
+        "PREDICTION_*",
+        "OBSERVATION_ACQUIRED",
+        "DISCRETE_ACTION_SELECTED"
+      ],
+      "timeline_fields_v2": [
+        "prediction_count",
+        "prospective_compositions",
+        "action",
+        "action_source"
+      ],
+      "analyzer_consumers": [
+        "cognition aggregates",
+        "structured cognitive event counts (often 0/NOT AVAILABLE)"
+      ],
+      "temporal_resolution": "pre-action cognition \u2192 selection; aggregates are cumulative counters not tick graphs",
+      "coverage_limitations": [
+        "Rich SCENARIO graphs compacted/checkpointed; structured SCENARIO_SELECTED often unavailable in Analyzer for V2 runs"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "temporal_prediction_error",
+      "mechanism_family": "COGNITIVE",
+      "label": "TEMPORAL PREDICTION ERROR",
+      "description": "Experimental: bounded prediction residuals enter existing TPS. Default OFF. Not a drift detector, reward, or policy.",
+      "validation": "Experimental (mm_gradual_prediction_drift). Residual trajectory, not DRIFT.",
+      "provenance_tag": "mm_gradual_prediction_drift_experiment",
+      "config_path": "cognition.temporal_prediction_error",
+      "default_integrated": false,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [
+        "observation channels feeding cognition"
+      ],
+      "observer_gt_fields": [
+        "cognitive metrics aggregates"
+      ],
+      "events_emitted_runtime": [
+        "SCENARIO_*",
+        "PREDICTION_*",
+        "OBSERVATION_ACQUIRED",
+        "DISCRETE_ACTION_SELECTED"
+      ],
+      "timeline_fields_v2": [
+        "prediction_count",
+        "prospective_compositions",
+        "action",
+        "action_source"
+      ],
+      "analyzer_consumers": [
+        "cognition aggregates",
+        "structured cognitive event counts (often 0/NOT AVAILABLE)"
+      ],
+      "temporal_resolution": "pre-action cognition \u2192 selection; aggregates are cumulative counters not tick graphs",
+      "coverage_limitations": [
+        "Rich SCENARIO graphs compacted/checkpointed; structured SCENARIO_SELECTED often unavailable in Analyzer for V2 runs"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "predicted_context_prospection",
+      "mechanism_family": "COGNITIVE",
+      "label": "PREDICTED CONTEXT PROSPECTION",
+      "description": "Experimental: predicted future context \u2192 read-only action-consequence lookup. Default OFF. Does not write experience, invent actions, or select.",
+      "validation": "Experimental (mm_predicted_context_prospection). Anticipatory prospection, not a policy.",
+      "provenance_tag": "mm_predicted_context_prospection_experiment",
+      "config_path": "cognition.predicted_context_prospection",
+      "default_integrated": false,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [
+        "observation channels feeding cognition"
+      ],
+      "observer_gt_fields": [
+        "cognitive metrics aggregates"
+      ],
+      "events_emitted_runtime": [
+        "SCENARIO_*",
+        "PREDICTION_*",
+        "OBSERVATION_ACQUIRED",
+        "DISCRETE_ACTION_SELECTED"
+      ],
+      "timeline_fields_v2": [
+        "prediction_count",
+        "prospective_compositions",
+        "action",
+        "action_source"
+      ],
+      "analyzer_consumers": [
+        "cognition aggregates",
+        "structured cognitive event counts (often 0/NOT AVAILABLE)"
+      ],
+      "temporal_resolution": "pre-action cognition \u2192 selection; aggregates are cumulative counters not tick graphs",
+      "coverage_limitations": [
+        "Rich SCENARIO graphs compacted/checkpointed; structured SCENARIO_SELECTED often unavailable in Analyzer for V2 runs"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "multistep_action_prospection",
+      "mechanism_family": "COGNITIVE",
+      "label": "MULTI-STEP ACTION PROSPECTION",
+      "description": "Experimental: present action \u2192 future context \u2192 future action. Default OFF. Not a plan, macro, or policy.",
+      "validation": "Experimental (mm_multistep_action_prospection). Composition of learned edges, not planning.",
+      "provenance_tag": "mm_multistep_action_prospection_experiment",
+      "config_path": "cognition.multistep_action_prospection",
+      "default_integrated": false,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [
+        "observation channels feeding cognition"
+      ],
+      "observer_gt_fields": [
+        "cognitive metrics aggregates"
+      ],
+      "events_emitted_runtime": [
+        "SCENARIO_*",
+        "PREDICTION_*",
+        "OBSERVATION_ACQUIRED",
+        "DISCRETE_ACTION_SELECTED"
+      ],
+      "timeline_fields_v2": [
+        "prediction_count",
+        "prospective_compositions",
+        "action",
+        "action_source"
+      ],
+      "analyzer_consumers": [
+        "cognition aggregates",
+        "structured cognitive event counts (often 0/NOT AVAILABLE)"
+      ],
+      "temporal_resolution": "pre-action cognition \u2192 selection; aggregates are cumulative counters not tick graphs",
+      "coverage_limitations": [
+        "Rich SCENARIO graphs compacted/checkpointed; structured SCENARIO_SELECTED often unavailable in Analyzer for V2 runs"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    },
+    {
+      "mechanism_id": "cognition",
+      "mechanism_family": "COGNITIVE",
+      "label": "COGNITION",
+      "description": "Master cognition enable (selection + learning).",
+      "validation": "Existing.",
+      "provenance_tag": "baseline_cognition",
+      "config_path": "cognition.cognition_enabled",
+      "default_integrated": true,
+      "implementation_files_hint": [
+        "mechanistic_mind/physical_system/mechanism_registry.py",
+        "mechanistic_mind/physical_system/runtime.py",
+        "mechanistic_mind/ui/psy_observer_web/scientific_telemetry_v2.py"
+      ],
+      "agent_accessible_fields": [
+        "observation channels feeding cognition"
+      ],
+      "observer_gt_fields": [
+        "cognitive metrics aggregates"
+      ],
+      "events_emitted_runtime": [
+        "SCENARIO_*",
+        "PREDICTION_*",
+        "OBSERVATION_ACQUIRED",
+        "DISCRETE_ACTION_SELECTED"
+      ],
+      "timeline_fields_v2": [
+        "prediction_count",
+        "prospective_compositions",
+        "action",
+        "action_source"
+      ],
+      "analyzer_consumers": [
+        "cognition aggregates",
+        "structured cognitive event counts (often 0/NOT AVAILABLE)"
+      ],
+      "temporal_resolution": "pre-action cognition \u2192 selection; aggregates are cumulative counters not tick graphs",
+      "coverage_limitations": [
+        "Rich SCENARIO graphs compacted/checkpointed; structured SCENARIO_SELECTED often unavailable in Analyzer for V2 runs",
+        "master switch; does not itself emit evidence"
+      ],
+      "v2_recording_note": "See SCIENTIFIC_TELEMETRY_V2.md; omitted runtime events \u2260 non-occurrence"
+    }
+  ],
+  "tick_causal_order_documented": [
+    "WORLD(T) / planet step",
+    "OBSERVATION (agent-accessible channels)",
+    "COGNITION (memory/prediction/prospection/competition) when enabled",
+    "ACTION SELECTION / COMPOSITE_MOTOR factorization",
+    "PHYSICAL COMMIT (site mechanics, orientation, deformation, push, signals, endo motor compose)",
+    "WORLD(T+1) state",
+    "EVIDENCE APPEND (timeline row + eligible events)"
+  ],
+  "ambiguities": [
+    "vision_optical mixes agent-accessible exo with optical GT contributions in one nest",
+    "action string is LEGACY one-label projection under COMPOSITE_MOTOR_V1; action_source=COMPOSITE_FACTORIZED",
+    "prediction_count / prospective_compositions are cumulative aggregates, not reconstructable graphs",
+    "absence of SCENARIO_SELECTED in Analyzer \u2260 PSC did not run (V2 compact / coverage NOT AVAILABLE)",
+    "omitted V2 event types must not be read as DID_NOT_OCCUR",
+    "agent_1 cumulative empty / UNDERCOVER separately labeled \u2014 multi-body identity mapping fragile",
+    "path_euclid / wrap net often 0 or NOT AVAILABLE despite distance manhattan_legacy present",
+    "cognition_enabled NOT AVAILABLE in Analyzer identity for example run despite cognition aggregates"
+  ]
+}

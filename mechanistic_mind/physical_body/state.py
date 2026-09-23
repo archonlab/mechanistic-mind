@@ -24,6 +24,18 @@ class PhysicalBodyState:
     B_site: np.ndarray | None = None  # experimental local material (n_sites, 3); unused when morphology OFF
     theta: float = 0.0  # experimental orientation (rad); unused when body_orientation OFF
     omega: float = 0.0  # experimental angular velocity (rad/tick)
+    # Articulated head / neck DOF (unused when articulated_head OFF → remain 0).
+    head_relative_angle: float = 0.0
+    head_omega: float = 0.0
+    neck_motor: float = 0.0  # last motor command [-1, 1]
+    push_exertion: float = 0.0  # armed contact push this tick [0, 1]
+    # Oscillatory signaling motor state (unused when oscillatory_signaling OFF).
+    osc_freq_u: float = 0.5
+    osc_amp_u: float = 0.5
+    osc_emit_remaining: int = 0
+    osc_emit_active: float = 0.0
+    osc_frequency: float = 0.0  # last physical freq (WORLD GT cache)
+    osc_amplitude: float = 0.0
     matter_in: float = 0.0
     matter_out: float = 0.0
     heat_from_world: float = 0.0
@@ -44,6 +56,16 @@ class PhysicalBodyState:
             motor_ux=self.motor_ux, motor_uy=self.motor_uy,
             B_site=None if self.B_site is None else self.B_site.copy(),
             theta=float(getattr(self, "theta", 0.0)), omega=float(getattr(self, "omega", 0.0)),
+            head_relative_angle=float(getattr(self, "head_relative_angle", 0.0) or 0.0),
+            head_omega=float(getattr(self, "head_omega", 0.0) or 0.0),
+            neck_motor=float(getattr(self, "neck_motor", 0.0) or 0.0),
+            push_exertion=float(getattr(self, "push_exertion", 0.0) or 0.0),
+            osc_freq_u=float(getattr(self, "osc_freq_u", 0.5) or 0.5),
+            osc_amp_u=float(getattr(self, "osc_amp_u", 0.5) or 0.5),
+            osc_emit_remaining=int(getattr(self, "osc_emit_remaining", 0) or 0),
+            osc_emit_active=float(getattr(self, "osc_emit_active", 0.0) or 0.0),
+            osc_frequency=float(getattr(self, "osc_frequency", 0.0) or 0.0),
+            osc_amplitude=float(getattr(self, "osc_amplitude", 0.0) or 0.0),
             matter_in=self.matter_in, matter_out=self.matter_out,
             heat_from_world=self.heat_from_world, heat_to_world=self.heat_to_world,
             react_consumed=self.react_consumed, core_exchange_cum=self.core_exchange_cum,
@@ -87,6 +109,14 @@ class PhysicalBodyState:
             "B_site": None if self.B_site is None else np.asarray(self.B_site, dtype=float).tolist(),
             "theta": float(getattr(self, "theta", 0.0)),
             "omega": float(getattr(self, "omega", 0.0)),
+            "head_relative_angle": float(getattr(self, "head_relative_angle", 0.0) or 0.0),
+            "head_omega": float(getattr(self, "head_omega", 0.0) or 0.0),
+            "neck_motor": float(getattr(self, "neck_motor", 0.0) or 0.0),
+            "push_exertion": float(getattr(self, "push_exertion", 0.0) or 0.0),
+            "osc_freq_u": float(getattr(self, "osc_freq_u", 0.5) or 0.5),
+            "osc_amp_u": float(getattr(self, "osc_amp_u", 0.5) or 0.5),
+            "osc_emit_remaining": int(getattr(self, "osc_emit_remaining", 0) or 0),
+            "osc_emit_active": float(getattr(self, "osc_emit_active", 0.0) or 0.0),
             "matter_in": self.matter_in,
             "matter_out": self.matter_out,
             "heat_from_world": self.heat_from_world,

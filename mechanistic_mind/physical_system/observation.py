@@ -73,6 +73,7 @@ FORBIDDEN_TOKENS = (
     "TEACHER",
     "DEMONSTRATOR",
     "SOCIAL_SIGNAL",
+    "SOURCE_ID",
 )
 
 
@@ -116,6 +117,12 @@ def accessible_observation(
     include_signal_fields: bool = True,
     near_field_cfg: Any = None,
     foreign_bodies: Any = None,
+    vestibular_cfg: Any = None,
+    neck_proprioception_cfg: Any = None,
+    articulated_head_cfg: Any = None,
+    oscillatory_cfg: Any = None,
+    orientation_meta: Any = None,
+    prev_omega: float | None = None,
 ) -> dict[str, float]:
     """Canonical physically accessible observation fragment (dict[str, float]).
 
@@ -123,6 +130,7 @@ def accessible_observation(
     Default PSR has no FIELD arrays, so observation keys stay unchanged.
     Near-field exo_* fragments appear only when near_field_cfg is enabled
     and perception_enabled (ablation: perception_enabled=False → no exo_*).
+    Vestibular vest_* / neck prop_neck_* appear only when those sensors are ON.
     """
     w = int(planet_config.width)
     h = int(planet_config.height)
@@ -181,6 +189,39 @@ def accessible_observation(
         )
         for k, v in exo.items():
             frag[str(k)] = _clip01(float(v))
+    # Vestibular / neck proprioception (anonymous; no compass / absolute heading).
+    if vestibular_cfg is not None:
+        from mechanistic_mind.physical_system.vestibular_proprioception import (
+            cognition_vestibular_fragments,
+        )
+        vest = cognition_vestibular_fragments(
+            body,
+            vestibular_cfg,
+            orientation_meta=orientation_meta if isinstance(orientation_meta, dict) else None,
+            prev_omega=prev_omega,
+        )
+        for k, v in vest.items():
+            frag[str(k)] = float(v)
+    if neck_proprioception_cfg is not None:
+        from mechanistic_mind.physical_system.vestibular_proprioception import (
+            cognition_neck_proprioception_fragments,
+        )
+        prop = cognition_neck_proprioception_fragments(
+            body,
+            neck_proprioception_cfg,
+            articulated_head=articulated_head_cfg,
+        )
+        for k, v in prop.items():
+            frag[str(k)] = float(v)
+    # Oscillatory L/R banded receptors (anonymous; no source id/direction/frequency).
+    if oscillatory_cfg is not None:
+        from mechanistic_mind.physical_system.oscillatory_signaling import cognition_osc_fragments
+        head_on = bool(getattr(articulated_head_cfg, "enabled", False)) if articulated_head_cfg else False
+        osc = cognition_osc_fragments(
+            body, world, oscillatory_cfg, articulated_head=head_on,
+        )
+        for k, v in osc.items():
+            frag[str(k)] = float(v)
     # Leak guard on own output
     hits = audit_cognition_payload(frag)
     if hits:

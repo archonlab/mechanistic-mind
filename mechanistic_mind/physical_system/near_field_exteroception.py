@@ -416,6 +416,34 @@ def body_optical_occupancy(
     return occ
 
 
+# Tick-scoped sample_near_field reuse (identical inputs → identical output object
+# graph). Cleared whenever world.tick changes. Callers must treat results as
+# read-only (existing code only reads).
+_SNF_TICK: int | None = None
+_SNF_CACHE: dict[tuple[Any, ...], dict[str, Any]] = {}
+
+
+def _snf_fb_key(
+    foreign_bodies: list[tuple[Any, Any]] | tuple[tuple[Any, Any], ...] | None,
+) -> tuple[tuple[int, float, float, float], ...]:
+    if not foreign_bodies:
+        return ()
+    out: list[tuple[int, float, float, float]] = []
+    for item in foreign_bodies:
+        if len(item) < 1:
+            continue
+        b = item[0]
+        out.append(
+            (
+                id(b),
+                float(getattr(b, "x", 0.0) or 0.0),
+                float(getattr(b, "y", 0.0) or 0.0),
+                float(getattr(b, "theta", 0.0) or 0.0),
+            )
+        )
+    return tuple(out)
+
+
 def sample_near_field(
     *,
     world: PlanetState,
@@ -430,14 +458,48 @@ def sample_near_field(
     Optional ``foreign_bodies``: sequence of (PhysicalBodyState, PhysicalBodyConfig)
     excluding the observing body (self-exclusion by caller).
     """
+    global _SNF_TICK, _SNF_CACHE
     h, w = int(world.T.shape[0]), int(world.T.shape[1])
     t = int(world.tick if tick is None else tick)
+    if _SNF_TICK != t:
+        _SNF_CACHE.clear()
+        _SNF_TICK = t
     bx = float(body.x)
     by = float(body.y)
-    theta = float(getattr(body, "theta", 0.0) or 0.0)
+    body_theta = float(getattr(body, "theta", 0.0) or 0.0)
+    head_on = bool(getattr(body, "_articulated_head_enabled", False))
+    head_rel = float(getattr(body, "head_relative_angle", 0.0) or 0.0)
+    radius = clamp_vision_radius(getattr(cfg, "radius", DEFAULT_VISION_RADIUS))
+    cache_key = (
+        id(world),
+        id(body),
+        t,
+        round(bx, 6),
+        round(by, 6),
+        round(body_theta, 6),
+        round(head_rel, 6),
+        head_on,
+        radius,
+        float(getattr(cfg, "fov_deg", 0.0) or 0.0),
+        bool(getattr(cfg, "body_optics_active", False)),
+        bool(getattr(cfg, "vision_contributes", False)),
+        _snf_fb_key(foreign_bodies),
+    )
+    hit = _SNF_CACHE.get(cache_key)
+    if hit is not None:
+        return hit
+
+    # Sensor orientation authority: head_world when articulated head enabled on body.
+    if head_on:
+        from mechanistic_mind.physical_system.articulated_head import head_world_heading
+
+        theta = head_world_heading(body)
+        sensor_status = "AVAILABLE"
+    else:
+        theta = body_theta
+        sensor_status = "NOT_AVAILABLE"
     cx = int(math.floor(bx)) % w
     cy = int(math.floor(by)) % h
-    radius = clamp_vision_radius(getattr(cfg, "radius", DEFAULT_VISION_RADIUS))
     neighbors = moore_neighbor_cells(cx, cy, w, h, radius=radius)
     illum = illumination_intensity(t, cfg)
     surface = getattr(world, "surface_response", None)
@@ -509,12 +571,16 @@ def sample_near_field(
     for i, v in enumerate(channels):
         fragments[f"exo_{i}"] = float(max(0.0, min(1.0, v)))
 
-    return {
+    out = {
         "tick": t,
         "body_xy": [bx, by],
         "body_cell": [cx, cy],
-        "body_theta": theta,
-        "sensor_forward_axis": theta,
+        "body_theta": body_theta,
+        "head_relative_angle": head_rel,
+        "head_world_heading": float(theta),
+        "head_omega": float(getattr(body, "head_omega", 0.0) or 0.0),
+        "neck_motor": float(getattr(body, "neck_motor", 0.0) or 0.0),
+        "sensor_forward_axis": float(theta),
         "fov_deg": float(cfg.fov_deg),
         "vision_radius": int(radius),
         "radius": int(radius),
@@ -533,9 +599,12 @@ def sample_near_field(
         "fragments": fragments,
         "neighbors": neighbor_rows,
         "surface_meta": dict(getattr(world, "surface_meta", None) or {}),
-        "ACTIVE_SENSOR_ORIENTATION": ACTIVE_SENSOR_ORIENTATION,
+        "ACTIVE_SENSOR_ORIENTATION": sensor_status,
+        "articulated_head_enabled": head_on,
         "optical_composition": "composed = 1 - (1-surf)*(1-body_opt); body_opt = max foreign optical_response",
     }
+    _SNF_CACHE[cache_key] = out
+    return out
 
 
 def cognition_exo_fragments(
@@ -603,7 +672,7 @@ ACCEPTANCE_GATES = {
     "P22_ORIENTATION_STATUS_EXPLICIT": "ACTIVE_SENSOR_ORIENTATION reported",
 }
 
-ACTIVE_SENSOR_ORIENTATION = "NOT_AVAILABLE"
+ACTIVE_SENSOR_ORIENTATION = "NOT_AVAILABLE"  # overridden per-sample when articulated head ON
 
 FOV_SELECTION_RATIONALE = {
     "candidates_deg": list(FOV_CANDIDATES_DEG),

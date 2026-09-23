@@ -18,7 +18,6 @@ from .identity import (
     SNAPSHOT_SCHEMA,
     display_name,
     promotion_class,
-    release_display_name,
 )
 
 EXPERIMENTAL_COGNITION_KEYS = (
@@ -33,6 +32,9 @@ EXPERIMENTAL_COGNITION_KEYS = (
     "temporal_prediction_error",
     "predicted_context_prospection",
     "multistep_action_prospection",
+    "contextual_predictive_organization",
+    "context_grounded_prospection",
+    "persistent_prospective_control",
 )
 
 BOUNDED_LIMITS = {

@@ -21,9 +21,13 @@ from mechanistic_mind.research.predictive_equivalence import (
     _copy_float_map,
     _floats,
     _in_aabb,
+    _inspect_counter_inc,
     _linf,
     _predict_from_delta,
+    class_index_enabled,
+    iter_active_classes_for_action,
 )
+
 
 VARY_EPS = 1e-12
 MAX_REL_PROV = 12
@@ -163,25 +167,19 @@ def _partial_in(fragment: dict[str, float], aabb: dict[str, Any], keys: list[str
     return {"ok": True, "gate": "partial_span"}
 
 
-def retrieve(
+def _retrieve_collect_hits_full_scan(
     eq_store: dict[str, Any],
-    fragment: dict[str, float],
-    action: str,
+    frag: dict[str, float],
+    act: str,
     *,
-    meta: dict[str, Any] | None = None,
-    count: bool = True,
-) -> dict[str, Any]:
-    """Contextual partial retrieval over relation-specific relevant keys."""
-    if meta is not None and meta.get("enabled") is False:
-        return {"status": "DISABLED", "predicted": {}}
-    if eq_store.get("enabled") is False:
-        return {"status": "DISABLED", "predicted": {}}
-    if count and meta is not None:
-        meta["retrieves"] = int(meta.get("retrieves") or 0) + 1
-    frag = _floats(fragment)
-    act = str(action)
+    meta: dict[str, Any] | None,
+    count: bool,
+) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    """Legacy full class scan (oracle). Not used in production retrieve."""
     hits: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    n = 0
     for cls in (eq_store.get("classes") or {}).values():
+        n += 1
         if cls.get("status") != "ACTIVE" or cls.get("action") != act:
             continue
         if int(cls.get("support") or 0) < MIN_CLASS_SUPPORT:
@@ -193,10 +191,50 @@ def retrieve(
         if gate.get("gate") == "insufficient_evidence":
             if count and meta is not None:
                 meta["insufficient"] = int(meta.get("insufficient") or 0) + 1
-            # do not match this class; keep scanning
             continue
         if gate.get("ok"):
             hits.append((cls, gate))
+    _inspect_counter_inc(eq_store, n)
+    return hits
+
+
+def _retrieve_collect_hits_indexed(
+    eq_store: dict[str, Any],
+    frag: dict[str, float],
+    act: str,
+    *,
+    meta: dict[str, Any] | None,
+    count: bool,
+) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    """Action-bucket narrowing; final authority remains _partial_in + support max."""
+    hits: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    n = 0
+    for cls in iter_active_classes_for_action(eq_store, act):
+        n += 1
+        if int(cls.get("support") or 0) < MIN_CLASS_SUPPORT:
+            continue
+        rel = cls.get("relevance") or {}
+        keys = list(rel.get("relevant") or [])
+        aabb = cls.get("aabb") or {}
+        gate = _partial_in(frag, aabb, keys)
+        if gate.get("gate") == "insufficient_evidence":
+            if count and meta is not None:
+                meta["insufficient"] = int(meta.get("insufficient") or 0) + 1
+            continue
+        if gate.get("ok"):
+            hits.append((cls, gate))
+    _inspect_counter_inc(eq_store, n)
+    return hits
+
+
+def _retrieve_from_hits(
+    eq_store: dict[str, Any],
+    frag: dict[str, float],
+    hits: list[tuple[dict[str, Any], dict[str, Any]]],
+    *,
+    meta: dict[str, Any] | None,
+    count: bool,
+) -> dict[str, Any]:
     if not hits:
         return {"status": "NO_MATCH", "predicted": {}, "gate": "no_partial_class_span"}
     tau = float(eq_store.get("continuation_linf") or eq_store.get("continuation_l1") or CONTINUATION_LINF)
@@ -236,6 +274,51 @@ def retrieve(
         "gate": gate.get("gate") or "partial_span",
         "not_attention": True,
     }
+
+
+def _retrieve_full_scan_reference(
+    eq_store: dict[str, Any],
+    fragment: dict[str, float],
+    action: str,
+    *,
+    meta: dict[str, Any] | None = None,
+    count: bool = False,
+) -> dict[str, Any]:
+    """Private oracle: pre-index full-scan retrieve. Tests/debug only."""
+    if meta is not None and meta.get("enabled") is False:
+        return {"status": "DISABLED", "predicted": {}}
+    if eq_store.get("enabled") is False:
+        return {"status": "DISABLED", "predicted": {}}
+    if count and meta is not None:
+        meta["retrieves"] = int(meta.get("retrieves") or 0) + 1
+    frag = _floats(fragment)
+    act = str(action)
+    hits = _retrieve_collect_hits_full_scan(eq_store, frag, act, meta=meta, count=count)
+    return _retrieve_from_hits(eq_store, frag, hits, meta=meta, count=count)
+
+
+def retrieve(
+    eq_store: dict[str, Any],
+    fragment: dict[str, float],
+    action: str,
+    *,
+    meta: dict[str, Any] | None = None,
+    count: bool = True,
+) -> dict[str, Any]:
+    """Contextual partial retrieval over relation-specific relevant keys."""
+    if meta is not None and meta.get("enabled") is False:
+        return {"status": "DISABLED", "predicted": {}}
+    if eq_store.get("enabled") is False:
+        return {"status": "DISABLED", "predicted": {}}
+    if count and meta is not None:
+        meta["retrieves"] = int(meta.get("retrieves") or 0) + 1
+    frag = _floats(fragment)
+    act = str(action)
+    if class_index_enabled():
+        hits = _retrieve_collect_hits_indexed(eq_store, frag, act, meta=meta, count=count)
+    else:
+        hits = _retrieve_collect_hits_full_scan(eq_store, frag, act, meta=meta, count=count)
+    return _retrieve_from_hits(eq_store, frag, hits, meta=meta, count=count)
 
 
 def diagnostic(eq_store: dict[str, Any], fragment: dict[str, float], action: str, meta: dict[str, Any] | None = None) -> dict[str, Any]:

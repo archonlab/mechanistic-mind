@@ -23,9 +23,24 @@ from mechanistic_mind.research import future_sensitive_action as fsa
 from mechanistic_mind.research import prediction_error_revision as per
 from mechanistic_mind.research import temporal_prediction_error as tpe
 from mechanistic_mind.research import predicted_context_prospection as pcp
+from mechanistic_mind.research import contextual_predictive_organization as cpo
+from mechanistic_mind.research import context_grounded_prospection as cgp
+from mechanistic_mind.research import persistent_prospective_control as ppc
+from mechanistic_mind.research import contextual_stack_bridge as csb
 from mechanistic_mind.research import multistep_action_prospection as mapr
 
-from .actions import available_actions
+from .actions import OSC_ACTIONS, available_actions
+from . import sensorimotor_consequence as smc
+from . import o_prime_history_bridge as oph
+from . import observed_composite_psc as ocpsc
+from .composite_motor import (
+    LEGACY_SCHEMA,
+    MOTOR_SCHEMA,
+    CompositeMotorOutput,
+    build_composite_from_factorized,
+    locomotion_options,
+    select_factorized_side_channels,
+)
 from .observation import audit_cognition_payload
 from .unknown_action_probe import classify_unmodeled_actions, probe_receipt
 
@@ -38,6 +53,55 @@ def set_tick_local_retain(enabled: bool) -> None:
     global _USE_TICK_LOCAL_RETAIN
     _USE_TICK_LOCAL_RETAIN = bool(enabled)
 
+
+
+
+def _enrich_groups_with_smc(
+    groups: dict[str, list],
+    *,
+    observation: dict[str, float],
+    smc_preds: list[dict[str, Any]],
+    withhold: bool,
+) -> dict[str, list]:
+    """Add/augment scenarios with SMC predicted fragments — support/reliability only."""
+    if withhold or not smc_preds:
+        return groups
+    out = {k: list(v or []) for k, v in (groups or {}).items()}
+    for pred in smc_preds:
+        if pred.get("status") not in {smc.MATCH, smc.LOW_SUPPORT}:
+            continue
+        loco = str(pred.get("candidate_locomotion") or "")
+        if not loco:
+            continue
+        o_hat = smc.apply_predicted_to_observation(observation, pred.get("predicted_delta"))
+        scn = {
+            "scenario_id": f"smc:{pred.get('record_id')}:{loco}",
+            "source_structure_ids": [pred.get("record_id")],
+            "provenance": {"path": "sensorimotor_consequence", "record_id": pred.get("record_id")},
+            "action_sequence": [loco],
+            "first_action": loco,
+            "depth": 1,
+            "historical_support": int(pred.get("support") or 0),
+            "historical_support_raw": pred.get("support"),
+            "reliability": float(pred.get("reliability") or 0.5),
+            "reliability_raw": pred.get("reliability"),
+            "current_match_evidence": pred,
+            "predicted_state_fragments": o_hat,
+            "predicted_body_fragments": "NOT_AVAILABLE",
+            "predicted_environment_fragments": "NOT_AVAILABLE",
+            "composition_path": [pred],
+            "score_reliability_path": pred.get("reliability"),
+            "sensorimotor_consequence": True,
+        }
+        out.setdefault(loco, []).append(scn)
+    return out
+
+def _smc_store(state: dict[str, Any]) -> dict[str, Any]:
+    store = state.get("sensorimotor_consequence")
+    if not isinstance(store, dict):
+        store = smc.empty_store(enabled=False)
+        state["sensorimotor_consequence"] = store
+    return store
 
 def tick_local_retain_enabled() -> bool:
     return bool(_USE_TICK_LOCAL_RETAIN)
@@ -64,6 +128,8 @@ def _retain_tick_local_list(rows: list[Any] | None, *, limit: int) -> list[Any]:
     if not _USE_TICK_LOCAL_RETAIN:
         return deepcopy(rows[:limit])
     return list(rows[:limit])
+
+
 from . import scenario_competition as sc
 
 
@@ -113,6 +179,40 @@ class CognitionConfig:
     # Experimental: present action → future context → future action composition.
     # Default OFF. Does not invent macros, value, or execute future actions.
     multistep_action_prospection: bool = False
+    # COMPOSITE_MOTOR_V1: one cognitive cycle → structured multi-domain motor output.
+    # Default ON. Does not add skills, turn-taking, or Cartesian action tokens.
+    composite_motor: bool = True
+    # Experimental: action-conditioned (O,M)→ΔS store. Default OFF.
+    # Learns accessible sensory consequences of self motors; no reward/seeking.
+    sensorimotor_consequence_model: bool = False
+    # When True with model enabled: learn store but do not attach predictions to PSC.
+    sensorimotor_consequence_withhold_from_psc: bool = False
+    # Experiment control: shuffle motor labels during learning (breaks conditioning).
+    sensorimotor_consequence_shuffle_motors: bool = False
+    # When False: osc_l_*/osc_r_* remain in observation but are WITHHELD from SMC / O′.
+    sensorimotor_consequence_bilateral: bool = True
+    # Optional family WITHHELD map: visual/field/vestibular/proprioceptive/
+    # bilateral/local_world/body/internal → bool. None = all ON (full embodied).
+    sensorimotor_consequence_families: dict | None = None
+    # O′ → existing history retrieval → PSC (default OFF)
+    historical_sensorimotor_selection_bridge: bool = False
+    historical_sensorimotor_selection_withhold: bool = False
+    historical_sensorimotor_selection_shuffle: bool = False  # O′↔history mismatch control
+    # Experimental 4.26: higher-order contextual predictive organization. Default OFF.
+    contextual_predictive_organization: bool = False
+    contextual_predictive_organization_ablate: bool = False
+    contextual_predictive_organization_shuffle: bool = False
+    # Experimental 4.27: prospection over contextual structures. Default OFF.
+    context_grounded_prospection: bool = False
+    context_grounded_prospection_ablate: bool = False
+    context_grounded_prospection_shuffle: bool = False
+    # Experimental 4.28: support-gated persistent prospective control. Default OFF.
+    persistent_prospective_control: bool = False
+    persistent_prospective_control_ablate: bool = False
+    persistent_prospective_control_ablate_chunks: bool = False
+    # PSC motor resolution: LOCO_FACTORIZED (default/legacy) | OBSERVED_COMPOSITE (experimental).
+    # Missing/legacy configs resolve to LOCO_FACTORIZED. Do not silently migrate.
+    psc_motor_resolution: str = "LOCO_FACTORIZED"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -137,6 +237,25 @@ class CognitionConfig:
             "temporal_prediction_error": self.temporal_prediction_error,
             "predicted_context_prospection": self.predicted_context_prospection,
             "multistep_action_prospection": self.multistep_action_prospection,
+            "composite_motor": self.composite_motor,
+            "sensorimotor_consequence_model": self.sensorimotor_consequence_model,
+            "sensorimotor_consequence_withhold_from_psc": self.sensorimotor_consequence_withhold_from_psc,
+            "sensorimotor_consequence_shuffle_motors": self.sensorimotor_consequence_shuffle_motors,
+            "sensorimotor_consequence_bilateral": self.sensorimotor_consequence_bilateral,
+            "sensorimotor_consequence_families": self.sensorimotor_consequence_families,
+            "historical_sensorimotor_selection_bridge": self.historical_sensorimotor_selection_bridge,
+            "historical_sensorimotor_selection_withhold": self.historical_sensorimotor_selection_withhold,
+            "historical_sensorimotor_selection_shuffle": self.historical_sensorimotor_selection_shuffle,
+            "contextual_predictive_organization": bool(getattr(self, "contextual_predictive_organization", False)),
+            "contextual_predictive_organization_ablate": bool(getattr(self, "contextual_predictive_organization_ablate", False)),
+            "contextual_predictive_organization_shuffle": bool(getattr(self, "contextual_predictive_organization_shuffle", False)),
+            "context_grounded_prospection": bool(getattr(self, "context_grounded_prospection", False)),
+            "context_grounded_prospection_ablate": bool(getattr(self, "context_grounded_prospection_ablate", False)),
+            "context_grounded_prospection_shuffle": bool(getattr(self, "context_grounded_prospection_shuffle", False)),
+            "persistent_prospective_control": bool(getattr(self, "persistent_prospective_control", False)),
+            "persistent_prospective_control_ablate": bool(getattr(self, "persistent_prospective_control_ablate", False)),
+            "persistent_prospective_control_ablate_chunks": bool(getattr(self, "persistent_prospective_control_ablate_chunks", False)),
+            "psc_motor_resolution": str(getattr(self, "psc_motor_resolution", "LOCO_FACTORIZED") or "LOCO_FACTORIZED"),
         }
 
     @classmethod
@@ -156,6 +275,13 @@ def empty_cognitive_state(config: CognitionConfig) -> dict[str, Any]:
     multiscale["ablate_local"] = not config.multiscale_prediction
     multiscale["ablate_broader"] = not config.multiscale_prediction
     prospection["ablate_composition"] = not config.prospective_composition
+    smc_store = smc.empty_store(
+        enabled=bool(config.sensorimotor_consequence_model),
+        bilateral=bool(getattr(config, "sensorimotor_consequence_bilateral", True)),
+        families=getattr(config, "sensorimotor_consequence_families", None),
+    )
+    smc_store["shuffle_motor_labels"] = bool(config.sensorimotor_consequence_shuffle_motors)
+
     instrumental["ablate_learned"] = not config.instrumental_observation
     equivalence = pe.empty_store()
     equivalence["enabled"] = bool(config.predictive_equivalence)
@@ -177,11 +303,25 @@ def empty_cognitive_state(config: CognitionConfig) -> dict[str, Any]:
     pcp_meta["enabled"] = bool(config.predicted_context_prospection)
     map_meta = mapr.empty_meta()
     map_meta["enabled"] = bool(config.multistep_action_prospection)
+    cpo_store = cpo.empty_store()
+    cpo_store["enabled"] = bool(getattr(config, "contextual_predictive_organization", False))
+    cpo_store["ablate_higher_order"] = bool(getattr(config, "contextual_predictive_organization_ablate", False))
+    cpo_store["ablate_predictive_use"] = bool(getattr(config, "contextual_predictive_organization_ablate", False))
+    cpo_store["shuffle_members"] = bool(getattr(config, "contextual_predictive_organization_shuffle", False))
+    cgp_store = cgp.empty_store()
+    cgp_store["enabled"] = bool(getattr(config, "context_grounded_prospection", False))
+    cgp_store["ablate_composition"] = bool(getattr(config, "context_grounded_prospection_ablate", False))
+    cgp_store["shuffle_relations"] = bool(getattr(config, "context_grounded_prospection_shuffle", False))
+    ppc_store = ppc.empty_store()
+    ppc_store["enabled"] = bool(getattr(config, "persistent_prospective_control", False))
+    ppc_store["ablate_persistence"] = bool(getattr(config, "persistent_prospective_control_ablate", False))
+    ppc_store["ablate_motor_chunks"] = bool(getattr(config, "persistent_prospective_control_ablate_chunks", False))
     return {
         "config": config.to_dict(),
         "compression": compression,
         "multiscale": multiscale,
         "prospection": prospection,
+        "sensorimotor_consequence": smc_store,
         "instrumental": instrumental,
         "equivalence": equivalence,
         "relevance": relevance,
@@ -193,6 +333,9 @@ def empty_cognitive_state(config: CognitionConfig) -> dict[str, Any]:
         "temporal_prediction_error": tpe_store,
         "predicted_context_prospection": pcp_meta,
         "multistep_action_prospection": map_meta,
+        "contextual_organization": cpo_store,
+        "context_grounded_prospection": cgp_store,
+        "persistent_prospective_control": ppc_store,
         "trace": empty_trace(config.causal_trace_capacity),
         "last_fragment": None,
         "last_action": None,
@@ -229,6 +372,7 @@ class CognitionTickResult:
     predictions: list[dict[str, Any]] = field(default_factory=list)
     selection_rule: str = ""
     actions: list[str] = field(default_factory=list)
+    motor_output: dict[str, Any] | None = None
 
 
 def run_cognition_before_action(
@@ -244,7 +388,7 @@ def run_cognition_before_action(
         raise RuntimeError(f"cognition received forbidden observation tokens: {hits}")
 
     cfg = state["config"]
-    actions = list(available_actions())
+    actions = list(state.get("available_actions") or available_actions())
     previous, previous_action = state.get("last_fragment"), state.get("last_action")
     trace = state["trace"]
     metrics = state["metrics"]
@@ -352,6 +496,72 @@ def run_cognition_before_action(
             action=previous_action,
             consequent=observation,
         )
+        # 4.26–4.28: contextual organization / context transitions / PPC advance
+        state["_contextual_stack_experience"] = csb.on_experience(
+            state,
+            tick=tick,
+            previous=previous if isinstance(previous, dict) else None,
+            observation=observation if isinstance(observation, dict) else None,
+            previous_action=str(previous_action) if previous_action else None,
+            cfg=cfg,
+        )
+        # Action-conditioned sensorimotor consequence (composite motor → ΔS)
+        smc_store = _smc_store(state)
+        smc_store["enabled"] = bool(cfg.get("sensorimotor_consequence_model"))
+        smc.set_bilateral(smc_store, bool(cfg.get("sensorimotor_consequence_bilateral", True)))
+        _fam = cfg.get("sensorimotor_consequence_families")
+        if isinstance(_fam, dict):
+            smc.set_families(smc_store, **{str(k): bool(v) for k, v in _fam.items()})
+        smc_store["shuffle_motor_labels"] = bool(cfg.get("sensorimotor_consequence_shuffle_motors"))
+        last_motor = state.get("last_motor_output")
+        if isinstance(last_motor, dict) and smc_store.get("enabled"):
+            smc_receipt = smc.update(
+                smc_store,
+                tick=tick,
+                observation_t=previous,
+                motor=last_motor,
+                observation_t1=observation,
+            )
+            learn_events["sensorimotor_consequence"] = smc_receipt
+            state["last_sensorimotor_update"] = {
+                "kind": "SENSORIMOTOR_CONSEQUENCE_UPDATED",
+                "tick": int(tick),
+                "receipt": smc_receipt,
+            }
+            # Dual-write into prospective store under COMPOSITE motor signature so
+            # existing PSC MATCH support can condition on full motor organization.
+            # Predicted consequent = previous + mean pathway is handled at query time;
+            # here we also learn full observation under motor signature key.
+            m_sig = smc.motor_signature_from_composite(
+                last_motor,
+                shuffle_salt=int(tick) if smc_store.get("shuffle_motor_labels") else None,
+            )
+            pr.learn_transition(
+                state["prospection"],
+                tick=tick,
+                antecedent=previous,
+                action=m_sig,
+                consequent=observation,
+            )
+            # Component-conditioned keys so neck/loco side channels can MATCH.
+            loco = str(last_motor.get("locomotion") or "WAIT")
+            neck = str(last_motor.get("neck") or "NONE")
+            if neck and neck not in ("NONE", "NECK_HOLD", ""):
+                pr.learn_transition(
+                    state["prospection"],
+                    tick=tick,
+                    antecedent=previous,
+                    action=neck,
+                    consequent=observation,
+                )
+            # Loco-only signature for candidate queries
+            pr.learn_transition(
+                state["prospection"],
+                tick=tick,
+                antecedent=previous,
+                action=smc.motor_signature_loco_only(loco),
+                consequent=observation,
+            )
         tr_id = event(
             trace,
             tick=tick,
@@ -588,6 +798,16 @@ def run_cognition_before_action(
         metrics["prospective_compositions"] += 1
         metrics["novel_compositions"] += int(any(int(x.get("depth", 0)) > 1 for x in continuations))
 
+    # 4.27/4.28: inject contextual compositions; note PPC preferred action
+    continuations, state["_contextual_stack_before_sel"] = csb.before_selection(
+        state,
+        tick=tick,
+        observation=observation if isinstance(observation, dict) else None,
+        continuations=continuations,
+        cfg=cfg,
+    )
+    composition = {**composition, "continuations": continuations}
+
     selected = None
     selected_source = "ENDOGENOUS_VARIATION"
     selection_rule = "ENDOGENOUS_INDEX: actions[floor(rng*len(actions))] when no prospective/prediction winner"
@@ -595,6 +815,51 @@ def run_cognition_before_action(
     competition_result: dict[str, Any] = {"outcome_class": "NOT_RUN", "mode": selection_mode}
     scenario_groups_public: dict[str, Any] = {}
     peer_evaluation = "NONE"
+    # COMPOSITE_MOTOR_V1: PSC competes on locomotion only (bounded; no Cartesian product).
+    # Side channels (neck/osc/push) are factorized in the SAME cycle after loco selection.
+    composite_on = bool(cfg.get("composite_motor", True))
+    select_actions = locomotion_options(actions) if composite_on else list(actions)
+
+    # --- Sensorimotor consequence queries (available to PSC as MATCH evidence) ---
+    smc_store = _smc_store(state)
+    smc_store["enabled"] = bool(cfg.get("sensorimotor_consequence_model"))
+    smc.set_bilateral(smc_store, bool(cfg.get("sensorimotor_consequence_bilateral", True)))
+    _fam = cfg.get("sensorimotor_consequence_families")
+    if isinstance(_fam, dict):
+        smc.set_families(smc_store, **{str(k): bool(v) for k, v in _fam.items()})
+    smc_candidate_preds: list[dict[str, Any]] = []
+    smc_withhold = bool(cfg.get("sensorimotor_consequence_withhold_from_psc"))
+    o_prime_bridge_rows: list[dict[str, Any]] = []
+    o_prime_bridge_meta: dict[str, Any] = {"enabled": False}
+    if smc_store.get("enabled") and isinstance(observation, dict):
+        smc_candidate_preds = smc.query_candidates(
+            smc_store,
+            observation=observation,
+            loco_candidates=list(select_actions),
+            tick=tick,
+        )
+        if not smc_withhold:
+            # Attach as compression-style prediction entries so factorized side
+            # channels and retained-prediction paths can see MATCH support.
+            for pred in smc_candidate_preds:
+                if pred.get("status") in {smc.MATCH, smc.LOW_SUPPORT} and pred.get("predicted_delta"):
+                    loco = str(pred.get("candidate_locomotion") or "")
+                    if not loco:
+                        continue
+                    o_hat = smc.apply_predicted_to_observation(observation, pred.get("predicted_delta"))
+                    predictions.append({
+                        "action": loco,
+                        "source": "sensorimotor_consequence",
+                        "result": {
+                            "status": "MATCH",
+                            "support": int(pred.get("support") or 0),
+                            "reliability": float(pred.get("reliability") or 0.5),
+                            "predicted": o_hat,
+                            "sensorimotor_record_id": pred.get("record_id"),
+                            "predicted_delta": pred.get("predicted_delta"),
+                        },
+                        "sensorimotor_consequence": pred,
+                    })
 
     if cfg.get("prospective_composition"):
         if selection_mode == "LEGACY_FIRST":
@@ -620,7 +885,7 @@ def run_cognition_before_action(
                     store=state["prospection"],
                     observation=observation,
                     continuations=continuations,
-                    actions=actions,
+                    actions=select_actions,
                     conflict_candidates=(conflict_org.get("candidates") or []),
                     action_counts=(state.get("metrics") or {}).get("action_counts") or {},
                     meta=fsa_meta,
@@ -630,7 +895,7 @@ def run_cognition_before_action(
                     store=state["prospection"],
                     observation=observation,
                     continuations=continuations,
-                    actions=actions,
+                    actions=select_actions,
                 )
             if cfg.get("prediction_error_revision"):
                 groups = per.filter_groups(_per_store(state), groups)
@@ -640,9 +905,83 @@ def run_cognition_before_action(
                     "count": len(groups.get(a) or []),
                     "scenarios": groups.get(a) or [],
                 }
-                for a in actions
+                for a in select_actions
             }
-            comp = sc.compete_scenarios(groups=groups, actions=actions, rng_value=rng_value)
+            groups = _enrich_groups_with_smc(
+                groups,
+                observation=observation if isinstance(observation, dict) else {},
+                smc_preds=smc_candidate_preds,
+                withhold=smc_withhold,
+            )
+            o_prime_bridge_rows: list[dict[str, Any]] = []
+            o_prime_bridge_meta: dict[str, Any] = {"enabled": False, "withheld_from_psc": False}
+            if (
+                cfg.get("historical_sensorimotor_selection_bridge")
+                and smc_store.get("enabled")
+                and isinstance(observation, dict)
+                and smc_candidate_preds
+            ):
+                o_prime_bridge_rows = oph.evaluate_candidates(
+                    observation=observation,
+                    smc_preds=smc_candidate_preds,
+                    prospection=state.get("prospection") or {},
+                    compression=state.get("compression") if cfg.get("retrieval") else None,
+                    actions=list(select_actions),
+                    retrieval_enabled=bool(cfg.get("retrieval")),
+                    shuffle_o_prime_history=bool(cfg.get("historical_sensorimotor_selection_shuffle")),
+                    tick=int(tick),
+                )
+                o_withhold = bool(cfg.get("historical_sensorimotor_selection_withhold"))
+                n_match = sum(1 for r in o_prime_bridge_rows if (r.get("history") or {}).get("status") == oph.MATCH)
+                supports = [
+                    int((r.get("history") or {}).get("historical_support") or 0)
+                    for r in o_prime_bridge_rows
+                    if (r.get("history") or {}).get("status") == oph.MATCH
+                ]
+                o_prime_bridge_meta = {
+                    "enabled": True,
+                    "withheld_from_psc": o_withhold,
+                    "shuffle": bool(cfg.get("historical_sensorimotor_selection_shuffle")),
+                    "n_candidates_evaluated": len(o_prime_bridge_rows),
+                    "n_history_match": n_match,
+                    "history_support_spread": (max(supports) - min(supports)) if supports else 0,
+                    "history_support_differentiated": bool(supports) and (max(supports) - min(supports)) >= 1,
+                }
+                # Local CF on pre-bridge groups (same rng_value; no state mutation)
+                cf = sc.compete_scenarios(groups=groups, actions=select_actions, rng_value=rng_value)
+                o_prime_bridge_meta["local_counterfactual"] = {
+                    "selected": cf.get("selected"),
+                    "source": cf.get("source"),
+                    "outcome_class": (cf.get("competition") or {}).get("outcome_class"),
+                }
+                if not o_withhold:
+                    for r in o_prime_bridge_rows:
+                        scn = r.get("scenario")
+                        if not scn:
+                            continue
+                        loco = str(r.get("candidate_locomotion") or "")
+                        hss = dict(scn.get("historical_sensorimotor_selection") or {})
+                        hss["available_to_psc"] = True
+                        scn["historical_sensorimotor_selection"] = hss
+                        if loco:
+                            groups.setdefault(loco, []).append(scn)
+                else:
+                    for r in o_prime_bridge_rows:
+                        scn = r.get("scenario")
+                        if scn:
+                            hss = dict(scn.get("historical_sensorimotor_selection") or {})
+                            hss["available_to_psc"] = False
+                            scn["historical_sensorimotor_selection"] = hss
+            else:
+                o_prime_bridge_rows = []
+            comp = sc.compete_scenarios(groups=groups, actions=select_actions, rng_value=rng_value)
+            if o_prime_bridge_meta.get("enabled") and not o_prime_bridge_meta.get("withheld_from_psc"):
+                cf_sel = (o_prime_bridge_meta.get("local_counterfactual") or {}).get("selected")
+                o_prime_bridge_meta["selection_differs_from_withheld_cf"] = (
+                    str(comp.get("selected")) != str(cf_sel)
+                    if cf_sel is not None and comp.get("selected") is not None
+                    else False
+                )
             competition_result = comp.get("competition") or {}
             competition_result["mode"] = selection_mode
             if cfg.get("future_sensitive_action"):
@@ -678,12 +1017,114 @@ def run_cognition_before_action(
         selection_rule = "RETAINED_PREDICTION: argmax support among compression matches"
         peer_evaluation = "COMPRESSION_SUPPORT_ONLY"
 
-    if selected not in actions:
-        selected = actions[min(len(actions) - 1, int(float(rng_value) * len(actions)))]
+    if selected not in select_actions:
+        selected = select_actions[min(len(select_actions) - 1, int(float(rng_value) * len(select_actions)))]
         selected_source = "ENDOGENOUS_VARIATION"
-        selection_rule = "ENDOGENOUS_INDEX: actions[floor(rng*len(actions))] fallback"
+        selection_rule = (
+            "ENDOGENOUS_INDEX: select_actions[floor(rng*len)] "
+            + ("(composite loco set)" if composite_on else "(full repertoire)")
+        )
         if competition_result.get("outcome_class") == "NO_SUPPORT":
             competition_result["fallback"] = "ENDOGENOUS_VARIATION"
+
+    # --- PSC motor resolution (default LOCO_FACTORIZED; OBSERVED_COMPOSITE experimental) ---
+    psc_motor_res = ocpsc.normalize_mode(cfg.get("psc_motor_resolution"))
+    observed_selection_meta: dict[str, Any] = {
+        "mode": psc_motor_res,
+        "status": "NOT_USED",
+        "experimental": psc_motor_res == ocpsc.MODE_OBSERVED,
+    }
+    motor_output: CompositeMotorOutput | None = None
+    skip_factorized = False
+    if (
+        composite_on
+        and psc_motor_res == ocpsc.MODE_OBSERVED
+        and bool(smc_store.get("enabled"))
+        and bool(cfg.get("historical_sensorimotor_selection_bridge"))
+        and isinstance(observation, dict)
+        and str(selection_mode).upper() != "LEGACY_FIRST"
+    ):
+        oc = ocpsc.select_observed_composite_motor(
+            observation=observation,
+            smc_store=smc_store,
+            loco_candidates=list(select_actions),
+            prospection=state.get("prospection") or {},
+            compression=state.get("compression") if cfg.get("retrieval") else None,
+            retrieval_enabled=bool(cfg.get("retrieval")),
+            tick=int(tick) if tick is not None else None,
+            rng_value=float(rng_value),
+        )
+        observed_selection_meta.update({
+            "status": oc.get("status"),
+            "reason": oc.get("reason"),
+            "n_candidates": oc.get("n_candidates"),
+            "exact_composite_matches": oc.get("exact_composite_matches"),
+            "candidate_signatures": oc.get("candidate_signatures"),
+            "selected_signature": oc.get("selected_signature"),
+            "selected_locomotion": oc.get("selected_locomotion"),
+            "candidates": oc.get("candidates"),
+            "compete_source": oc.get("compete_source"),
+        })
+        if oc.get("status") == "SELECTED" and oc.get("motor") is not None:
+            motor_output = oc["motor"]
+            motor_output.schema = MOTOR_SCHEMA
+            selected = motor_output.legacy_token
+            selected_source = "OBSERVED_COMPOSITE_PSC"
+            selection_rule = (
+                "OBSERVED_COMPOSITE [EXPERIMENTAL]: empirical composite signatures → "
+                "SMC → O′ → history → compete_scenarios → full COMPOSITE_MOTOR_V1 "
+                "(no Cartesian invention; no legacy side-channel overwrite)"
+            )
+            competition_result = dict(oc.get("competition") or competition_result)
+            competition_result["mode"] = selection_mode
+            competition_result["psc_motor_resolution"] = ocpsc.MODE_OBSERVED
+            competition_result["selected_composite_signature"] = oc.get("selected_signature")
+            skip_factorized = True
+        else:
+            observed_selection_meta["fallback"] = "LOCO_FACTORIZED_THIS_TICK"
+
+    # --- COMPOSITE MOTOR: factorize side channels (LOCO_FACTORIZED / fallback only) ---
+    if composite_on and not skip_factorized:
+        head_on = any(str(a).startswith("NECK_") for a in actions)
+        osc_on = any(str(a) in OSC_ACTIONS for a in actions)
+        push_on = "PUSH" in actions
+        neck, neck_src, osc, osc_src, push, push_src = select_factorized_side_channels(
+            available=list(actions),
+            predictions=predictions,
+            rng_value=float(rng_value),
+            articulated_head=head_on,
+            oscillatory=osc_on,
+            physical_push=push_on,
+        )
+        loco = selected if (selected == "WAIT" or str(selected).startswith("MOVE:")) else "WAIT"
+        motor_output = build_composite_from_factorized(
+            locomotion=loco,
+            loco_source=selected_source,
+            neck=neck,
+            neck_source=neck_src,
+            osc=osc,
+            osc_source=osc_src,
+            push=push,
+            push_source=push_src,
+        )
+        motor_output.schema = MOTOR_SCHEMA
+        # Legacy primary token for counters / last_action learning key.
+        selected = motor_output.legacy_token
+        selected_source = "COMPOSITE_FACTORIZED"
+        selection_rule = (
+            "COMPOSITE_MOTOR_V1: one cycle → locomotion(PSC) + factorized "
+            "neck/oscillator/push (no Cartesian catalog, no second cognition)"
+        )
+        competition_result = dict(competition_result or {})
+        competition_result["psc_motor_resolution"] = ocpsc.MODE_LOCO
+    elif not composite_on:
+        motor_output = CompositeMotorOutput.from_legacy(str(selected), source=selected_source)
+        competition_result = dict(competition_result or {})
+        competition_result["psc_motor_resolution"] = psc_motor_res
+    else:
+        # OBSERVED_COMPOSITE winner already set — do not re-factorize side channels.
+        competition_result = dict(competition_result or {})
+        competition_result["psc_motor_resolution"] = ocpsc.MODE_OBSERVED
 
     probe_enabled = bool(cfg.get("unknown_action_physical_probe"))
     if probe_enabled:
@@ -720,7 +1161,12 @@ def run_cognition_before_action(
         tick=tick,
         kind="ACTION_SELECTED",
         mechanism="current_mm_cognition",
-        payload={"action": selected, "source": selected_source},
+        payload={
+            "action": selected,
+            "source": selected_source,
+            "motor_output": motor_output.to_dict() if motor_output else None,
+            "motor_schema": (motor_output.schema if motor_output else LEGACY_SCHEMA),
+        },
     )
     edge(
         trace,
@@ -743,7 +1189,26 @@ def run_cognition_before_action(
         )
         metrics["instrumental_later_used"] += 1
 
-    metrics["action_counts"][selected] = int(metrics["action_counts"].get(selected, 0)) + 1
+    metrics["action_counts"][str(selected)] = int(metrics["action_counts"].get(str(selected), 0)) + 1
+    # Component-level control counts (distinct from effector-active ticks).
+    mc = metrics.setdefault("motor_component_counts", {})
+    if motor_output is not None:
+        if motor_output.locomotion and motor_output.locomotion not in ("WAIT", "NONE"):
+            mc["locomotion"] = int(mc.get("locomotion", 0)) + 1
+            mc[motor_output.locomotion] = int(mc.get(motor_output.locomotion, 0)) + 1
+        if motor_output.neck and motor_output.neck != "NONE":
+            mc["neck"] = int(mc.get("neck", 0)) + 1
+            mc[motor_output.neck] = int(mc.get(motor_output.neck, 0)) + 1
+        osc = motor_output.oscillator
+        if osc.frequency_delta:
+            mc["osc_freq"] = int(mc.get("osc_freq", 0)) + 1
+        if osc.amplitude_delta:
+            mc["osc_amp"] = int(mc.get("osc_amp", 0)) + 1
+        if osc.emit_trigger:
+            mc["OSC_EMIT"] = int(mc.get("OSC_EMIT", 0)) + 1
+        if motor_output.push:
+            mc["PUSH"] = int(mc.get("PUSH", 0)) + 1
+        metrics["motor_schema"] = motor_output.schema
     if cfg.get("prediction_error_revision"):
         per.pending_from_selection(
             _per_store(state),
@@ -800,11 +1265,39 @@ def run_cognition_before_action(
         )
     else:
         state["last_fragment"] = observation
+    state["last_motor_output"] = motor_output.to_dict() if motor_output else None
+    # Support-gated continuation may keep organizing action without full PSC reselection.
+    _ppc_pref = (state.get("_contextual_stack_before_sel") or {}).get("ppc_preferred")
+    if (
+        _ppc_pref
+        and cfg.get("persistent_prospective_control")
+        and not cfg.get("persistent_prospective_control_ablate")
+        and (selected_source in {"ENDOGENOUS_VARIATION", "RETAINED_PREDICTION"} or str(selected) == str(_ppc_pref))
+    ):
+        if str(selected) != str(_ppc_pref) and selected_source in {"ENDOGENOUS_VARIATION", "RETAINED_PREDICTION"}:
+            selected = str(_ppc_pref)
+            selected_source = "PERSISTENT_PROSPECTIVE_CONTROL"
+            selection_rule = "PERSISTENT_PROSPECTIVE_CONTROL: continue selected prospective while support holds"
+        elif str(selected) == str(_ppc_pref) and (state.get("persistent_prospective_control") or {}).get("active"):
+            selected_source = "PERSISTENT_PROSPECTIVE_CONTROL"
+            selection_rule = "PERSISTENT_PROSPECTIVE_CONTROL: continue selected prospective while support holds"
     state["last_action"] = selected
+    state["_contextual_stack_after_sel"] = csb.after_selection(
+        state,
+        tick=tick,
+        selected=str(selected) if selected else None,
+        continuations=continuations,
+        observation=observation if isinstance(observation, dict) else None,
+        cfg=cfg,
+        selection_source=str(selected_source) if selected_source else None,
+    )
     state["last_selection"] = {
         "action": selected,
         "source": selected_source,
+        "motor_output": motor_output.to_dict() if motor_output else None,
+        "motor_schema": motor_output.schema if motor_output else LEGACY_SCHEMA,
         "candidates": actions,
+        "select_actions": list(select_actions),
         "prediction_matches": _retain_tick_local_list(predictions, limit=8),
         "continuations": _retain_tick_local_list(continuations, limit=8),
         "instrumental_prediction": _retain_tick_local(instrumental_prediction),
@@ -819,6 +1312,11 @@ def run_cognition_before_action(
         "prospective_selection_mode": selection_mode,
         "scenario_groups": _retain_tick_local(scenario_groups_public),
         "competition": _retain_tick_local(competition_result),
+        "contextual_stack": _retain_tick_local({
+            "experience": state.get("_contextual_stack_experience"),
+            "before_sel": state.get("_contextual_stack_before_sel"),
+            "after_sel": state.get("_contextual_stack_after_sel"),
+        }),
         "unknown_action_probe": _retain_tick_local(probe_info),
         "equivalence_diagnostic": _retain_tick_local(last_pe_diag),
         "temporal_diagnostic": _retain_tick_local(last_tps_diag),
@@ -832,6 +1330,32 @@ def run_cognition_before_action(
         "predicted_context_prospection": _retain_tick_local(last_pcp_diag),
         "predicted_context_branches": _retain_tick_local_list(pcp_branches, limit=8),
         "multistep_action_prospection": _retain_tick_local(last_map_diag),
+
+        "sensorimotor_consequence": _retain_tick_local(smc.diagnostic(_smc_store(state))),
+        "sensorimotor_candidate_predictions": _retain_tick_local_list(smc_candidate_preds, limit=12),
+        "sensorimotor_withheld_from_psc": bool(smc_withhold),
+        "o_prime_history_bridge": _retain_tick_local(o_prime_bridge_meta),
+        "psc_motor_resolution": psc_motor_res,
+        "observed_composite_selection": _retain_tick_local(observed_selection_meta),
+        "o_prime_history_candidates": _retain_tick_local_list(
+            [
+                {
+                    "candidate_locomotion": r.get("candidate_locomotion"),
+                    "history_status": (r.get("history") or {}).get("status"),
+                    "history_support": (r.get("history") or {}).get("historical_support"),
+                    "history_match_count": (r.get("history") or {}).get("match_count"),
+                    "support_spread": (r.get("history") or {}).get("support_spread"),
+                    "predicted_fields": (r.get("construct") or {}).get("predicted_fields"),
+                    "available_to_psc": (
+                        ((r.get("scenario") or {}).get("historical_sensorimotor_selection") or {}).get("available_to_psc")
+                    ),
+                    "history_shuffled": bool(r.get("history_shuffled")),
+                }
+                for r in (o_prime_bridge_rows or [])
+            ],
+            limit=12,
+        ),
+        "sensorimotor_last_update": _retain_tick_local(state.get("last_sensorimotor_update")),
         "multistep_action_branches": _retain_tick_local_list(map_branches, limit=8),
     }
     return CognitionTickResult(
@@ -843,7 +1367,24 @@ def run_cognition_before_action(
         predictions=predictions,
         selection_rule=selection_rule,
         actions=list(actions),
+        motor_output=motor_output.to_dict() if motor_output else None,
     )
+
+
+def clear_derived_indexes(state: dict[str, Any]) -> None:
+    """Drop reconstructible indexes after snapshot restore. Canonical stores unchanged."""
+    eq = state.get("equivalence")
+    if isinstance(eq, dict):
+        pe.clear_derived_caches(eq)
+    temporal = state.get("temporal")
+    if isinstance(temporal, dict):
+        inner = temporal.get("inner")
+        if isinstance(inner, dict):
+            pe.clear_derived_caches(inner)
+        temporal.pop("_retrieve_cache", None)
+    smc_store = state.get("sensorimotor_consequence")
+    if isinstance(smc_store, dict):
+        smc.invalidate_indexes(smc_store)
 
 
 def _equivalence_store(state: dict[str, Any]) -> dict[str, Any]:
@@ -1040,4 +1581,5 @@ def cognition_public_view(state: dict[str, Any]) -> dict[str, Any]:
             "observer": deepcopy((sel.get("multistep_action_prospection") or {}).get("observer") or {}),
             "note": "MULTI-STEP ACTION PROSPECTION — not planning, not a policy",
         },
+        **csb.public_view_sections(state),
     }

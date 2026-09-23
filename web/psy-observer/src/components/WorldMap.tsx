@@ -22,8 +22,11 @@ type Props = {
   onSelectCell?: (info: { ix: number; iy: number; value: number | null; field: string } | null) => void;
   layers?: Record<string, boolean>;
   agentsObserver?: Array<Record<string, unknown>>;
+  agentsViews?: Record<string, any> | null;
+  fovOverlay?: { show: boolean; showCandidates: boolean; agents: Record<string, boolean> } | null;
   interactionTargetId?: string | null;
   nearFieldSensor?: any;
+  followXY?: { x: number; y: number } | null;
 };
 
 function clamp01(t: number) {
@@ -85,8 +88,11 @@ export function WorldMap({
   onSelectCell,
   layers = { body: true, sites: true, trajectory: true, velocity: true, orientation: true, deformation: true, occupancy: false, force: false },
   agentsObserver = [],
+  agentsViews = null,
+  fovOverlay = null,
   interactionTargetId = null,
   nearFieldSensor = null,
+  followXY = null,
 }: Props) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const heatCache = useRef<{
@@ -124,6 +130,22 @@ export function WorldMap({
       window.removeEventListener('resize', measure);
     };
   }, []);
+
+  useEffect(() => {
+    if (!followXY || !world || viewport.w < 2) return;
+    const gw = world.width || 32;
+    const gh = world.height || 32;
+    const W = viewport.w;
+    const H = viewport.h;
+    setCam((c) => {
+      const cell = Math.min(W / gw, H / gh) * c.zoom;
+      return {
+        ...c,
+        x: W / 2 - (W - gw * cell) / 2 - Number(followXY.x) * cell,
+        y: H / 2 - (H - gh * cell) / 2 - Number(followXY.y) * cell,
+      };
+    });
+  }, [followXY?.x, followXY?.y, viewport.w, viewport.h, world?.width, world?.height]);
 
   useEffect(() => {
     const canvas = ref.current;
@@ -185,11 +207,12 @@ export function WorldMap({
       });
       drawBoundaryChrome(ctx, W, H, ox, oy, gw * cell, gh * cell, topo);
       if (layers.body) {
-        drawBody(ctx, body, ox, oy, cell, layers, '#3b82f6', nearFieldSensor);
+        drawBody(ctx, body, ox, oy, cell, layers, '#3b82f6', nearFieldSensor, 'agent_0');
         (world.entities?.bodies || []).forEach((b: any, i: number) => {
           if (i === 0) return;
-          drawBody(ctx, { ...body, x: b.x, y: b.y, theta: b.theta || 0 }, ox, oy, cell, { ...layers, sites: false, deformation: false }, '#f97316');
+          drawBody(ctx, { ...body, x: b.x, y: b.y, theta: b.theta || 0 }, ox, oy, cell, { ...layers, sites: false, deformation: false }, '#f97316', null, `agent_${i}`);
         });
+        drawMultiAgentFov(ctx, ox, oy, cell, { body, nearFieldSensor, agentsObserver, agentsViews, fovOverlay });
       }
       return;
     }
@@ -407,10 +430,10 @@ export function WorldMap({
 
     drawBoundaryChrome(ctx, W, H, ox, oy, gw * cell, gh * cell, topo);
     if (layers.body) {
-      drawBody(ctx, body, ox, oy, cell, layers, '#3b82f6', nearFieldSensor);
+      drawBody(ctx, body, ox, oy, cell, layers, '#3b82f6', nearFieldSensor, 'agent_0');
       (world.entities?.bodies || []).forEach((b: any, i: number) => {
         if (i === 0) return;
-        drawBody(ctx, { ...body, x: b.x, y: b.y, theta: b.theta || 0 }, ox, oy, cell, { ...layers, sites: false, deformation: false }, '#f97316');
+        drawBody(ctx, { ...body, x: b.x, y: b.y, theta: b.theta || 0 }, ox, oy, cell, { ...layers, sites: false, deformation: false }, '#f97316', null, `agent_${i}`);
       });
       // Observer-only: experimenter YOU + target ring (never in agent observation)
       for (const a of agentsObserver) {
@@ -432,8 +455,11 @@ export function WorldMap({
           ox, oy, cell,
           { ...layers, sites: false, deformation: false },
           '#eab308',
+          null,
+          String(a.observer_id || 'YOU'),
         );
       }
+      drawMultiAgentFov(ctx, ox, oy, cell, { body, nearFieldSensor, agentsObserver, agentsViews, fovOverlay });
       if (interactionTargetId) {
         const t = agentsObserver.find(a => String(a.observer_id) === String(interactionTargetId));
         if (t) {
@@ -537,7 +563,7 @@ export function WorldMap({
     } else if (geo && typeof geo === 'object') {
       ctx.fillText('yellow=requested  green=realized  cyan=local/GT flow', 10, H - 24);
     }
-  }, [world, body, layer, viewMode, perception, renderMode, opacity, showGrid, vectorDensity, contourLevels, autoScale, scaleMin, scaleMax, scalarIds, cam, trajectory, topo, layers, geometryInterpretation, agentsObserver, interactionTargetId, nearFieldSensor, viewport]);
+  }, [world, body, layer, viewMode, perception, renderMode, opacity, showGrid, vectorDensity, contourLevels, autoScale, scaleMin, scaleMax, scalarIds, cam, trajectory, topo, layers, geometryInterpretation, agentsObserver, agentsViews, fovOverlay, interactionTargetId, nearFieldSensor, viewport]);
 
   function clientToCell(e: React.MouseEvent) {
     const canvas = ref.current;
@@ -774,11 +800,117 @@ function drawAmbientForceArrows(
   }
 }
 
+function fovPalette(index: number) {
+  const palettes = [
+    { fill: 'rgba(56, 189, 248, 0.14)', stroke: 'rgba(56, 189, 248, 0.65)', label: '#7dd3fc' },
+    { fill: 'rgba(251, 146, 60, 0.14)', stroke: 'rgba(249, 115, 22, 0.7)', label: '#fdba74' },
+    { fill: 'rgba(167, 139, 250, 0.14)', stroke: 'rgba(139, 92, 246, 0.7)', label: '#c4b5fd' },
+    { fill: 'rgba(52, 211, 153, 0.12)', stroke: 'rgba(16, 185, 129, 0.7)', label: '#6ee7b7' },
+  ];
+  return palettes[index % palettes.length];
+}
+
+function drawMultiAgentFov(
+  ctx: CanvasRenderingContext2D,
+  ox: number, oy: number, cell: number,
+  opts: {
+    body: any;
+    nearFieldSensor: any;
+    agentsObserver: Array<Record<string, unknown>>;
+    agentsViews: Record<string, any> | null;
+    fovOverlay: { show: boolean; showCandidates: boolean; agents: Record<string, boolean> } | null;
+  },
+) {
+  const overlay = opts.fovOverlay;
+  if (!overlay || overlay.show === false) return;
+  const views = opts.agentsViews || {};
+  const ids = Object.keys(views).length
+    ? Object.keys(views)
+    : (opts.agentsObserver || []).map((a) => String(a.observer_id || a.agent_id || '')).filter(Boolean);
+  const list = ids.length ? ids : ['agent_0'];
+  list.forEach((id, i) => {
+    if (overlay.agents[id] === false) return;
+    const view = views[id] || {};
+    const nf = view.physical?.near_field_exteroception
+      || (i === 0 ? opts.nearFieldSensor : null);
+    const b = view.body
+      || opts.agentsObserver.find((a) => String(a.observer_id || a.agent_id) === id)
+      || (i === 0 ? opts.body : null);
+    if (!b || !nf || Number(nf.fov_deg) <= 0) return;
+    drawAgentFov(ctx, b, nf, ox, oy, cell, fovPalette(i), overlay.showCandidates, id);
+  });
+}
+
+function drawAgentFov(
+  ctx: CanvasRenderingContext2D,
+  body: any,
+  nf: any,
+  ox: number, oy: number, cell: number,
+  pal: { fill: string; stroke: string; label: string },
+  showCandidates: boolean,
+  label: string,
+) {
+  const bx = ox + Number(body.x) * cell;
+  const by = oy + Number(body.y) * cell;
+  const bodyTheta = Number(body.theta ?? nf.body_theta ?? 0);
+  const headTheta = Number(
+    nf.head_world_heading
+      ?? nf.sensor_forward_axis
+      ?? body.head_world_heading
+      ?? (bodyTheta + Number(body.head_relative_angle || nf.head_relative_angle || 0)),
+  );
+  const fov = Number(nf.fov_deg) * Math.PI / 180;
+  const half = fov / 2;
+  const visionR = Math.max(1, Math.min(3, Number(nf.vision_radius ?? nf.radius ?? 1)));
+  const reach = cell * (visionR + 0.15);
+  ctx.beginPath();
+  ctx.moveTo(bx, by);
+  ctx.arc(bx, by, reach, headTheta - half, headTheta + half);
+  ctx.closePath();
+  ctx.fillStyle = pal.fill;
+  ctx.fill();
+  ctx.strokeStyle = pal.stroke;
+  ctx.lineWidth = 1.25;
+  ctx.stroke();
+  ctx.fillStyle = pal.label;
+  ctx.font = '10px ui-monospace, monospace';
+  ctx.fillText(String(label).replace(/_/g, ' ').toUpperCase(), bx + 8, by - 10);
+  if (!showCandidates) return;
+  const neighbors = nf.neighbors || [];
+  for (const nb of neighbors) {
+    const c = nb.cell;
+    if (!c) continue;
+    const nx = ox + (Number(c[0]) + 0.5) * cell;
+    const ny = oy + (Number(c[1]) + 0.5) * cell;
+    const contrib = Number(nb.final_contribution || 0);
+    const det = Boolean(nb.detectable) && contrib > 0;
+    ctx.beginPath();
+    ctx.arc(nx, ny, Math.max(2, cell * (det ? 0.18 : 0.13)), 0, Math.PI * 2);
+    const bodyOpt = Number(nb.body_optical || 0);
+    if (det) {
+      ctx.fillStyle = bodyOpt > 0
+        ? `rgba(251, 191, 36, ${Math.min(0.85, 0.28 + contrib)})`
+        : `rgba(52, 211, 153, ${Math.min(0.85, 0.28 + contrib)})`;
+      ctx.fill();
+      ctx.strokeStyle = pal.stroke;
+      ctx.lineWidth = 1.2;
+    } else if (nb.inside_fov) {
+      ctx.strokeStyle = pal.stroke;
+      ctx.lineWidth = 1.1;
+    } else {
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
+      ctx.lineWidth = 1;
+    }
+    ctx.stroke();
+  }
+}
+
 function drawBody(
   ctx: CanvasRenderingContext2D, body: any, ox: number, oy: number,
   cell: number, layers: Record<string, boolean>,
   fill = '#3b82f6',
   nearFieldSensor: any = null,
+  _label = 'body',
 ) {
   if (!body) return;
   const bx = ox + Number(body.x) * cell;
@@ -794,60 +926,33 @@ function drawBody(
   ctx.fillStyle = fill;
   ctx.fill();
   if (layers.orientation) {
-    const theta = Number(body.theta || 0);
+    const bodyTheta = Number(body.theta || 0);
+    const headTheta = Number(
+      nearFieldSensor?.head_world_heading
+        ?? nearFieldSensor?.sensor_forward_axis
+        ?? body.head_world_heading
+        ?? (bodyTheta + Number(body.head_relative_angle || 0)),
+    );
+    // Body heading (amber)
     ctx.strokeStyle = '#fbbf24';
     ctx.beginPath(); ctx.moveTo(bx, by);
-    ctx.lineTo(bx + Math.cos(theta) * (r + 10), by + Math.sin(theta) * (r + 10));
+    ctx.lineTo(bx + Math.cos(bodyTheta) * (r + 10), by + Math.sin(bodyTheta) * (r + 10));
     ctx.stroke();
+    // Head / sensor axis (cyan) when distinct
+    if (Math.abs(headTheta - bodyTheta) > 1e-4) {
+      ctx.strokeStyle = '#22d3ee';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(bx, by);
+      ctx.lineTo(bx + Math.cos(headTheta) * (r + 14), by + Math.sin(headTheta) * (r + 14));
+      ctx.stroke();
+      ctx.lineWidth = 1.5;
+    }
     const omega = Number(body.omega || 0);
     if (Math.abs(omega) > 1e-6) {
       ctx.strokeStyle = 'rgba(251,191,36,0.7)';
       ctx.beginPath();
-      ctx.arc(bx, by, r + 14, theta, theta + Math.max(-Math.PI / 2, Math.min(Math.PI / 2, omega * 4)), omega < 0);
+      ctx.arc(bx, by, r + 14, bodyTheta, bodyTheta + Math.max(-Math.PI / 2, Math.min(Math.PI / 2, omega * 4)), omega < 0);
       ctx.stroke();
-    }
-    // Local FOV wedge — reach scales with Moore vision radius (candidate domain).
-    if (nearFieldSensor && Number(nearFieldSensor.fov_deg) > 0) {
-      const fov = Number(nearFieldSensor.fov_deg) * Math.PI / 180;
-      const half = fov / 2;
-      const visionR = Math.max(1, Math.min(3, Number(nearFieldSensor.vision_radius ?? nearFieldSensor.radius ?? 1)));
-      const reach = cell * (visionR + 0.15);
-      ctx.beginPath();
-      ctx.moveTo(bx, by);
-      ctx.arc(bx, by, reach, theta - half, theta + half);
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(56, 189, 248, 0.18)';
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.55)';
-      ctx.stroke();
-      const neighbors = nearFieldSensor.neighbors || [];
-      for (const nb of neighbors) {
-        const c = nb.cell;
-        if (!c) continue;
-        const nx = ox + (Number(c[0]) + 0.5) * cell;
-        const ny = oy + (Number(c[1]) + 0.5) * cell;
-        const contrib = Number(nb.final_contribution || 0);
-        const det = Boolean(nb.detectable) && contrib > 0;
-        ctx.beginPath();
-        ctx.arc(nx, ny, Math.max(2, cell * (det ? 0.22 : 0.16)), 0, Math.PI * 2);
-        const bodyOpt = Number(nb.body_optical || 0);
-        if (det) {
-          ctx.fillStyle = bodyOpt > 0
-            ? `rgba(251, 191, 36, ${Math.min(0.95, 0.35 + contrib)})`
-            : `rgba(52, 211, 153, ${Math.min(0.95, 0.35 + contrib)})`;
-          ctx.fill();
-          ctx.strokeStyle = bodyOpt > 0 ? 'rgba(245, 158, 11, 1)' : 'rgba(16, 185, 129, 1)';
-          ctx.lineWidth = 2;
-        } else if (nb.inside_fov) {
-          ctx.strokeStyle = bodyOpt > 0 ? 'rgba(251, 191, 36, 0.85)' : 'rgba(56, 189, 248, 0.9)';
-          ctx.lineWidth = 1.5;
-        } else {
-          // Candidate Moore source domain, outside FOV
-          ctx.strokeStyle = 'rgba(148, 163, 184, 0.45)';
-          ctx.lineWidth = 1;
-        }
-        ctx.stroke();
-      }
     }
   }
   if (layers.sites && Array.isArray(body.sites)) {
@@ -908,7 +1013,7 @@ function drawBody(
   }
   ctx.fillStyle = '#e2e8f0';
   ctx.font = '11px sans-serif';
-  ctx.fillText('body-0', bx + r + 4, by - 4);
+  ctx.fillText(String(_label).replace(/_/g, ' '), bx + r + 4, by - 4);
 }
 
 function drawBoundaryChrome(

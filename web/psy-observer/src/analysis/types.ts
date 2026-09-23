@@ -137,7 +137,7 @@ export type AgentAnalysis = {
     vision_only_episodes: NaMetric;
     peak_body_optical_contribution: NaMetric;
     exo_body_derived_delta: NaMetric | Record<string, number>;
-    next_action_observations: NaMetric;
+    next_action_observations: NaMetric | Record<string, number>;
     cognition_linkage: string;
   };
 };
@@ -279,6 +279,8 @@ export type RunAnalysis = {
     cumulative_runtime_summaries: any[];
     source: string | null;
     note: string | null;
+    telemetry_schema?: string | null;
+    telemetry_mode?: string | null;
   };
 };
 

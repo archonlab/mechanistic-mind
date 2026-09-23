@@ -1,6 +1,7 @@
-/** Observer-only Signal Context Interpreter panel (BETA2-SIGINT-01 / 02 / 03). */
+/** Observer-only Signal Context Interpreter panel (physical signal forensics). */
 import { useState } from 'react';
 import {
+  analyzeSignalContextCurrent,
   analyzeSignalContextRun,
   getSignalContextEpisode,
   getSignalIntervention,
@@ -14,7 +15,8 @@ import {
   saveSignalSpecimen,
 } from '../api/client';
 
-const REF_RUN = 'psyweb-20260918T021911.211579Z-b3cd1135';
+/** Demoted reference fixture — regression/demo only, never primary current-run analysis. */
+export const REFERENCE_FIXTURE_RUN_ID = 'psyweb-20260918T021911.211579Z-b3cd1135';
 
 function KV({ name, value }: { name: string; value: unknown }) {
   const v =
@@ -34,9 +36,19 @@ function KV({ name, value }: { name: string; value: unknown }) {
 export function SignalContextPanel({
   live,
   selectedEvent,
+  sourceMeta,
 }: {
   live?: any;
   selectedEvent?: any;
+  /** Always-visible CURRENT RUN identity (t0 / no-evidence still shows V2 shell). */
+  sourceMeta?: {
+    run_id?: string | null;
+    generation?: number | string | null;
+    tick?: number | string | null;
+    telemetry_schema?: string | null;
+    motor_schema?: string | null;
+    coverage?: string | null;
+  };
 }) {
   const [analysis, setAnalysis] = useState<any>(null);
   const [busy, setBusy] = useState(false);
@@ -67,14 +79,35 @@ export function SignalContextPanel({
     String(selectedEvent?.type || selectedEvent?.kind || '').includes('SIGNAL_EMITTED') ||
     String(selectedEvent?.type || selectedEvent?.kind || '').includes('EMITTED');
 
-  async function runAnalyze(runId = REF_RUN) {
+  async function runAnalyzeCurrent() {
     setBusy(true);
     setErr(null);
     try {
-      const r = await analyzeSignalContextRun(runId, {
+      const r = await analyzeSignalContextCurrent({
+        max_timeline_rows: 50000,
+        max_events: 200000,
+        max_episode_details: 40,
+      });
+      if (!r.accepted) throw new Error(r.error || 'analysis failed');
+      setAnalysis(r);
+      const first = (r.episode_details || [])[0];
+      setSelectedEp(first || null);
+    } catch (e: any) {
+      setErr(String(e?.message || e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runAnalyzeReference() {
+    setBusy(true);
+    setErr(null);
+    try {
+      const r = await analyzeSignalContextRun(REFERENCE_FIXTURE_RUN_ID, {
         max_timeline_rows: 20000,
         max_events: 120000,
         max_episode_details: 36,
+        reference: true,
       });
       if (!r.accepted) throw new Error(r.error || 'analysis failed');
       setAnalysis(r);
@@ -250,25 +283,277 @@ export function SignalContextPanel({
   const controls = detail?.matched_controls;
   const verdict = detail?.EVIDENCE_VERDICT || detail?.matched_comparison?.evidence;
 
+  const runId =
+    analysis?.run_id || analysis?.source?.run_id || sourceMeta?.run_id || 'NOT AVAILABLE';
+  const generation =
+    analysis?.generation ?? analysis?.source?.generation ?? sourceMeta?.generation ?? 'NOT AVAILABLE';
+  const tickCutoff =
+    analysis?.cutoff_tick ?? analysis?.source?.cutoff_tick ?? sourceMeta?.tick ?? 'NOT AVAILABLE';
+  const telemetrySchema =
+    analysis?.telemetry_schema
+    || analysis?.source?.telemetry_schema
+    || sourceMeta?.telemetry_schema
+    || 'NOT AVAILABLE';
+  const motorSchema =
+    analysis?.motor_schema
+    || analysis?.source?.motor_schema
+    || sourceMeta?.motor_schema
+    || 'NOT AVAILABLE';
+  const coverage =
+    analysis?.coverage
+    || analysis?.source?.coverage
+    || sourceMeta?.coverage
+    || (analysis ? 'ANALYZED' : 'NO EVIDENCE YET — analyze current run');
+  const oscDetected = analysis
+    ? Boolean(analysis.signal_systems?.oscillatory_signaling?.detected)
+    : null;
+  const legacyDetected = analysis
+    ? Boolean(analysis.signal_systems?.legacy_fields?.detected)
+    : null;
+
   return (
-    <div className="science-card" style={{ marginTop: 12 }}>
-      <h3>Signal Context Interpreter</h3>
-      <div className="subtle">
-        PHYSICAL SIGNAL → measurable context → deltas → matched controls. Not communication.
+    <div className="science-card signal-forensics-panel" style={{ marginTop: 12 }}>
+      <h3>SIGNAL FORENSICS V2</h3>
+      <div className="subtle" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+        <span className="info-kind kind-ANALYZER_INFERENCE">ANALYZER INFERENCE</span>
+        <span className="info-kind kind-WORLD_GT">HISTORICAL EVIDENCE</span>
+        <span>Current-run physical forensics · OSC + legacy FIELD · COMPOSITE_MOTOR_V1.</span>
       </div>
-      <div className="subtle" style={{ marginTop: 4 }}>
-        PHYSICAL FIELD = runtime ground truth · EMPIRICAL association ≠ causal link · Observer-only
+      <div className="subtle">
+        Not a live monitor (use SIGNALS for LIVE). Not communication. Not a language translator.
       </div>
 
-      <div className="toolbar-row" style={{ marginTop: 8, gap: 8, flexWrap: 'wrap' }}>
-        <button disabled={busy} onClick={() => runAnalyze()}>
-          {busy ? 'Analyzing…' : 'ANALYZE seed-17 reference run'}
+      <details open className="signal-forensics-section">
+        <summary>SOURCE / RUN IDENTITY</summary>
+        <div className="subtle"><span className="info-kind kind-ANALYZER_INFERENCE">DEBUG</span></div>
+        <KV name="Source" value="CURRENT RUN" />
+        <KV name="run_id" value={runId} />
+        <KV name="generation" value={generation} />
+        <KV name="tick / cutoff" value={tickCutoff} />
+        <KV name="telemetry schema" value={telemetrySchema} />
+        <KV name="motor schema" value={motorSchema} />
+        <KV name="coverage" value={coverage} />
+        {analysis?.evidence_agreement ? (
+          <div className="subtle">
+            Evidence agreement: run_id {String(analysis.evidence_agreement.run_id_match)} · cutoff{' '}
+            {String(analysis.evidence_agreement.cutoff_match)}
+          </div>
+        ) : null}
+        <div className="subtle" style={{ marginTop: 4 }}>
+          LIVE buffer: episodes {live?.n_episodes ?? 0} · buffered recv:{' '}
+          {live?.n_receptions_buffered ?? 0}
+          {' · '}LIVE=0 does not imply historical episodes=0
+        </div>
+      </details>
+
+      <details open className="signal-forensics-section">
+        <summary>SIGNAL SYSTEMS DETECTED IN RUN</summary>
+        <div className="subtle"><span className="info-kind kind-ANALYZER_INFERENCE">ANALYZER</span></div>
+        <KV
+          name="OSCILLATORY"
+          value={
+            oscDetected == null
+              ? 'NO EVIDENCE YET'
+              : oscDetected
+                ? 'DETECTED'
+                : 'NO EVIDENCE IN RUN'
+          }
+        />
+        <KV
+          name="LEGACY FIELD"
+          value={
+            legacyDetected == null
+              ? 'NO EVIDENCE YET'
+              : legacyDetected
+                ? 'DETECTED'
+                : 'NO EVIDENCE IN RUN'
+          }
+        />
+        {analysis?.signal_systems?.oscillatory_signaling?.note ? (
+          <div className="subtle">{analysis.signal_systems.oscillatory_signaling.note}</div>
+        ) : null}
+      </details>
+
+      <div className="toolbar-row" style={{ marginTop: 12, gap: 8, flexWrap: 'wrap' }}>
+        <button type="button" className="active" disabled={busy} onClick={runAnalyzeCurrent}>
+          {busy ? 'Analyzing…' : 'ANALYZE CURRENT RUN'}
         </button>
-        <span className="subtle">
-          LIVE episodes: {live?.n_episodes ?? 0} · buffered recv: {live?.n_receptions_buffered ?? 0}
-        </span>
+        <button type="button" disabled={busy} onClick={runAnalyzeReference} style={{ opacity: 0.75 }}>
+          REFERENCE FIXTURE: seed 17
+        </button>
       </div>
       {err ? <div className="availability" style={{ marginTop: 6 }}>{err}</div> : null}
+
+      {analysis ? (
+        <div style={{ marginTop: 10 }}>
+          <details open className="signal-forensics-section">
+            <summary>SUMMARY COUNTS</summary>
+            <div className="subtle"><span className="info-kind kind-ANALYZER_INFERENCE">HISTORICAL EVIDENCE</span></div>
+            <KV name="Legacy FIELD episodes" value={analysis.n_episodes} />
+            <KV name="OSC emission episodes" value={analysis.n_oscillatory_episodes} />
+            <KV name="Detailed FIELD episodes" value={analysis.n_episode_details} />
+            <KV name="Cross-agent FIELD episodes" value={analysis.n_cross_agent_episodes} />
+            <KV name="Channels (legacy)" value={analysis.channel_counts} />
+          </details>
+
+          <details open className="signal-forensics-section">
+            <summary>OSCILLATORY EPISODES</summary>
+            {(analysis.oscillatory_episodes || []).length ? (
+              <div className="event-list" style={{ maxHeight: 140 }}>
+                {(analysis.oscillatory_episodes || []).slice(0, 20).map((ep: any) => (
+                  <div key={ep.episode_id} className="subtle">
+                    {ep.agent_id} t{ep.start_tick}–{ep.end_tick} dur={ep.duration} · {ep.representation}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="na">NO EVIDENCE YET</div>
+            )}
+          </details>
+
+          <details className="signal-forensics-section">
+            <summary>FULL-DUPLEX PHYSICAL COUPLING</summary>
+            <div className="subtle">Physical co-occurrence only — not dialogue / turn-taking semantics.</div>
+            {analysis.full_duplex ? (
+              <>
+                <KV name="Half-duplex rule" value={analysis.full_duplex.half_duplex_rule ? 'YES' : 'NO'} />
+                <KV name="Turn-taking inferred" value={analysis.full_duplex.turn_taking_inferred ? 'YES' : 'NO'} />
+                {Object.entries(analysis.full_duplex.per_agent || {}).map(([aid, st]: any) => (
+                  <div key={aid} style={{ marginTop: 4 }}>
+                    <b>{aid}</b>
+                    <KV name="emitting" value={st.ticks_emitting} />
+                    <KV name="receiving (osc energy)" value={st.ticks_receiving} />
+                    <KV name="emitting+receiving" value={st.ticks_emitting_and_receiving} />
+                  </div>
+                ))}
+                <KV name="A∩B both emitting" value={analysis.full_duplex.two_agent?.A_emitting_while_B_emitting} />
+                <KV name="both emit+recv" value={analysis.full_duplex.two_agent?.both_emitting_and_both_receiving} />
+              </>
+            ) : (
+              <div className="na">NO EVIDENCE YET</div>
+            )}
+          </details>
+
+          <h4 style={{ marginTop: 10 }}>SPECTROTEMPORAL PATTERNS</h4>
+          {(analysis.spectrotemporal_patterns || []).length ? (
+            (analysis.spectrotemporal_patterns || []).slice(0, 8).map((p: any) => (
+              <div key={p.pattern_id} className="subtle" style={{ marginTop: 4 }}>
+                {p.pattern_id}: n={p.count} · agents={JSON.stringify(p.agents)} · {p.note}
+              </div>
+            ))
+          ) : (
+            <div className="na">NO EVIDENCE YET</div>
+          )}
+
+          <h4 style={{ marginTop: 10 }}>COMPOSITE MOTOR CONTEXT</h4>
+          {analysis.composite_motor ? (
+            <>
+              <KV name="Schema" value={analysis.composite_motor.schema} />
+              <KV name="Authoritative" value={analysis.composite_motor.authoritative ? 'YES' : 'NO (legacy)'} />
+              <div className="subtle">{analysis.composite_motor.note}</div>
+              {Object.entries(analysis.composite_motor.agents || {}).map(([aid, ag]: any) => (
+                <div key={aid} style={{ marginTop: 6 }}>
+                  <b>{aid}</b>
+                  <KV name="locomotion ticks" value={ag.locomotion_ticks} />
+                  <KV name="neck-control ticks" value={ag.neck_control_ticks} />
+                  <KV name="oscillator-control ticks" value={ag.oscillator_control_ticks} />
+                  <KV name="emission-trigger ticks" value={ag.emission_trigger_ticks} />
+                  <KV name="push ticks" value={ag.push_ticks} />
+                  <KV name="WAIT/no-intervention" value={ag.wait_no_intervention_ticks} />
+                  <KV name="OSC_EMIT selections" value={ag.control_vs_effector?.OSC_EMIT_selections} />
+                  <KV name="emission active ticks" value={ag.control_vs_effector?.emission_active_ticks} />
+                  <KV name="neck commands" value={ag.control_vs_effector?.neck_commands} />
+                  <KV name="head rotating ticks" value={ag.control_vs_effector?.head_rotating_ticks} />
+                  <div className="subtle">{ag.legacy_projection_note}</div>
+                </div>
+              ))}
+              <h4 style={{ marginTop: 8 }}>Combinations (factorized — not Cartesian tokens)</h4>
+              {Object.entries(analysis.composite_motor.named_combinations || {})
+                .filter(([, n]) => Number(n) > 0)
+                .map(([k, n]) => (
+                  <KV key={k} name={k} value={n} />
+                ))}
+            </>
+          ) : (
+            <div className="na">NO EVIDENCE YET</div>
+          )}
+
+          <h4 style={{ marginTop: 10 }}>PHYSICAL RELATIONS</h4>
+          {analysis.temporal_physical_relations ? (
+            <>
+              <KV name="First cross-agent contribution" value={analysis.temporal_physical_relations.first_cross_agent_contribution_tick} />
+              <KV name="First optical exposure" value={analysis.temporal_physical_relations.first_body_optical_exposure_tick} />
+              <KV name="First contact" value={analysis.temporal_physical_relations.first_physical_contact_tick} />
+              <KV name="signal → optical Δ" value={analysis.temporal_physical_relations.signal_to_optical_delta} />
+              <KV name="signal → contact Δ" value={analysis.temporal_physical_relations.signal_to_contact_delta} />
+              <KV name="optical → contact Δ" value={analysis.temporal_physical_relations.optical_to_contact_delta} />
+            </>
+          ) : (
+            <div className="na">NO EVIDENCE YET</div>
+          )}
+
+          <h4 style={{ marginTop: 10 }}>CANDIDATE ASSOCIATIONS</h4>
+          {(analysis.candidate_associations || []).length ? (
+            (analysis.candidate_associations || []).slice(0, 8).map((a: any, i: number) => (
+              <div key={i} className="subtle" style={{ marginTop: 4 }}>
+                [{a.evidence_label}] {a.question} · n={a.count ?? '—'} · causation={a.causation}
+              </div>
+            ))
+          ) : (
+            <div className="na">NO EVIDENCE YET</div>
+          )}
+
+          {analysis.interaction_chronology?.length ? (
+            <>
+              <h4 style={{ marginTop: 10 }}>INTERACTION CHRONOLOGY</h4>
+              <div className="subtle">Chronology only — not narrative interpretation.</div>
+              {(analysis.interaction_chronology || []).slice(0, 24).map((c: any, i: number) => (
+                <div key={i} className="subtle">
+                  t{c.tick} {c.kind} {c.agent_id || ''} {c.detail || ''}
+                </div>
+              ))}
+            </>
+          ) : null}
+
+          <h4 style={{ marginTop: 10 }}>LEGACY FIELD EPISODES (detail)</h4>
+          {(analysis.episode_details || []).length ? (
+            <div className="event-list" style={{ maxHeight: 160 }}>
+              {(analysis.episode_details || []).slice(0, 24).map((d: any) => {
+                const e = d.signal_episode || {};
+                return (
+                  <button key={e.episode_id} type="button" onClick={() => setSelectedEp(d)}>
+                    <span>t{e.peak_tick}</span>
+                    <b>{e.channel}</b>
+                    <small>
+                      {e.receiver_agent_id} · {d.EVIDENCE_VERDICT} · peak=
+                      {Number(e.intensity?.peak).toFixed(3)}
+                    </small>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="na">NO EVIDENCE YET</div>
+          )}
+          {(analysis.patterns || []).slice(0, 4).map((p: any) => (
+            <div key={p.pattern_id} className="subtle" style={{ marginTop: 4 }}>
+              LEGACY pattern {p.pattern_id}: n={p.episodes} · {p.SIGNAL?.channel}
+            </div>
+          ))}
+
+          <h4 style={{ marginTop: 10 }}>SCIENTIFIC BOUNDARY</h4>
+          <div className="subtle">
+            Physical signal ≠ message · Reception ≠ interpretation · No speaker/listener ·
+            Temporal association ≠ causation · Cognition linkage: NOT_ESTABLISHED
+          </div>
+        </div>
+      ) : null}
+
+      <details style={{ marginTop: 16, borderTop: '1px solid rgba(148,163,184,0.25)', paddingTop: 12 }}>
+        <summary style={{ cursor: 'pointer', fontWeight: 600 }}>LEGACY / ADVANCED TOOLS</summary>
+        <div className="subtle" style={{ marginTop: 6 }}>
+          SIGINT-04/05/06 and specimen replay — secondary diagnostics, not the default current-run workflow.
+        </div>
 
       {isRecv ? (
         <div style={{ marginTop: 8 }}>
@@ -278,9 +563,6 @@ export function SignalContextPanel({
           <KV name="Attribution" value={selectedEvent?.evidence?.source_attribution} />
           <KV name="local.FIELD_A" value={selectedEvent?.evidence?.['local.FIELD_A']} />
           <KV name="local.FIELD_B" value={selectedEvent?.evidence?.['local.FIELD_B']} />
-          <div className="subtle">
-            Open ANALYZE for PRE/POST + matched controls around this tick’s episode family.
-          </div>
         </div>
       ) : null}
 
@@ -343,9 +625,7 @@ export function SignalContextPanel({
                 </button>
               ))}
             </div>
-            <div className="subtle" style={{ marginTop: 6 }}>
-              Mode
-            </div>
+            <div className="subtle" style={{ marginTop: 6 }}>Mode</div>
             <div className="toolbar-row" style={{ gap: 6, flexWrap: 'wrap' }}>
               {(['EXACT', 'ALTER_AMPLITUDE', 'ALTER_CHANNEL', 'DELAY'] as const).map((m) => (
                 <button
@@ -386,7 +666,7 @@ export function SignalContextPanel({
 
       {episodes.length ? (
         <>
-          <h4 style={{ marginTop: 10 }}>LIVE episodes (bounded)</h4>
+          <h4 style={{ marginTop: 10 }}>LIVE episodes (bounded buffer — not scientific history)</h4>
           <div className="event-list">
             {episodes.slice(-8).reverse().map((e: any) => (
               <button key={e.episode_id} type="button" onClick={() => inspectLiveEpisode(e.episode_id)}>
@@ -401,46 +681,6 @@ export function SignalContextPanel({
             ))}
           </div>
         </>
-      ) : (
-        <div className="subtle" style={{ marginTop: 8 }}>
-          No LIVE episodes yet — run TwoAgent with experimental physical signal, or ANALYZE a saved run.
-        </div>
-      )}
-
-      {analysis ? (
-        <div style={{ marginTop: 10 }}>
-          <h4>Analysis summary</h4>
-          <KV name="Episodes" value={analysis.n_episodes} />
-          <KV name="Detailed" value={analysis.n_episode_details} />
-          <KV name="Matched associations" value={analysis.matched_association_count} />
-          <KV name="Channels" value={analysis.channel_counts} />
-          <KV name="Patterns" value={(analysis.patterns || []).length} />
-          <div className="event-list" style={{ maxHeight: 160 }}>
-            {(analysis.episode_details || []).slice(0, 24).map((d: any) => {
-              const e = d.signal_episode || {};
-              return (
-                <button key={e.episode_id} type="button" onClick={() => setSelectedEp(d)}>
-                  <span>t{e.peak_tick}</span>
-                  <b>{e.channel}</b>
-                  <small>
-                    {e.receiver_agent_id} · {d.EVIDENCE_VERDICT} · peak=
-                    {Number(e.intensity?.peak).toFixed(3)}
-                  </small>
-                </button>
-              );
-            })}
-          </div>
-          {(analysis.patterns || []).slice(0, 6).map((p: any) => (
-            <div key={p.pattern_id} className="subtle" style={{ marginTop: 4 }}>
-              {p.pattern_id}: n={p.episodes} · {p.SIGNAL?.channel} · evidence={p.evidence}
-              {' · '}actionΔ {Number(p.POST?.requested_direction_changed_frac || 0).toFixed(2)}
-              {' vs ctrl '}
-              {p.matched_controls?.mean_action_change_rate == null
-                ? '—'
-                : Number(p.matched_controls.mean_action_change_rate).toFixed(2)}
-            </div>
-          ))}
-        </div>
       ) : null}
 
       {ep ? (
@@ -774,6 +1014,7 @@ export function SignalContextPanel({
           </div>
         ) : null}
       </div>
+      </details>
     </div>
   );
 }

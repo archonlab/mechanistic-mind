@@ -7,6 +7,7 @@ import {
   focusWindow,
   nextZ,
   openOrFocusWindow,
+  preferredOpenSize,
   simulationCenterX,
 } from './floatingWindows.ts';
 
@@ -47,5 +48,23 @@ describe('OBSERVER_DESKTOP_01 floating windows', () => {
     assert.equal(configPending({ seed: '17' }, { seed: '17' }), false);
     assert.equal(configPending({ seed: '18' }, { seed: '17' }), true);
     assert.equal(configPending({ seed: '18' }, null), false);
+  });
+
+  it('tall-list panels prefer most of viewport height', () => {
+    const tall = { width: 1200, height: 900 };
+    const mech = preferredOpenSize('mechanisms', tall);
+    assert.ok(mech.h >= Math.floor(900 * 0.88) - 1, `mechanisms h=${mech.h}`);
+    assert.ok(mech.h <= 900 - 24);
+    const compact = preferredOpenSize('geometry', tall);
+    assert.equal(compact.h, 360);
+    const short = preferredOpenSize('mechanisms', { width: 800, height: 280 });
+    assert.ok(short.h <= 280 - 24);
+    assert.ok(short.h >= 160);
+  });
+
+  it('openOrFocusWindow uses preferredOpenSize for mechanisms', () => {
+    const bounds = { width: 1100, height: 800 };
+    const wins = openOrFocusWindow([], 'mechanisms', bounds, 0);
+    assert.ok(wins[0].h >= Math.floor(800 * 0.88) - 1);
   });
 });

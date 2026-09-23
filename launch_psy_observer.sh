@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Psy Observer Web — Public Beta 1 launcher (Linux / Unix).
+# Psy Observer Web — Beta 3 launcher (Linux / Unix).
 # Double-click or run from any working directory.
 # First launch may create .venv_psy_web and install requirements-observer.txt.
 # Starts mechanistic_mind.ui.psy_observer_web via the canonical Python launcher.
@@ -139,7 +139,7 @@ pick_runtime_python() {
 
 if [ ! -f "$ROOT/mechanistic_mind/ui/psy_observer_web/web_dist/index.html" ]; then
   fail "The Observer interface is not built yet (missing production web_dist files).
-This Public Public Beta 1 archive should already include web_dist. Re-download the release if it is missing."
+This Beta 3 archive should already include web_dist. Re-download the release if it is missing."
 fi
 
 if [ ! -f "$BOOTSTRAP" ]; then

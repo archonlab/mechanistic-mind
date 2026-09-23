@@ -1,2 +1,0 @@
-d0b35dd2b56e25226704903c9df0be3a9d4e4433108acb4a11a82a4c94af6a97  MM-2.0-Tiktaalik-Undercover-Public-Beta-1.tar.gz
-3abec52068b52925f6c581bf9d1568385a6cdf17a17046bf95956c9d0509d27c  MM-2.0-Tiktaalik-Undercover-Public-Beta-1.zip

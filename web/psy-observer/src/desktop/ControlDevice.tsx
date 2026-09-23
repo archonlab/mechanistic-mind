@@ -1,11 +1,11 @@
-import type { ReactNode } from 'react';
 import { ToolIcon } from './icons';
-import { EXPERIMENT_MENU, HOME_TOOLS, type DeviceTool, type ExperimentScreen } from './types';
+import { HOME_TOOLS, type DeviceTool, type ExperimentScreen } from './types';
 
 type Props = {
   collapsed: boolean;
   onToggleCollapse: () => void;
   tool: DeviceTool;
+  activeTool?: DeviceTool | null;
   onTool: (t: DeviceTool) => void;
   experimentScreen: ExperimentScreen;
   onExperimentScreen: (s: ExperimentScreen) => void;
@@ -13,14 +13,15 @@ type Props = {
   overrideCount: number;
   undercoverInWorld: boolean;
   selectedAgentLabel: string;
-  children: ReactNode;
 };
 
 export function ControlDevice({
-  collapsed, onToggleCollapse, tool, onTool,
-  experimentScreen, onExperimentScreen,
-  pending, overrideCount, undercoverInWorld, selectedAgentLabel, children,
+  collapsed, onToggleCollapse, tool, activeTool, onTool,
+  experimentScreen: _experimentScreen, onExperimentScreen: _onExperimentScreen,
+  pending, overrideCount, undercoverInWorld, selectedAgentLabel,
 }: Props) {
+  void _experimentScreen;
+  void _onExperimentScreen;
   if (collapsed) {
     return (
       <aside className="control-device collapsed" aria-label="Control dock">
@@ -29,9 +30,10 @@ export function ControlDevice({
           <button
             key={t.id}
             type="button"
-            className={`dock-icon ${tool === t.id ? 'active' : ''}`}
+            className={`dock-icon ${(activeTool === undefined ? tool : activeTool) === t.id ? 'active' : ''}`}
             title={t.label}
-            onClick={() => { onTool(t.id); onToggleCollapse(); }}
+            data-rail-tool={t.id}
+            onClick={() => { onTool(t.id); }}
           >
             <ToolIcon tool={t.id} />
           </button>
@@ -62,42 +64,14 @@ export function ControlDevice({
         </div>
       </header>
 
-      {tool === 'home' ? (
-        <nav className="device-home">
-          {HOME_TOOLS.map((t) => (
-            <button key={t.id} type="button" className="home-tile" onClick={() => onTool(t.id)}>
-              <ToolIcon tool={t.id} />
-              <span>{t.label}</span>
-            </button>
-          ))}
-        </nav>
-      ) : (
-        <div className="device-screen">
-          <div className="device-nav-row">
-            <button type="button" className="back" onClick={() => {
-              if (tool === 'experiment' && experimentScreen !== 'menu') onExperimentScreen('menu');
-              else onTool('home');
-            }}>
-              ‹ {tool === 'experiment' && experimentScreen !== 'menu' ? 'Experiment' : 'Home'}
-            </button>
-            <strong className="device-screen-title">
-              {tool === 'experiment' && experimentScreen !== 'menu'
-                ? EXPERIMENT_MENU.find((x) => x.id === experimentScreen)?.label || 'Experiment'
-                : HOME_TOOLS.find((x) => x.id === tool)?.label || tool}
-            </strong>
-          </div>
-          {tool === 'experiment' && experimentScreen === 'menu' && (
-            <nav className="device-submenu">
-              {EXPERIMENT_MENU.map((s) => (
-                <button key={s.id} type="button" className="submenu-row" onClick={() => onExperimentScreen(s.id)}>
-                  <span>{s.label}</span><span>›</span>
-                </button>
-              ))}
-            </nav>
-          )}
-          <div className="device-body">{children}</div>
-        </div>
-      )}
+      <nav className="device-home">
+        {HOME_TOOLS.map((t) => (
+          <button key={t.id} type="button" className={`home-tile ${(activeTool === undefined ? tool : activeTool) === t.id ? 'active' : ''}`} onClick={() => onTool(t.id)}>
+            <ToolIcon tool={t.id} />
+            <span>{t.label}</span>
+          </button>
+        ))}
+      </nav>
     </aside>
   );
 }

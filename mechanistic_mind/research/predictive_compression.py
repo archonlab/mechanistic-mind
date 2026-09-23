@@ -21,11 +21,30 @@ PREDICTION_AT_EVENT_CAPACITY = 64
 RAW_ARCHIVE_CAPACITY = 0  # after purge: must stay 0 for deleted ids
 
 
+# Same-payload signature reuse (identical digest; bounded map).
+_SIG_CACHE: dict[tuple[tuple[str, Any], ...], str] = {}
+_SIG_CACHE_MAX = 8192
+
+
 def _sig(payload: dict[str, Any]) -> str:
-    items = sorted((str(k), round(float(v), 4) if isinstance(v, (int, float)) and not isinstance(v, bool) else str(v))
-                   for k, v in payload.items())
+    items = tuple(
+        sorted(
+            (
+                str(k),
+                round(float(v), 4) if isinstance(v, (int, float)) and not isinstance(v, bool) else str(v),
+            )
+            for k, v in payload.items()
+        )
+    )
+    hit = _SIG_CACHE.get(items)
+    if hit is not None:
+        return hit
     raw = "|".join(f"{k}:{v}" for k, v in items)
-    return sha1(raw.encode("utf-8")).hexdigest()[:12]
+    digest = sha1(raw.encode("utf-8")).hexdigest()[:12]
+    if len(_SIG_CACHE) >= _SIG_CACHE_MAX:
+        _SIG_CACHE.clear()
+    _SIG_CACHE[items] = digest
+    return digest
 
 
 def empty_memory(*, recent_capacity: int = RECENT_CAPACITY) -> dict[str, Any]:
@@ -327,9 +346,16 @@ def _forget_structure(mem: dict[str, Any], key: str) -> None:
         mem["forgotten_structures"] = int(mem.get("forgotten_structures") or 0) + 1
 
 
-def predict(mem: dict[str, Any], fragment: dict[str, float], action: str, *, domain: str = "generic") -> dict[str, Any]:
+def predict(
+    mem: dict[str, Any],
+    fragment: dict[str, float],
+    action: str,
+    *,
+    domain: str = "generic",
+    antecedent_sig: str | None = None,
+) -> dict[str, Any]:
     """Retrieve best matching ACTIVE structure for antecedent+action."""
-    ant = _sig(fragment)
+    ant = antecedent_sig if antecedent_sig is not None else _sig(fragment)
     best = None
     for row in (mem.get("structures") or {}).values():
         if row.get("status") != "ACTIVE":
@@ -416,38 +442,58 @@ def expand_structure(mem: dict[str, Any], structure_id: str) -> dict[str, Any]:
 
 
 def memory_cost(mem: dict[str, Any]) -> dict[str, Any]:
+    """Observer/research cost panel.
+
+    ``bytes_*`` are exact JSON sizes of the persistent/raw maps. Results are
+    cached on ``mem`` until structural occupancy counters change so LIVE/full
+    frames do not re-serialize the entire store on every ``cognitive_view``.
+    """
     import json
-    payload = {
-        "recent": mem.get("recent"),
-        "structures": mem.get("structures"),
-        "exceptions": mem.get("exceptions"),
-        "prediction_at_event": mem.get("prediction_at_event"),
-        "raw_log": mem.get("raw_log"),
-    }
-    # rough byte cost of persistent memory (not including removed ids list)
+
+    structures = mem.get("structures") or {}
+    exceptions = mem.get("exceptions") or {}
+    recent = mem.get("recent") or []
+    pae = mem.get("prediction_at_event") or {}
+    raw_log = mem.get("raw_log") or {}
+    cache_key = (
+        int(mem.get("ticks_lived") or 0),
+        int(mem.get("raw_generated") or 0),
+        int(mem.get("raw_retained") or 0),
+        int(mem.get("raw_removed") or 0),
+        int(mem.get("revisions") or 0),
+        len(recent),
+        len(structures),
+        len(exceptions),
+        len(pae),
+        len(raw_log) if isinstance(raw_log, dict) else 0,
+    )
+    cached = mem.get("_memory_cost_cache")
+    if isinstance(cached, dict) and cached.get("key") == cache_key:
+        return dict(cached["cost"])
+
     persistent = {
-        "recent": mem.get("recent"),
-        "structures": mem.get("structures"),
-        "exceptions": mem.get("exceptions"),
-        "prediction_at_event": mem.get("prediction_at_event"),
-        "raw_log": mem.get("raw_log"),
+        "recent": recent,
+        "structures": structures,
+        "exceptions": exceptions,
+        "prediction_at_event": pae,
+        "raw_log": raw_log,
     }
-    raw_only = {"raw_log": mem.get("raw_log")}
+    raw_only = {"raw_log": raw_log}
     bytes_persistent = len(json.dumps(persistent, sort_keys=True).encode("utf-8"))
     bytes_raw = len(json.dumps(raw_only, sort_keys=True).encode("utf-8"))
     ticks = max(1, int(mem.get("ticks_lived") or 1))
-    return {
+    cost = {
         "ticks_lived": mem.get("ticks_lived"),
         "raw_generated": mem.get("raw_generated"),
         "raw_retained": mem.get("raw_retained"),
         "raw_removed": mem.get("raw_removed"),
-        "recent_buffer_size": len(mem.get("recent") or []),
-        "compressed_structure_count": len(mem.get("structures") or {}),
-        "exception_count": len(mem.get("exceptions") or {}),
-        "provenance_edge_count": sum(len(r.get("provenance") or []) for r in (mem.get("structures") or {}).values()),
+        "recent_buffer_size": len(recent),
+        "compressed_structure_count": len(structures),
+        "exception_count": len(exceptions),
+        "provenance_edge_count": sum(len(r.get("provenance") or []) for r in structures.values()),
         "revision_count": mem.get("revisions"),
         "forgotten_structures": mem.get("forgotten_structures"),
-        "prediction_at_event_count": len(mem.get("prediction_at_event") or {}),
+        "prediction_at_event_count": len(pae),
         "bytes_persistent": bytes_persistent,
         "bytes_raw_log": bytes_raw,
         "bytes_per_lived_tick": round(bytes_persistent / ticks, 4),
@@ -456,6 +502,8 @@ def memory_cost(mem: dict[str, Any]) -> dict[str, Any]:
         ),
         "metrics_affect_cognition": bool(mem.get("metrics_affect_cognition")),
     }
+    mem["_memory_cost_cache"] = {"key": cache_key, "cost": cost}
+    return dict(cost)
 
 
 def snapshot(mem: dict[str, Any]) -> dict[str, Any]:

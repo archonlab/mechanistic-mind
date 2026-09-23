@@ -31,7 +31,11 @@ TRIGGER_EPISODE_REPLAY = "NATURAL_SIGNAL_EPISODE_REPLAY"
 NOT_RECORDED = "NOT_RECORDED"
 NOT_RECONSTRUCTABLE = "NOT_RECONSTRUCTABLE"
 
-DEFAULT_REF_RUN = None  # public package: pass explicit path
+_PROJECT_ROOT = Path(__file__).resolve().parents[4]
+DEFAULT_REF_RUN = (
+    _PROJECT_ROOT / "results" / "psychology_observer" / "psy_observer_web"
+    / "psyweb-20260918T021911.211579Z-b3cd1135"
+)
 REF_START, REF_END = 1554, 1563
 HORIZON_MARKERS = (1, 2, 5, 10, 25, 50, 100)
 
@@ -270,9 +274,7 @@ def load_episode_from_events(
 def reconstruct_reference_episode_1554_1563(
     run_dir: Path | str | None = None,
 ) -> NaturalSignalEpisode:
-    if not run_dir:
-        raise FileNotFoundError('reference run directory required (no bundled default in public package)')
-    root = Path(run_dir)
+    root = Path(run_dir) if run_dir else DEFAULT_REF_RUN
     run_id = root.name
     events = root / "scientific_events.jsonl"
     return load_episode_from_events(

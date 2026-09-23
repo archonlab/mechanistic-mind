@@ -16,7 +16,8 @@ export type ExperimentScreen =
   | 'set_model'
   | 'set_ecology'
   | 'set_resources'
-  | 'experimental';
+  | 'experimental'
+  | 'set_predictive';
 
 export type FloatingWindowId =
   | 'analysis'
@@ -60,5 +61,6 @@ export const EXPERIMENT_MENU: { id: ExperimentScreen; label: string }[] = [
   { id: 'set_model', label: 'Set Model' },
   { id: 'set_ecology', label: 'Set Ecology' },
   { id: 'set_resources', label: 'Set Resources' },
+  { id: 'set_predictive', label: 'Predictive / PSC' },
   { id: 'experimental', label: 'Experimental' },
 ];

@@ -1,0 +1,254 @@
+{
+  "schema": "mm.scientific_relationship_types.design_draft.v0",
+  "created": "2026-09-21T05:32:50.068120+00:00",
+  "layers": [
+    "EVIDENCE_GRAPH",
+    "DERIVED_RELATIONSHIP_GRAPH",
+    "HYPOTHESIS_FORENSIC_LAYER"
+  ],
+  "nodes": [
+    {
+      "type": "WORLD_STATE",
+      "key": [
+        "run_id",
+        "tick"
+      ]
+    },
+    {
+      "type": "BODY_STATE",
+      "key": [
+        "run_id",
+        "tick",
+        "physical_body_id"
+      ]
+    },
+    {
+      "type": "OBSERVATION",
+      "key": [
+        "observation_id"
+      ]
+    },
+    {
+      "type": "SENSORY_EXPOSURE",
+      "key": [
+        "run_id",
+        "tick",
+        "agent_id",
+        "channel"
+      ]
+    },
+    {
+      "type": "MEMORY_CONTEXT",
+      "key": [
+        "run_id",
+        "tick",
+        "agent_id"
+      ],
+      "tier": "CHECKPOINT/RESEARCH"
+    },
+    {
+      "type": "RETRIEVAL",
+      "key": [
+        "decision_id",
+        "retrieval_index?"
+      ],
+      "tier": "RESEARCH"
+    },
+    {
+      "type": "PREDICTION",
+      "key": [
+        "decision_id",
+        "action_or_candidate"
+      ]
+    },
+    {
+      "type": "PROSPECTIVE_CANDIDATE",
+      "key": [
+        "decision_id",
+        "candidate_id"
+      ]
+    },
+    {
+      "type": "DECISION",
+      "key": [
+        "decision_id"
+      ]
+    },
+    {
+      "type": "MOTOR_OUTPUT",
+      "key": [
+        "motor_id"
+      ]
+    },
+    {
+      "type": "PHYSICAL_EVENT",
+      "key": [
+        "event_id"
+      ]
+    },
+    {
+      "type": "CONSEQUENCE",
+      "key": [
+        "consequence_id"
+      ]
+    },
+    {
+      "type": "REVISION",
+      "key": [
+        "revision_id"
+      ]
+    },
+    {
+      "type": "EXPERIMENTER_INTERVENTION",
+      "key": [
+        "intervention_id"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "type": "PHYSICALLY_CAUSED",
+      "from": [
+        "PHYSICAL_EVENT",
+        "MOTOR_OUTPUT"
+      ],
+      "to": [
+        "CONSEQUENCE",
+        "BODY_STATE",
+        "WORLD_STATE"
+      ],
+      "strength_default": "DIRECT_CAUSAL_LINK"
+    },
+    {
+      "type": "OBSERVED_AS",
+      "from": [
+        "SENSORY_EXPOSURE",
+        "WORLD_STATE"
+      ],
+      "to": [
+        "OBSERVATION"
+      ],
+      "strength_default": "RECONSTRUCTED_CAUSAL_LINK"
+    },
+    {
+      "type": "AVAILABLE_TO_AGENT",
+      "from": [
+        "OBSERVATION"
+      ],
+      "to": [
+        "DECISION"
+      ],
+      "strength_default": "DIRECT_CAUSAL_LINK",
+      "note": "same-tick begin_tick observation fed cognition"
+    },
+    {
+      "type": "RETRIEVED_FROM",
+      "from": [
+        "MEMORY_CONTEXT"
+      ],
+      "to": [
+        "RETRIEVAL",
+        "PREDICTION"
+      ],
+      "strength_default": "RECONSTRUCTED_CAUSAL_LINK",
+      "tier": "RESEARCH"
+    },
+    {
+      "type": "PREDICTED",
+      "from": [
+        "PREDICTION"
+      ],
+      "to": [
+        "PROSPECTIVE_CANDIDATE",
+        "DECISION"
+      ],
+      "strength_default": "DIRECT_CAUSAL_LINK"
+    },
+    {
+      "type": "COMPOSED_INTO",
+      "from": [
+        "PREDICTION"
+      ],
+      "to": [
+        "PROSPECTIVE_CANDIDATE"
+      ],
+      "strength_default": "DIRECT_CAUSAL_LINK"
+    },
+    {
+      "type": "COMPETED_WITH",
+      "from": [
+        "PROSPECTIVE_CANDIDATE"
+      ],
+      "to": [
+        "PROSPECTIVE_CANDIDATE"
+      ],
+      "strength_default": "DIRECT_CAUSAL_LINK",
+      "tier": "RESEARCH"
+    },
+    {
+      "type": "SELECTED",
+      "from": [
+        "DECISION"
+      ],
+      "to": [
+        "PROSPECTIVE_CANDIDATE",
+        "MOTOR_OUTPUT"
+      ],
+      "strength_default": "DIRECT_CAUSAL_LINK"
+    },
+    {
+      "type": "PRODUCED_MOTOR",
+      "from": [
+        "DECISION"
+      ],
+      "to": [
+        "MOTOR_OUTPUT"
+      ],
+      "strength_default": "DIRECT_CAUSAL_LINK"
+    },
+    {
+      "type": "PHYSICALLY_RESULTED_IN",
+      "from": [
+        "MOTOR_OUTPUT"
+      ],
+      "to": [
+        "CONSEQUENCE"
+      ],
+      "strength_default": "DIRECT_CAUSAL_LINK"
+    },
+    {
+      "type": "RECEIVED_FROM",
+      "from": [
+        "PHYSICAL_EVENT"
+      ],
+      "to": [
+        "SENSORY_EXPOSURE",
+        "OBSERVATION"
+      ],
+      "strength_default": "DIRECT_CAUSAL_LINK"
+    },
+    {
+      "type": "UPDATED_BY",
+      "from": [
+        "REVISION"
+      ],
+      "to": [
+        "MEMORY_CONTEXT",
+        "PREDICTION"
+      ],
+      "strength_default": "DIRECT_CAUSAL_LINK",
+      "tier": "RESEARCH"
+    },
+    {
+      "type": "TEMPORALLY_FOLLOWED",
+      "from": [
+        "*"
+      ],
+      "to": [
+        "*"
+      ],
+      "strength_default": "TEMPORALLY_ASSOCIATED",
+      "note": "never upgrade to causal without mechanism evidence"
+    }
+  ]
+}

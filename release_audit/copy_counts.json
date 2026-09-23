@@ -1,0 +1,30 @@
+{
+  "counts": {
+    "mechanistic_mind": 364,
+    "web": 134,
+    "configs": 11,
+    "docs": 151,
+    "knowledge": 137,
+    "worlds": 14,
+    "mm": 1,
+    "packaging": 1,
+    "tools": 2,
+    "tests": 270,
+    "experiments_py": 182
+  },
+  "audit": {
+    "home_thehost_files": 0,
+    "desktop_psy_files": 8,
+    "localhost_mention_files": 2,
+    "secret_hint_files": 6,
+    "escaped_symlinks": [],
+    "sample": [
+      "SECRET_HINT CHANGELOG.md",
+      "SECRET_HINT KNOWN_LIMITATIONS.md",
+      "SECRET_HINT mechanistic_mind/ui/psy_observer_web/web_dist/favicon.svg",
+      "SECRET_HINT mechanistic_mind/ui/psy_observer_web/web_dist/assets/index-Dp-0DmBo.js",
+      "SECRET_HINT web/psy-observer/public/favicon.svg",
+      "SECRET_HINT web/psy-observer/src/assets/vite.svg"
+    ]
+  }
+}

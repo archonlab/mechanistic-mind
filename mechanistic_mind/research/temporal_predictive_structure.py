@@ -15,7 +15,7 @@ from typing import Any
 from mechanistic_mind.research import predictive_equivalence as pe
 from mechanistic_mind.research import predictive_relevance as prl
 from mechanistic_mind.research.predictive_compression import _sig
-from mechanistic_mind.research.predictive_equivalence import _floats
+from mechanistic_mind.research.predictive_equivalence import _floats, bump_store_generation
 
 WINDOW = 4
 LAGS = (1, 2, 3, 4)
@@ -110,6 +110,8 @@ def append(store: dict[str, Any], fragment: dict[str, float]) -> None:
     ring.append(_floats(fragment))
     store["ring"] = ring[-RING:]
     store["appends"] = int(store.get("appends") or 0) + 1
+    # Window identity changed → same-tick retrieve memo must not reuse prior results.
+    bump_store_generation(store)
 
 
 def current_window(store: dict[str, Any], present: dict[str, float] | None = None) -> list[dict[str, float]]:
@@ -168,22 +170,19 @@ def learn(
         )
         learned.append({"lag": int(lag), "status": got.get("status"), "class_id": got.get("class_id"), "n": len(window)})
         store["learns"] = int(store.get("learns") or 0) + 1
+    bump_store_generation(store)
     return {"status": "LEARNED" if learned else "TOO_SHORT", "items": learned}
 
 
-def retrieve(
+def _retrieve_uncached(
     store: dict[str, Any],
     present: dict[str, float],
     action: str,
     *,
-    lag: int | None = None,
-    count: bool = True,
-    meta: dict[str, Any] | None = None,
+    lag: int | None,
+    meta: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    if store.get("enabled") is False:
-        return {"status": "DISABLED", "predicted": {}}
-    if count:
-        store["retrieves"] = int(store.get("retrieves") or 0) + 1
+    """Core TPS retrieve without counter side-effects or same-tick memo."""
     inner = store.get("inner") or pe.empty_store()
     window = current_window(store, present)
     if len(window) < int(store.get("window") or WINDOW):
@@ -221,8 +220,6 @@ def retrieve(
     }
     if not hits:
         if conflicts:
-            if count:
-                store["conflicts"] = int(store.get("conflicts") or 0) + 1
             return {
                 **base,
                 "status": "TEMPORAL_CONFLICT",
@@ -235,8 +232,6 @@ def retrieve(
     tau = float(inner.get("continuation_linf") or pe.CONTINUATION_LINF)
     conts = [h[1].get("predicted_continuation") or {} for h in hits]
     if len(hits) > 1 and any(pe._linf(conts[0], c) > tau for c in conts[1:]):
-        if count:
-            store["conflicts"] = int(store.get("conflicts") or 0) + 1
         return {
             **base,
             "status": "TEMPORAL_CONFLICT",
@@ -248,8 +243,6 @@ def retrieve(
             "candidates": [h[1] for h in hits],
         }
     L, got = max(hits, key=lambda t: int(t[1].get("support") or 0))
-    if count:
-        store["matches"] = int(store.get("matches") or 0) + 1
     return {
         **base,
         "status": "MATCH",
@@ -261,6 +254,54 @@ def retrieve(
         "relevant": got.get("relevant"),
         "allowed_variation": got.get("allowed_variation"),
     }
+
+
+def retrieve(
+    store: dict[str, Any],
+    present: dict[str, float],
+    action: str,
+    *,
+    lag: int | None = None,
+    count: bool = True,
+    meta: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    if store.get("enabled") is False:
+        return {"status": "DISABLED", "predicted": {}}
+    if count:
+        store["retrieves"] = int(store.get("retrieves") or 0) + 1
+    use_rel = bool(meta is not None and meta.get("enabled"))
+    # Same-tick memo: identical trajectory window + action + lag + unchanged
+    # class/relevance generation → identical result. Key MUST include the window
+    # identity (not merely present sig): same present with different history is
+    # a different query. Generation bumps on append/learn/refresh.
+    window = current_window(store, present)
+    window_key = tuple(_sig(f) for f in window)
+    gen = (
+        int(store.get("_retrieve_cache_gen") or 0),
+        int((store.get("inner") or {}).get("_ix_gen") or 0),
+    )
+    cache_key = (
+        gen,
+        window_key,
+        str(action),
+        None if lag is None else int(lag),
+        use_rel,
+    )
+    cache = store.setdefault("_retrieve_cache", {})
+    hit = cache.get(cache_key)
+    if hit is not None:
+        store["_retrieve_cache_hits"] = int(store.get("_retrieve_cache_hits") or 0) + 1
+        result = hit
+    else:
+        store["_retrieve_cache_misses"] = int(store.get("_retrieve_cache_misses") or 0) + 1
+        result = _retrieve_uncached(store, present, action, lag=lag, meta=meta)
+        cache[cache_key] = result
+    if count:
+        if result.get("status") == "MATCH":
+            store["matches"] = int(store.get("matches") or 0) + 1
+        elif result.get("status") == "TEMPORAL_CONFLICT":
+            store["conflicts"] = int(store.get("conflicts") or 0) + 1
+    return result
 
 
 def diagnostic(store: dict[str, Any], present: dict[str, float], action: str) -> dict[str, Any]:
@@ -301,7 +342,9 @@ def refresh_relevance(store: dict[str, Any], *, tick: int = 0) -> dict[str, Any]
     meta["enabled"] = True
     inner = store.setdefault("inner", pe.empty_store())
     inner["enabled"] = True
-    return prl.refresh(inner, tick=int(tick), meta=meta)
+    out = prl.refresh(inner, tick=int(tick), meta=meta)
+    bump_store_generation(store)
+    return out
 
 
 def memory_usage(store: dict[str, Any]) -> dict[str, Any]:

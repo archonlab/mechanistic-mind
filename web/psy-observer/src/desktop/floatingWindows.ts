@@ -4,7 +4,7 @@ import type { FloatingWindowId, FloatingWindowState } from './types';
 const DEFAULTS: Record<FloatingWindowId, { title: string; w: number; h: number }> = {
   analysis: { title: 'Analysis', w: 520, h: 440 },
   sensor_inspector: { title: 'Sensor Inspector', w: 400, h: 420 },
-  signal_forensics: { title: 'Signal Forensics', w: 440, h: 400 },
+  signal_forensics: { title: 'SIGNAL FORENSICS V2', w: 520, h: 560 },
   effective_world: { title: 'Effective World', w: 380, h: 420 },
   mechanisms: { title: 'Mechanisms', w: 420, h: 400 },
   geometry: { title: 'Geometry', w: 360, h: 360 },
@@ -15,6 +15,39 @@ const DEFAULTS: Record<FloatingWindowId, { title: string; w: number; h: number }
   interventions: { title: 'Live Interventions', w: 400, h: 360 },
   raw: { title: 'Advanced / Raw', w: 480, h: 400 },
 };
+
+/** Windows with long scrollable lists — open using most of available viewport height. */
+const VIEWPORT_TALL_IDS: ReadonlySet<FloatingWindowId> = new Set([
+  'mechanisms',
+  'signal_forensics',
+  'analysis',
+  'observe_inspector',
+  'observe_overlays',
+  'raw',
+]);
+
+const CHROME_MARGIN = 24; // top offset + bottom breathing room inside float host
+
+/**
+ * Preferred open size. Tall-list panels expand to ~88% of available float-host height
+ * (bounded by defaults as a floor and viewport-margin as a ceiling). Compact panels
+ * keep their static defaults unless the viewport is smaller.
+ */
+export function preferredOpenSize(
+  id: FloatingWindowId,
+  bounds: { width: number; height: number },
+): { w: number; h: number } {
+  const d = DEFAULTS[id];
+  const maxW = Math.max(240, bounds.width - 16);
+  const maxH = Math.max(160, bounds.height - CHROME_MARGIN);
+  const w = Math.min(d.w, maxW);
+  if (VIEWPORT_TALL_IDS.has(id)) {
+    const target = Math.floor(bounds.height * 0.88);
+    const h = Math.min(maxH, Math.max(d.h, target));
+    return { w, h };
+  }
+  return { w, h: Math.min(d.h, maxH) };
+}
 
 export function nextZ(windows: FloatingWindowState[]): number {
   if (!windows.length) return 1;
@@ -47,14 +80,15 @@ export function openOrFocusWindow(
     return windows.map((w) => (w.id === id ? { ...w, z: nextZ(windows) } : w));
   }
   const d = DEFAULTS[id];
+  const size = preferredOpenSize(id, bounds);
   const offset = 24 * (cascadeIndex % 6);
   const draft: FloatingWindowState = {
     id,
     title: d.title,
     x: 24 + offset,
     y: 24 + offset,
-    w: d.w,
-    h: d.h,
+    w: size.w,
+    h: size.h,
     z: nextZ(windows),
   };
   return [...windows, clampWindow(draft, bounds)];
@@ -97,7 +131,7 @@ export function toggleMaximize(
   return windows.map((win) => {
     if (win.id !== id) return win;
     if (win.maximized) {
-      const r = win.savedRect || { x: 24, y: 24, w: DEFAULTS[id].w, h: DEFAULTS[id].h };
+      const r = win.savedRect || { x: 24, y: 24, ...preferredOpenSize(id, bounds) };
       return clampWindow({ ...win, ...r, maximized: false, savedRect: undefined }, bounds);
     }
     return {
@@ -117,10 +151,10 @@ export function resetWindowPosition(
   id: FloatingWindowId,
   bounds: { width: number; height: number },
 ): FloatingWindowState[] {
-  const d = DEFAULTS[id];
+  const size = preferredOpenSize(id, bounds);
   return windows.map((win) =>
     win.id === id
-      ? clampWindow({ ...win, x: 24, y: 24, w: d.w, h: d.h, maximized: false, savedRect: undefined }, bounds)
+      ? clampWindow({ ...win, x: 24, y: 24, w: size.w, h: size.h, maximized: false, savedRect: undefined }, bounds)
       : win,
   );
 }

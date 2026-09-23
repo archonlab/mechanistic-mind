@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 APP_NAME = "Psy Observer"
-APP_MODEL = "MM 2.0 TIKTAALIK | TIKTAALIK: UNDERCOVER | PUBLIC BETA 1"
+APP_MODEL = "MM 1.0 — Tiktaalik"
 PREFERRED_PORT = 8768
 HOST = "127.0.0.1"
 LOCK_SCHEMA = "psy.observer.instance.v1"

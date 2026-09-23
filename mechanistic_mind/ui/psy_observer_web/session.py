@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import threading
 import time
+import uuid
 from datetime import datetime, timezone
 from collections import deque
 from copy import deepcopy
@@ -37,7 +38,31 @@ from .scientific_history import (
     live_scientific_dir,
     load_evidence_package,
 )
-from .serialize import compact_timeline_event, live_frame, collect_observer_events
+
+from mechanistic_mind.scientific_v3.writer import ScientificV3Writer
+from .subscriptions import ObserverInterest, PRESETS, PRODUCT_GRAPHS, PRODUCT_GEOMETRY, PRODUCT_SIGNALS, PRODUCT_EXPERIMENTER, PRODUCT_COGNITION, PRODUCT_DIAGNOSTICS, PRODUCT_SMC, PRODUCT_HISTORICAL_SENSORIMOTOR, PRODUCT_SIGNAL_SENSORIMOTOR, stub_deferred
+from .serialize import (
+    compact_timeline_event,
+    live_frame,
+    collect_observer_events,
+    collect_observer_events_for_tick,
+)
+from .live_bounds import (
+    LIVE_EVENT_EMBED,
+    LIVE_EVENT_EMBED_FULL,
+    LIVE_EVENT_RING_MAX,
+    LIVE_TELEMETRY_EMBED,
+    LIVE_TRAJECTORY_EMBED,
+    LIVE_TELEMETRY_RING_MIN,
+    LIVE_TRAJECTORY_RING_MIN,
+    LIVE_TRAJECTORY_RING_MULT,
+    LIVE_WORLD_INTERVENTION_EMBED,
+    LIVE_WORLD_INTERVENTION_SESSION_MAX,
+    SCI_APPEND_EVENT_TAIL,
+    live_bounds_snapshot,
+    live_refresh_elements_touched,
+    tail_list,
+)
 
 
 # Wall-clock period for one scientific tick at 1× (human-observable cadence).
@@ -45,9 +70,10 @@ from .serialize import compact_timeline_event, live_frame, collect_observer_even
 # This is simulation acceleration only — dt / physics / cognition unchanged.
 BASE_TICK_PERIOD_1X = 0.025  # 40 scientific ticks/sec target at 1× when CPU allows
 MAX_SPEED = 50.0
-EVENT_RING_MAX = 2500
-TRAJECTORY_EMBED_TAIL = 96
-TELEMETRY_EMBED_TAIL = 64
+# Aliases — LIVE display caps (not scientific / agent memory).
+EVENT_RING_MAX = LIVE_EVENT_RING_MAX
+TRAJECTORY_EMBED_TAIL = LIVE_TRAJECTORY_EMBED
+TELEMETRY_EMBED_TAIL = LIVE_TELEMETRY_EMBED
 
 
 def tick_sleep_seconds(speed: float) -> float:
@@ -79,11 +105,35 @@ class SessionConfig:
     seed: int = 17
     target_tick: int | None = None
     buffer_capacity: int = 512
-    ui_hz: float = 10.0  # max live push rate
+    ui_hz: float = 10.0  # max live push rate (observer sample Hz)
     steps_per_loop: int = 1
-    speed: float = 1.0  # relative sim steps aggressiveness
+    speed: float = 1.0  # relative sim steps aggressiveness (wall-clock only)
     cognition_enabled: bool = True
     results_root: Path | None = None
+    # Execution / presentation policy — NOT a different scientific world.
+    # LIVE: interactive observation (default)
+    # FAST: accelerated sim + moderate observer sample rate
+    # MAX: CPU-limited sim + low observer sample rate
+    # HEADLESS: no live presentation capture; scientific ticks unchanged
+    execution_mode: str = "LIVE"
+    # Evidence capture policy — orthogonal to execution_mode.
+    # FULL_SCIENTIFIC: existing ScientificHistoryWriter (V2 tiered)
+    # SEARCH_COMPACT: bounded metrics + rolling candidate windows only
+    evidence_mode: str = "FULL_SCIENTIFIC"
+    search_compact_pre_window: int = 32
+    search_compact_post_window: int = 32
+    search_compact_max_candidates: int = 8
+    search_compact_trigger_threshold: int = 8
+
+
+# Presets map presentation policy → wall-clock speed + observer Hz.
+# Scientific dt / cognition / physics are NEVER changed by these presets.
+EXECUTION_MODE_PRESETS: dict[str, dict[str, float | bool]] = {
+    "LIVE": {"speed": 1.0, "ui_hz": 10.0, "capture": True},
+    "FAST": {"speed": 10.0, "ui_hz": 5.0, "capture": True},
+    "MAX": {"speed": MAX_SPEED, "ui_hz": 2.0, "capture": True},
+    "HEADLESS": {"speed": MAX_SPEED, "ui_hz": 1.0, "capture": False},
+}
 
 
 @dataclass
@@ -125,9 +175,21 @@ class ObserverSession:
     _geo_live_enabled: bool = True
     _sig_live_enabled: bool = True
     _subscribers: list[Callable[[dict[str, Any]], None]] = field(default_factory=list)
+    _heartbeat_subscribers: list[Callable[[dict[str, Any]], None]] = field(default_factory=list)
     _last_push: float = 0.0
     _thread: threading.Thread | None = None
+    _heartbeat_thread: threading.Thread | None = None
+    _heartbeat_stop: bool = False
     _stop_flag: bool = False
+    # LIVE mechanism / vision apply at tick boundaries (never mid-tick).
+    _live_apply_queue: deque[dict[str, Any]] = field(default_factory=deque)
+    _live_apply_lock: threading.Lock = field(default_factory=threading.Lock)
+    _live_apply_seq: int = 0
+    _pending_live_apply: dict[str, Any] | None = None
+    _tick_in_progress: bool = False
+    _tick_started_mono: float = 0.0
+    _last_tick_wall_ms: float = 0.0
+    _last_tick_completed_mono: float = 0.0
     _runtime_generation: int = 0
     _frame_seq: int = 0
     _trajectory: deque[dict[str, Any]] = field(default_factory=lambda: deque(maxlen=2048))
@@ -139,12 +201,24 @@ class ObserverSession:
     _finalize_key: tuple[Any, ...] | None = None
     _active_run_id: str | None = None
     _finalize_lock: threading.Lock = field(default_factory=threading.Lock)
+    _save_job: dict[str, Any] | None = None
+    _save_job_thread: threading.Thread | None = None
     _event_ring: deque[dict[str, Any]] = field(default_factory=lambda: deque(maxlen=EVENT_RING_MAX))
     _event_keys: set[tuple[Any, ...]] = field(default_factory=set)
     # Beta 2: LIVE world/mechanism interventions for current runtime generation only.
-    _world_interventions: list[dict[str, Any]] = field(default_factory=list)
+    # Recent session interventions for LIVE embed + API list (bounded).
+    # Full provenance for Analyzer comes from scientific_events.jsonl.
+    _world_interventions: deque = field(
+        default_factory=lambda: deque(maxlen=LIVE_WORLD_INTERVENTION_SESSION_MAX)
+    )
     _world_intervention_fp0: str | None = None
+    # Configuration integrity (mechanism authority + preflight + run-start manifest).
+    _resolved_mechanism_config: Any = None
+    _preflight_result: dict[str, Any] | None = None
+    _runtime_mechanism_manifest: dict[str, Any] | None = None
     _visual_dropped: int = 0
+    _observer_interest: ObserverInterest = field(default_factory=ObserverInterest)
+    _psc_shadow_replay_count: int = 0
     _perf_window_start: float = 0.0
     _perf_ticks: int = 0
     _perf_captures: int = 0
@@ -152,6 +226,9 @@ class ObserverSession:
     _perf_obs_fps: float = 0.0
     _last_frame_tick: int | None = None
     _sci_writer: ScientificHistoryWriter | None = None
+    _v3_writer: ScientificV3Writer | None = field(default=None)
+    _v3_last_error: str | None = field(default=None)
+    _compact_writer: Any = None
     _sci_live_dir: Path | None = None
     # Async Observer capture (BETA2-OBS-02) — never block SIM on live_frame.
     _capture_thread: threading.Thread | None = None
@@ -182,6 +259,148 @@ class ObserverSession:
         self.reset(seed=self.config.seed)
         self._ensure_capture_worker()
 
+    def mechanism_integrity_status(self) -> dict[str, Any]:
+        """CONFIGURED / RUNTIME / AVAILABLE compact status for Observer."""
+        resolved = self._resolved_mechanism_config
+        pf = self._preflight_result
+        manifest = self._runtime_mechanism_manifest
+        return {
+            "preflight": pf,
+            "resolved": resolved.to_dict() if resolved is not None and hasattr(resolved, "to_dict") else resolved,
+            "manifest_present": manifest is not None,
+            "manifest_fingerprint": (manifest or {}).get("resolved_fingerprint"),
+            "manifest_checksum": (manifest or {}).get("checksum"),
+            "ready": bool(pf and pf.get("status") == "READY"),
+        }
+
+    def mechanisms_warm_state(self) -> dict[str, Any]:
+        """WARM enabled flags + integrity. Does not include COLD catalog metadata."""
+        rt = getattr(self, "runtime", None)
+        if rt is None:
+            return {"error": "no runtime", "catalog_included": False, "mechanisms": []}
+        snap = rt.mechanisms()
+        items = []
+        for m in snap.get("mechanisms") or []:
+            if not isinstance(m, dict):
+                continue
+            items.append({
+                "id": m.get("id"),
+                "enabled": bool(m.get("enabled")),
+                "ablatable": bool(m.get("ablatable", True)),
+            })
+        integrity = self.mechanism_integrity_status()
+        pf = integrity.get("preflight") if isinstance(integrity.get("preflight"), dict) else {}
+        slim_integrity = {
+            "ready": bool(integrity.get("ready")),
+            "manifest_present": bool(integrity.get("manifest_present")),
+            "manifest_fingerprint": integrity.get("manifest_fingerprint"),
+            "manifest_checksum": integrity.get("manifest_checksum"),
+            "preflight_status": pf.get("status") if isinstance(pf, dict) else None,
+        }
+        return {
+            "schema": "mm.observer.mechanism_state.v1",
+            "catalog_included": False,
+            "runtime_generation": int(self._runtime_generation),
+            "tick": int(getattr(rt, "tick", 0) or 0),
+            "model": "MM 1.0 — Tiktaalik",
+            "runtime_version": snap.get("runtime_version"),
+            "mechanisms": items,
+            "enabled": snap.get("enabled"),
+            "disabled": snap.get("disabled"),
+            "mechanism_integrity": slim_integrity,
+            "preflight_status": slim_integrity.get("preflight_status"),
+            "psc_motor_resolution": str(
+                getattr(getattr(getattr(rt, "config", None), "cognition", None), "psc_motor_resolution", None)
+                or "LOCO_FACTORIZED"
+            ),
+        }
+
+    def _clear_integrity_locked(self) -> None:
+        self._resolved_mechanism_config = None
+        self._preflight_result = None
+        self._runtime_mechanism_manifest = None
+
+    def _bind_and_preflight_locked(
+        self,
+        *,
+        requested_mechanisms: dict[str, Any] | None,
+        vision_radius: int | None = None,
+        source_hint: str = "NEW_EXPERIMENT",
+        apply_fresh_defaults: bool = True,
+    ) -> dict[str, Any]:
+        """Apply resolved mechanisms to current runtime and verify before scientific ticks."""
+        from mechanistic_mind.physical_system.mechanism_configuration import (
+            apply_resolved_to_runtime,
+            build_runtime_manifest,
+            resolve_mechanism_config,
+            run_preflight,
+        )
+
+        resolved = resolve_mechanism_config(
+            requested_mechanisms,
+            vision_radius=vision_radius,
+            source_hint=source_hint,
+            apply_fresh_defaults=apply_fresh_defaults,
+        )
+        apply_info = apply_resolved_to_runtime(self.runtime, resolved)
+        # Second bind pass if first had errors (e.g. missing config objects).
+        if apply_info.get("errors"):
+            apply_info = apply_resolved_to_runtime(self.runtime, resolved)
+        preflight = run_preflight(self.runtime, resolved)
+        # One repair+reverify cycle before t=1 when mismatches exist.
+        if preflight.status != "READY":
+            apply_resolved_to_runtime(self.runtime, resolved)
+            preflight = run_preflight(self.runtime, resolved)
+        self._resolved_mechanism_config = resolved
+        self._preflight_result = preflight.to_dict()
+        if preflight.status == "READY":
+            self._runtime_mechanism_manifest = build_runtime_manifest(
+                runtime=self.runtime,
+                resolved=resolved,
+                preflight=preflight,
+                run_id=self._active_run_id,
+                generation=self._runtime_generation,
+            )
+        else:
+            self._runtime_mechanism_manifest = None
+        return {
+            "resolved": resolved.to_dict(),
+            "preflight": self._preflight_result,
+            "apply": apply_info,
+            "manifest": self._runtime_mechanism_manifest,
+        }
+
+    def _require_preflight_ready(self, operation: str, before: dict[str, Any], request: dict[str, Any]) -> dict[str, Any] | None:
+        """Return a rejected control receipt if preflight is not READY; else None."""
+        pf = self._preflight_result
+        if pf is not None and pf.get("status") == "READY":
+            return None
+        # Attempt bind with stored/fresh defaults if never run.
+        if pf is None:
+            with self._step_lock:
+                with self._lock:
+                    self._bind_and_preflight_locked(
+                        requested_mechanisms=None,
+                        source_hint="NEW_EXPERIMENT",
+                        apply_fresh_defaults=True,
+                    )
+            pf = self._preflight_result
+        if pf is not None and pf.get("status") == "READY":
+            return None
+        reason = "PREFLIGHT_FAILED"
+        mismatches = (pf or {}).get("mismatches") or []
+        out = self._with_receipt(
+            self._clone_published(),
+            operation,
+            {**request, "preflight": pf},
+            before,
+            accepted=False,
+            reason=reason,
+        )
+        out["preflight"] = pf
+        out["mismatches"] = mismatches
+        return out
+
     def reset(self, *, seed: int | None = None, cognition_enabled: bool | None = None) -> dict[str, Any]:
         prior_finalize = None
         if getattr(self, "runtime", None) is not None and int(self.runtime.tick) > 0 and self._finalize_key is None:
@@ -200,6 +419,13 @@ class ObserverSession:
                 cfg.cognition.cognition_enabled = bool(self.config.cognition_enabled)
                 self.runtime = PhysicalSystemRuntime(seed=self.config.seed, config=cfg)
                 self._runtime_generation += 1
+                self._clear_integrity_locked()
+                # Fresh reset → full normal organism defaults (climate OFF).
+                integrity = self._bind_and_preflight_locked(
+                    requested_mechanisms={"cognition": bool(self.config.cognition_enabled)},
+                    source_hint="NEW_EXPERIMENT",
+                    apply_fresh_defaults=True,
+                )
                 self.status = "PAUSED"
                 self.mode = "LIVE"
                 self.inspect_tick = None
@@ -215,8 +441,8 @@ class ObserverSession:
                 self._reset_action_realization_locked()
                 self._reset_work_ecology_locked()
                 self._reset_locomotor_economy_locked()
-                self._trajectory = deque(maxlen=max(256, int(self.config.buffer_capacity) * 4))
-                self._telemetry = deque(maxlen=max(256, int(self.config.buffer_capacity) * 4))
+                self._trajectory = deque(maxlen=max(LIVE_TRAJECTORY_RING_MIN, int(self.config.buffer_capacity) * LIVE_TRAJECTORY_RING_MULT))
+                self._telemetry = deque(maxlen=max(LIVE_TELEMETRY_RING_MIN, int(self.config.buffer_capacity) * LIVE_TRAJECTORY_RING_MULT))
                 self._historical_compat = None
                 self._published = None
                 self._run_started_at = None
@@ -244,6 +470,9 @@ class ObserverSession:
                     frame, "RESET", {"seed": seed, "cognition_enabled": cognition_enabled},
                     before, requires_reset=True,
                 )
+                out["preflight"] = integrity.get("preflight")
+                out["mechanism_result"] = self.runtime.mechanisms()
+                out["mechanism_integrity"] = self.mechanism_integrity_status()
                 if prior_finalize is not None:
                     out["finalize"] = prior_finalize
                 return out
@@ -262,6 +491,135 @@ class ObserverSession:
             if fn in self._subscribers:
                 self._subscribers.remove(fn)
 
+    def subscribe_heartbeat(self, fn: Callable[[dict[str, Any]], None]) -> None:
+        with self._lock:
+            self._heartbeat_subscribers.append(fn)
+
+    def unsubscribe_heartbeat(self, fn: Callable[[dict[str, Any]], None]) -> None:
+        with self._lock:
+            if fn in self._heartbeat_subscribers:
+                self._heartbeat_subscribers.remove(fn)
+
+    def runtime_progress(self) -> dict[str, Any]:
+        """Cheap RUNNING progress snapshot — no frame build, no step_lock."""
+        pending = None
+        with self._live_apply_lock:
+            if self._pending_live_apply is not None:
+                pending = dict(self._pending_live_apply)
+            elif self._live_apply_queue:
+                pending = dict(self._live_apply_queue[0])
+                pending["queued_n"] = len(self._live_apply_queue)
+        in_prog = bool(self._tick_in_progress)
+        started = float(self._tick_started_mono or 0.0)
+        elapsed_ms = (time.monotonic() - started) * 1000.0 if in_prog and started else 0.0
+        detail = "IDLE"
+        if self.status == "RUNNING":
+            if in_prog:
+                detail = "COMPUTING_TICK"
+            elif pending:
+                detail = "PENDING_LIVE_APPLY"
+            else:
+                detail = "BETWEEN_TICKS"
+        exec_mode = str(self.config.execution_mode or "LIVE").upper()
+        sim_tick = int(getattr(self.runtime, "tick", 0) or 0)
+        frame_tick = int(self._last_frame_tick) if self._last_frame_tick is not None else sim_tick
+        return {
+            "status": self.status,
+            "status_detail": detail,
+            "tick": sim_tick,
+            "tick_in_progress": in_prog,
+            "tick_elapsed_ms": round(elapsed_ms, 1) if in_prog else None,
+            "last_tick_wall_ms": round(float(self._last_tick_wall_ms), 2),
+            "last_tick_completed_mono": float(self._last_tick_completed_mono or 0.0),
+            "sim_ticks_per_sec": round(float(self._perf_sim_tps), 1),
+            "observer_fps": round(float(self._perf_obs_fps), 1),
+            "pending_live_apply": pending,
+            "heartbeat_mono": time.monotonic(),
+            "execution_mode": exec_mode,
+            "display_frozen": bool(exec_mode == "HEADLESS" and self.status == "RUNNING"),
+            "display_tick": frame_tick,
+        }
+
+    def _ensure_heartbeat_worker(self) -> None:
+        if self._heartbeat_thread is not None and self._heartbeat_thread.is_alive():
+            return
+        self._heartbeat_stop = False
+        self._heartbeat_thread = threading.Thread(
+            target=self._heartbeat_worker_loop,
+            name="psy-observer-heartbeat",
+            daemon=True,
+        )
+        self._heartbeat_thread.start()
+
+    def _heartbeat_worker_loop(self) -> None:
+        """Push lightweight progress so UI does not mark COMPUTING ticks as STALE."""
+        while not self._heartbeat_stop:
+            time.sleep(0.4)
+            if self.status != "RUNNING":
+                continue
+            hb = self.runtime_progress()
+            for fn in list(self._heartbeat_subscribers):
+                try:
+                    fn(hb)
+                except Exception:
+                    pass
+
+    def _enqueue_live_apply(self, kind: str, payload: dict[str, Any]) -> dict[str, Any]:
+        with self._live_apply_lock:
+            self._live_apply_seq += 1
+            req = {
+                "request_id": f"live-apply-{self._live_apply_seq}",
+                "kind": kind,
+                "queued_at_mono": time.monotonic(),
+                "queued_at_tick": int(getattr(self.runtime, "tick", 0) or 0),
+                "status": "WAITING_FOR_TICK_BOUNDARY",
+                **payload,
+            }
+            self._live_apply_queue.append(req)
+            self._pending_live_apply = dict(req)
+            return dict(req)
+
+    def _drain_live_apply_queue_unlocked(self) -> list[dict[str, Any]]:
+        """Apply queued LIVE interventions at a safe tick boundary (caller holds step_lock)."""
+        applied: list[dict[str, Any]] = []
+        while True:
+            with self._live_apply_lock:
+                if not self._live_apply_queue:
+                    self._pending_live_apply = None
+                    break
+                req = self._live_apply_queue.popleft()
+            kind = str(req.get("kind") or "")
+            try:
+                if kind == "mechanism":
+                    out = self._apply_mechanism_now_unlocked(
+                        str(req["mechanism_id"]), bool(req["enabled"]),
+                    )
+                elif kind == "vision_radius":
+                    out = self._apply_vision_radius_now_unlocked(int(req["radius"]))
+                else:
+                    out = {
+                        "accepted": False,
+                        "error": f"unknown live apply kind {kind}",
+                        "control_receipt": {"accepted": False},
+                    }
+            except Exception as exc:
+                out = {
+                    "accepted": False,
+                    "error": f"LIVE_APPLY_FAILED:{exc}",
+                    "control_receipt": {"accepted": False, "reason": str(exc)},
+                }
+            ok = bool((out.get("control_receipt") or {}).get("accepted", out.get("accepted", True)))
+            done = {
+                **{k: v for k, v in req.items() if k != "result"},
+                "status": "APPLIED" if ok else "REJECTED",
+                "applied_at_tick": int(getattr(self.runtime, "tick", 0) or 0),
+                "applied_at_mono": time.monotonic(),
+            }
+            applied.append(done)
+            with self._live_apply_lock:
+                self._pending_live_apply = None
+        return applied
+
     def _event_key(self, ev: dict[str, Any]) -> tuple[Any, ...]:
         evidence = ev.get("evidence") if isinstance(ev.get("evidence"), dict) else {}
         return (
@@ -274,9 +632,20 @@ class ObserverSession:
             str(evidence.get("emission_id") or evidence.get("receipt_id") or ""),
         )
 
+    def _live_presentation_bookkeeping_enabled(self) -> bool:
+        """LIVE presentation rings/forensic accumulators — not required for science.
+
+        HEADLESS must not pay per-tick for Observer-only trajectory/telemetry rings
+        or action_realization / work_ecology / locomotor_economy accumulators.
+        Scientific V2 builds those fields from the slot at write time.
+        """
+        return str(self.config.execution_mode or "LIVE").upper() != "HEADLESS"
+
     def _accumulate_events_locked(self) -> None:
         """Drain structured events every scientific tick into a bounded observer ring."""
-        fresh = collect_observer_events(self.runtime, limit=120)
+        # Prefer current-tick emissions (O(buffer) filter) over re-sorting a wide window.
+        tick_now = int(self.runtime.tick)
+        fresh = collect_observer_events_for_tick(self.runtime, tick=tick_now, limit=120)
         newly: list[dict[str, Any]] = []
         for ev in fresh:
             key = self._event_key(ev)
@@ -285,10 +654,42 @@ class ObserverSession:
             self._event_keys.add(key)
             self._event_ring.append(ev)
             newly.append(ev)
-        if newly and self._sig_live_enabled:
+        if newly and self._sig_live_enabled and self._live_presentation_bookkeeping_enabled():
             self._observe_signal_events_locked(newly)
         if len(self._event_keys) > EVENT_RING_MAX * 2:
             self._event_keys = {self._event_key(e) for e in self._event_ring}
+
+    def _record_motion_locked(self) -> None:
+        if not self._live_presentation_bookkeeping_enabled():
+            # HEADLESS: skip LIVE rings + forensic observers. Geometry already gated.
+            return
+        self._trajectory.append({
+            "tick": int(self.runtime.tick),
+            "x": float(self.runtime.body.x),
+            "y": float(self.runtime.body.y),
+        })
+        # GEO-02: also record all-agent trajectory markers on selected body path only —
+        # multi-agent paths come from geometry events overlay.
+        self._observe_geometry_tick_locked()
+        self._observe_action_realization_locked()
+        self._observe_work_ecology_locked()
+        self._observe_locomotor_economy_locked()
+        work = getattr(self.runtime, "last_work_allocation", None) or {}
+        self._telemetry.append({
+            "tick": int(self.runtime.tick),
+            "work_reservoir": float(getattr(self.runtime.body, "mechanical_work_reservoir", 0.0) or 0.0),
+            "resource_A": float(getattr(self.runtime.body, "R_A_site", []).sum()) if getattr(self.runtime.body, "R_A_site", None) is not None else 0.0,
+            "resource_B": float(getattr(self.runtime.body, "R_B_site", []).sum()) if getattr(self.runtime.body, "R_B_site", None) is not None else 0.0,
+            "speed": float((self.runtime.body.vx ** 2 + self.runtime.body.vy ** 2) ** 0.5),
+            "omega": float(getattr(self.runtime.body, "omega", 0.0)),
+            "action_requested": float(work.get("requested_action") or 0.0),
+            "action_allocated": float(work.get("allocated_action") or 0.0),
+            "motor_requested": float(work.get("requested_motor") or 0.0),
+            "motor_allocated": float(work.get("allocated_motor") or 0.0),
+            "deformation_requested": float(work.get("requested_deformation") or 0.0),
+            "deformation_allocated": float(work.get("allocated_deformation") or 0.0),
+        })
+
 
     def collected_events(self, *, limit: int = 200) -> list[dict[str, Any]]:
         """Observer event batch for Timeline / Analyze Results (bounded).
@@ -458,9 +859,26 @@ class ObserverSession:
                                 gi["traversability"] = overlay
                             gi["geo_transport"] = transport
                         frame["geo_transport"] = transport
+                    # Lightweight Observer diagnostics on the published frame.
+                    op = frame.get("observer_perf") if isinstance(frame.get("observer_perf"), dict) else {}
+                    op = dict(op)
+                    op["capture_build_ms"] = round(float(timing.get("frame_build_ms") or 0.0), 3)
+                    op["detail_used"] = timing.get("detail_used")
+                    op["requested_tick"] = timing.get("requested_tick")
+                    op["queue_drops"] = int(self._capture_queue_drops)
+                    op["queue_depth"] = self.capture_queue_depth()
+                    frame["observer_perf"] = op
                     t_ser0 = time.perf_counter()
                     self._serialize_published(frame)
                     timing["serialization_ms"] = (time.perf_counter() - t_ser0) * 1000.0
+                    op["serialization_ms"] = round(float(timing["serialization_ms"]), 3)
+                    try:
+                        raw = getattr(self, "_last_serialized_bytes", None)
+                        if raw is not None:
+                            op["frame_bytes"] = int(raw)
+                    except Exception:
+                        pass
+                    frame["observer_perf"] = op
                     t_pub0 = time.perf_counter()
                     self._maybe_push(frame)
                     timing["publish_ms"] = (time.perf_counter() - t_pub0) * 1000.0
@@ -519,13 +937,19 @@ class ObserverSession:
         detail_s = detail or self._frame_detail_for_speed()
         self._accumulate_events_locked()
         # Compact RUNNING: smaller event tail to keep lock-hold and JSON bounded.
-        ev_tail = 16 if str(detail_s).lower() == "compact" else 80
-        events_payload = list(self._event_ring)[-ev_tail:]
+        ev_tail = LIVE_EVENT_EMBED if str(detail_s).lower() == "compact" else LIVE_EVENT_EMBED_FULL
+        events_payload = tail_list(self._event_ring, ev_tail)
         # Avoid multi-hundred-ms GC pauses mid-frame (can trip STALE even with coop yield).
         _gc_was = gc.isenabled()
         if _gc_was:
             gc.disable()
         try:
+            _interest = getattr(self, "_observer_interest", None)
+            _inc_cog = True if _interest is None else bool(_interest.wants(PRODUCT_COGNITION))
+            if _interest is not None:
+                _interest.record_producer("world")
+                if _inc_cog:
+                    _interest.record_producer(PRODUCT_COGNITION)
             frame = live_frame(
                 self.runtime,
                 status=self.status,
@@ -538,18 +962,42 @@ class ObserverSession:
                 # Compact RUNNING: use last published overlay (O(1)). Fresh rebuild
                 # happens outside `_step_lock` in the capture worker.
                 geometry_traversability=self._geo_overlay_for_capture_locked(detail=detail_s),
+                include_cognition=_inc_cog,
             )
         finally:
             if _gc_was:
                 gc.enable()
-        # Beta 2 live-intervention provenance (current runtime generation only).
-        frame["world_interventions"] = list(self._world_interventions)
+        # LIVE frame embeds only a bounded recent intervention strip.
+        # Full scientific intervention provenance remains in scientific_events.
+        session_n = len(self._world_interventions)
+        live_interventions = tail_list(self._world_interventions, LIVE_WORLD_INTERVENTION_EMBED)
+        frame["world_interventions"] = live_interventions
         frame["world_intervention_summary"] = {
-            "n": len(self._world_interventions),
+            "n": session_n,
+            "live_embed_n": len(live_interventions),
+            "live_embed_cap": LIVE_WORLD_INTERVENTION_EMBED,
+            "session_cap": LIVE_WORLD_INTERVENTION_SESSION_MAX,
+            "authority": "LIVE_RECENT_PLUS_SUMMARY",
+            "scientific_authority": "scientific_events.jsonl",
             "runtime_generation": int(self._runtime_generation),
             "configuration_history": (
-                "MULTI_REGIME" if self._world_interventions else "STATIC"
+                "MULTI_REGIME" if session_n else "STATIC"
             ),
+        }
+        # Compact integrity status (bounded — not full manifest every frame).
+        pf = self._preflight_result
+        frame["mechanism_integrity"] = {
+            "ready": bool(pf and pf.get("status") == "READY"),
+            "preflight_status": (pf or {}).get("status"),
+            "fingerprint": (
+                (self._runtime_mechanism_manifest or {}).get("resolved_fingerprint")
+                or (
+                    self._resolved_mechanism_config.fingerprint()
+                    if self._resolved_mechanism_config is not None else None
+                )
+            ),
+            "mismatch_n": len((pf or {}).get("mismatches") or []),
+            "rows": (pf or {}).get("rows"),
         }
         if self._sig_accum is None:
             self._reset_sig_accum_locked()
@@ -598,10 +1046,16 @@ class ObserverSession:
         }
         slots = getattr(self.runtime, "slots", None)
         if slots:
-            ticks["agent_0"] = int(slots[0].tick)
-            ticks["agent_1"] = int(slots[1].tick)
+            for i, slot in enumerate(slots):
+                ticks[f"agent_{i}"] = int(slot.tick)
         live_tick = int(self.runtime.tick)
         self._last_frame_tick = live_tick
+        elements_touched = live_refresh_elements_touched(
+            event_embed=len(events_payload),
+            traj_embed=0,
+            telem_embed=0,
+            intervention_embed=len(live_interventions),
+        )
         frame["observation"] = {
             "observation_frame_id": frame_id,
             "runtime_generation": self._runtime_generation,
@@ -612,6 +1066,8 @@ class ObserverSession:
             "tick_consistent": len(set(ticks.values())) == 1,
             "selected_agent_id": (frame.get("header") or {}).get("selected_agent_id") or (frame.get("header") or {}).get("selected_agent"),
             "frame_detail": detail_s,
+            "live_bounds": live_bounds_snapshot(),
+            "history_elements_touched_by_live_refresh": elements_touched,
         }
         frame.setdefault("header", {}).update({
             "observation_frame_id": frame_id,
@@ -620,6 +1076,8 @@ class ObserverSession:
             "live_runtime_tick": live_tick,
             "frame_tick": live_tick,
             "simulation_speed": float(self.config.speed),
+            "execution_mode": str(self.config.execution_mode or "LIVE"),
+            "observer_hz": float(self.config.ui_hz),
             "max_ticks": self.config.target_tick,
             "model_architecture": display_name(),
             # When not RUNNING, do not leave a stale window average in the header.
@@ -658,22 +1116,35 @@ class ObserverSession:
             }
         else:
             self._prev_bodies = {"agent_0": deepcopy(self._prev_body)}
-        traj_points = list(self._trajectory)
-        telem_series = list(self._telemetry)
         if detail_s == "compact":
-            traj_points = traj_points[-TRAJECTORY_EMBED_TAIL:]
-            telem_series = telem_series[-TELEMETRY_EMBED_TAIL:]
+            traj_points = tail_list(self._trajectory, LIVE_TRAJECTORY_EMBED)
+            telem_series = tail_list(self._telemetry, LIVE_TELEMETRY_EMBED)
+        else:
+            # Full detail: entire in-memory rings (already maxlen-bounded; not sci history).
+            traj_points = list(self._trajectory)
+            telem_series = list(self._telemetry)
         frame["trajectory"] = {
             "points": traj_points,
             "capacity": self._trajectory.maxlen,
             "boundary": "WRAP_PERIODIC",
             "truncated": len(self._trajectory) > len(traj_points),
+            "live_authority": "live_recent_trajectory",
+            "not_scientific_trajectory": True,
         }
         frame["telemetry"] = {
             "series": telem_series,
             "capacity": self._telemetry.maxlen,
             "truncated": len(self._telemetry) > len(telem_series),
+            "live_authority": "live_recent_telemetry",
         }
+        obs_meta = frame.get("observation")
+        if isinstance(obs_meta, dict):
+            obs_meta["history_elements_touched_by_live_refresh"] = live_refresh_elements_touched(
+                event_embed=len(events_payload),
+                traj_embed=len(traj_points),
+                telem_embed=len(telem_series),
+                intervention_embed=len(live_interventions),
+            )
         if self._historical_compat:
             frame["historical_compatibility"] = deepcopy(self._historical_compat)
         # Attach geo_transport + provenance on every capture (incl. Apply/reset/hydrate).
@@ -698,11 +1169,15 @@ class ObserverSession:
         experiment = frame.setdefault("experiment", {})
         experiment["observer"] = {
             "ui_hz": float(self.config.ui_hz),
-            "buffer_capacity": int(self.config.buffer_capacity),            "speed": float(self.config.speed),
+            "buffer_capacity": int(self.config.buffer_capacity),
+            "speed": float(self.config.speed),
             "target_tick": self.config.target_tick,
+            "execution_mode": str(self.config.execution_mode or "LIVE"),
+            "observer_hz": float(self.config.ui_hz),
             "base_tick_period_1x": BASE_TICK_PERIOD_1X,
             "capture_period_s": observer_capture_period(self.config.speed, self.config.ui_hz),
             "async_capture": True,
+            "capture_enabled": str(self.config.execution_mode or "LIVE").upper() != "HEADLESS",
             "capture_queue_drops": int(self._capture_queue_drops),
         }
         sim_tick_now = int(self.runtime.tick)
@@ -718,6 +1193,39 @@ class ObserverSession:
         self._published = frame
         if serialize:
             self._serialize_published(frame)
+
+        # Demand-driven: drop optional Observer products (science already recorded separately).
+        interest = getattr(self, "_observer_interest", None)
+        if interest is not None:
+            if not interest.wants(PRODUCT_GRAPHS):
+                frame["trajectory"] = stub_deferred(PRODUCT_GRAPHS)
+                if isinstance(frame.get("telemetry"), dict):
+                    frame["telemetry"] = {
+                        **stub_deferred(PRODUCT_GRAPHS),
+                        "series": [],
+                        "capacity": (frame.get("telemetry") or {}).get("capacity"),
+                    }
+            if not interest.wants(PRODUCT_SIGNALS):
+                frame["signal_context_interpretation"] = stub_deferred(PRODUCT_SIGNALS)
+            if not interest.wants(PRODUCT_EXPERIMENTER):
+                frame["experimenter_interaction"] = stub_deferred(PRODUCT_EXPERIMENTER)
+            if not interest.wants(PRODUCT_GEOMETRY):
+                gi = frame.get("geometry_interpretation")
+                if isinstance(gi, dict):
+                    frame["geometry_interpretation"] = {**stub_deferred(PRODUCT_GEOMETRY), "status": "DEFERRED"}
+            if not interest.wants(PRODUCT_COGNITION):
+                views = frame.get("agents_views") or {}
+                for _aid, view in list(views.items()) if isinstance(views, dict) else []:
+                    if not isinstance(view, dict):
+                        continue
+                    view["mind"] = stub_deferred(PRODUCT_COGNITION)
+                    view["cognition_pipeline"] = stub_deferred(PRODUCT_COGNITION)
+                    view["prospection_view"] = stub_deferred(PRODUCT_COGNITION)
+                    view["causal_chain"] = stub_deferred(PRODUCT_COGNITION)
+            frame.setdefault("header", {})["observer_detail_preset"] = interest.preset
+            frame.setdefault("header", {})["observer_products"] = sorted(interest.products)
+            frame["observer_interest"] = interest.snapshot()
+
         self._update_perf_locked(capture=True)
         return frame
 
@@ -726,8 +1234,10 @@ class ObserverSession:
         t_ser0 = time.perf_counter()
         try:
             self._published_json = json.dumps(frame, default=str, separators=(",", ":"))
+            self._last_serialized_bytes = len(self._published_json.encode("utf-8"))
         except TypeError:
             self._published_json = None
+            self._last_serialized_bytes = 0
         self._last_publish_serialize_ms = (time.perf_counter() - t_ser0) * 1000.0
 
     def _control_state(self) -> dict[str, Any]:
@@ -740,6 +1250,42 @@ class ObserverSession:
             "speed": float(self.config.speed),
         }
 
+    def _lifecycle_error(
+        self,
+        operation: str,
+        reason: str | None,
+        *,
+        code: str | None = None,
+        recoverable: bool | None = None,
+    ) -> dict[str, Any]:
+        """Observer/control error object — not a scientific DecisionReceipt."""
+        op = str(operation or "").upper()
+        msg = str(reason or "").strip() or "rejected"
+        status = str(self.status)
+        if code is None:
+            low = msg.lower()
+            if status == "SAVE_FAILED" or "save_failed" in low or "persistence_integrity" in low:
+                code = "SAVE_FAILED"
+            elif "http_failed" in low or "networkerror" in low or "disconnected" in low:
+                code = "HTTP_FAILED"
+            elif "finalization in progress" in low or "save_stop_started" in low or msg == "PREFLIGHT_FAILED":
+                code = "INVALID_TRANSITION"
+            elif "unknown" in low or "unsupported" in low or "not ablatable" in low:
+                code = "INVALID_TRANSITION"
+            elif op == "STOP":
+                code = "STOP_REJECTED"
+            else:
+                code = "INVALID_TRANSITION"
+        if recoverable is None:
+            recoverable = code in {"SAVE_FAILED", "INVALID_TRANSITION", "STOP_REJECTED", "HTTP_FAILED"}
+            if status == "STOPPED" and code != "SAVE_FAILED":
+                recoverable = False
+        return {
+            "code": str(code),
+            "message": msg,
+            "recoverable": bool(recoverable),
+        }
+
     def _with_receipt(
         self,
         frame: dict[str, Any],
@@ -750,20 +1296,34 @@ class ObserverSession:
         accepted: bool = True,
         requires_reset: bool = False,
         reason: str | None = None,
+        error: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        out = deepcopy(frame)
-        out["control_receipt"] = {
+        """Attach an Observer control receipt without deepcopying the frame body.
+
+        Nested frame content is treated as immutable (same contract as current_frame).
+        Only the top-level dict and header are shallow-copied so receipts cannot
+        mutate the published snapshot. Scientific Decision/Motor receipts are unchanged.
+        """
+        hdr = dict((frame or {}).get("header") or {})
+        out = {**(frame or {}), "header": hdr}
+        lifecycle = str(self.status)
+        receipt: dict[str, Any] = {
             "receipt_id": f"ctl-{self._runtime_generation}-{self._frame_seq}-{operation.lower()}",
             "operation": operation,
             "request": request,
             "accepted": bool(accepted),
+            "ok": bool(accepted),
             "previous_state": previous,
             "new_state": self._control_state(),
             "tick": int(self.runtime.tick),
             "runtime_generation": self._runtime_generation,
             "requires_reset": bool(requires_reset),
             "reason": reason,
+            "lifecycle_state": lifecycle,
         }
+        if not accepted:
+            receipt["error"] = error or self._lifecycle_error(operation, reason)
+        out["control_receipt"] = receipt
         return out
 
     def _maybe_push(self, frame: dict[str, Any], *, force: bool = False) -> bool:
@@ -787,19 +1347,29 @@ class ObserverSession:
                 self._clone_published(), "PLAY", {}, before,
                 accepted=False, reason="finalization in progress",
             )
+        blocked = self._require_preflight_ready("PLAY", before, {})
+        if blocked is not None:
+            return blocked
         if self._run_started_at is None:
             self._run_started_at = datetime.now(timezone.utc).isoformat()
             self._active_run_id = new_run_id()
             self._termination_reason = None
+            # Stamp run_id onto manifest once identity is known.
+            if self._runtime_mechanism_manifest is not None:
+                self._runtime_mechanism_manifest = dict(self._runtime_mechanism_manifest)
+                self._runtime_mechanism_manifest["run_id"] = self._active_run_id
         self.mode = "LIVE"
         self.inspect_tick = None
         self.status = "RUNNING"
         self._stop_flag = False
         self._ensure_capture_worker()
+        self._ensure_heartbeat_worker()
         with self._lock:
             self._ensure_scientific_locked()
             self._ensure_loop_locked()
         out = self._with_receipt(self._clone_published(status="RUNNING"), "PLAY", {}, before)
+        out["preflight"] = self._preflight_result
+        out["mechanism_integrity"] = self.mechanism_integrity_status()
         self._maybe_push(out, force=True)
         return out
 
@@ -853,7 +1423,56 @@ class ObserverSession:
         return Path(self.config.results_root) if self.config.results_root else default_results_root()
 
     def _ensure_scientific_locked(self) -> None:
-        """Open append-only scientific writer for the active run_id (idempotent)."""
+        """Open append-only scientific / compact writer for the active run_id (idempotent)."""
+        mode = str(getattr(self.config, "evidence_mode", None) or "FULL_SCIENTIFIC").upper()
+        if mode == "SEARCH_COMPACT":
+            if self._compact_writer is not None:
+                return
+            rid = self._active_run_id
+            if not rid:
+                return
+            live = live_scientific_dir(self._results_root(), rid)
+            from mechanistic_mind.ui.psy_observer_web.search_compact.controller import (
+                SearchCompactController,
+                trigger_action_count_threshold,
+            )
+            from mechanistic_mind.ui.psy_observer_web.search_compact.writer import SearchCompactWriter
+            fp = (
+                (self._runtime_mechanism_manifest or {}).get("resolved_fingerprint")
+                or (self._resolved_mechanism_config.fingerprint()
+                    if self._resolved_mechanism_config is not None else None)
+            )
+            ctrl = SearchCompactController(
+                run_id=rid,
+                seed=int(getattr(self.runtime, "seed", self.config.seed)),
+                config_fingerprint=fp,
+                pre_window=int(self.config.search_compact_pre_window),
+                post_window=int(self.config.search_compact_post_window),
+                max_candidates=int(self.config.search_compact_max_candidates),
+                triggers=[
+                    trigger_action_count_threshold(
+                        threshold=int(self.config.search_compact_trigger_threshold),
+                    ),
+                ],
+            )
+            writer = SearchCompactWriter(live / "search_compact", ctrl)
+            writer.open({
+                "run_id": rid,
+                "seed": int(getattr(self.runtime, "seed", self.config.seed)),
+                "config_fingerprint": fp,
+                "evidence_mode": "SEARCH_COMPACT",
+                "execution_mode": str(self.config.execution_mode or "LIVE"),
+                "runtime_type": type(self.runtime).__name__,
+                "agent_count": len(getattr(self.runtime, "slots", None) or [1]),
+                "runtime_generation": int(self._runtime_generation),
+                "pre_window": ctrl.pre_window,
+                "post_window": ctrl.post_window,
+                "max_candidates": ctrl.max_candidates,
+            })
+            self._compact_writer = writer
+            self._sci_live_dir = live
+            return
+
         if self._sci_writer is not None:
             return
         rid = self._active_run_id
@@ -872,9 +1491,33 @@ class ObserverSession:
             "ecology_preset": getattr(
                 getattr(self.runtime, "config", None), "ecology_preset", "CURRENT"
             ) or "CURRENT",
+            "runtime_mechanism_manifest": self._runtime_mechanism_manifest,
+            "mechanism_config_fingerprint": (
+                (self._runtime_mechanism_manifest or {}).get("resolved_fingerprint")
+                or (self._resolved_mechanism_config.fingerprint()
+                    if self._resolved_mechanism_config is not None else None)
+            ),
+            "preflight_status": (self._preflight_result or {}).get("status"),
+            "evidence_mode": "FULL_SCIENTIFIC",
+            "psc_prediction": __import__(
+                "mechanistic_mind.research.psc_opt", fromlist=["backend_provenance"]
+            ).backend_provenance(),
         })
         self._sci_writer = writer
         self._sci_live_dir = live
+        # SCIENTIFIC_V3 CORE — additive; does not replace V2
+        if self._v3_writer is None:
+            v3 = ScientificV3Writer(live)
+            v3.open(
+                run_id=str(rid),
+                generation=int(self._runtime_generation),
+                extra_meta={
+                    "runtime_type": type(self.runtime).__name__,
+                    "seed": int(getattr(self.runtime, "seed", self.config.seed)),
+                    "alongside": "SCIENTIFIC_V2_TIERED",
+                },
+            )
+            self._v3_writer = v3
 
     def _close_scientific_locked(self, *, clear_live_dir: bool = True) -> None:
         w = self._sci_writer
@@ -884,22 +1527,50 @@ class ObserverSession:
                 w.close()
             except Exception:
                 pass
+        v3w = self._v3_writer
+        self._v3_writer = None
+        if v3w is not None:
+            try:
+                v3w.close()
+            except Exception:
+                pass
+        cw = self._compact_writer
+        self._compact_writer = None
+        if cw is not None:
+            try:
+                cw.close()
+            except Exception:
+                pass
         if clear_live_dir:
             self._sci_live_dir = None
 
     def _append_scientific_locked(self) -> None:
-        """Persist one scientific record set per new simulation tick (not per UI capture)."""
+        """Persist one scientific / compact record set per new simulation tick."""
         if self._active_run_id is None:
             return
         self._ensure_scientific_locked()
+        mode = str(getattr(self.config, "evidence_mode", None) or "FULL_SCIENTIFIC").upper()
+        if mode == "SEARCH_COMPACT":
+            cw = self._compact_writer
+            if cw is None:
+                return
+            fresh = tail_list(self._event_ring, SCI_APPEND_EVENT_TAIL)
+            cw.append_tick(self.runtime, events=fresh)
+            return
         w = self._sci_writer
         if w is None:
             return
         w.append_tick(self.runtime)
-        # Drain freshly accumulated structured events into the scientific archive
-        fresh = list(self._event_ring)[-40:]
+        fresh = tail_list(self._event_ring, SCI_APPEND_EVENT_TAIL)
         if fresh:
             w.append_events(fresh)
+        v3w = self._v3_writer
+        if v3w is not None:
+            try:
+                v3w.append_runtime_tick(self.runtime)
+            except Exception as exc:
+                # Fail honestly — do not silently drop; surface on writer health / session
+                self._v3_last_error = str(exc)
 
     def scientific_evidence(
         self,
@@ -910,6 +1581,11 @@ class ObserverSession:
         with self._lock:
             if self._sci_writer is not None:
                 self._sci_writer.flush()
+            if self._v3_writer is not None:
+                try:
+                    self._v3_writer.flush()
+                except Exception as exc:
+                    self._v3_last_error = str(exc)
             live_dir = self._sci_live_dir
             timeline = list(self._timeline)
             events = list(self._event_ring)
@@ -929,7 +1605,7 @@ class ObserverSession:
             live_tick = int(self.runtime.tick)
             cut = int(cutoff_tick) if cutoff_tick is not None else live_tick
             runtime = self.runtime
-        return load_evidence_package(
+        pkg = load_evidence_package(
             evidence_dir=live_dir,
             runtime=runtime,
             ui_timeline=timeline,
@@ -938,7 +1614,110 @@ class ObserverSession:
             runtime_status=status,
             run_id=rid,
             identity=identity,
+            include_bulk_rows=False,
+            include_behavioral=False,
+            include_v3_core=False,
         )
+        pkg["v3_evidence_health"] = {
+            "writer_attached": self._v3_writer is not None,
+            "last_error": self._v3_last_error,
+            "health": (self._v3_writer.health if self._v3_writer is not None else None),
+            "live_dir": str(live_dir) if live_dir else None,
+        }
+        return pkg
+
+    def signal_forensics_current_run(
+        self,
+        *,
+        cutoff_tick: int | None = None,
+        max_episode_details: int = 40,
+        max_timeline_rows: int | None = 50_000,
+        max_events: int | None = 200_000,
+    ) -> dict[str, Any]:
+        """User-triggered Signal Forensics on CURRENT RUN scientific evidence.
+
+        Does not run on LIVE refresh. Reuses Analyzer evidence package authority.
+        """
+        from mechanistic_mind.ui.psy_observer_web.signal_context.analyze_run import (
+            analyze_signal_from_rows_events,
+        )
+
+        pkg = self.scientific_evidence(cutoff_tick=cutoff_tick)
+        rows = list(pkg.get("scientific_rows") or [])
+        events = list(pkg.get("events") or [])
+        if max_timeline_rows is not None and len(rows) > int(max_timeline_rows):
+            # Keep latest contiguous rows for performance (document as SPARSE if truncated).
+            rows = rows[-int(max_timeline_rows) :]
+            trunc = True
+        else:
+            trunc = False
+        if max_events is not None and len(events) > int(max_events):
+            events = events[-int(max_events) :]
+            trunc = True
+        world = getattr(getattr(self.runtime, "world", None), "config", None) or getattr(
+            self.runtime, "config", None
+        )
+        width = int(getattr(world, "width", None) or getattr(self.runtime.world, "width", 32) or 32)
+        height = int(getattr(world, "height", None) or getattr(self.runtime.world, "height", 32) or 32)
+        try:
+            width = int(self.runtime.world.width)
+            height = int(self.runtime.world.height)
+        except Exception:
+            pass
+        result = analyze_signal_from_rows_events(
+            rows=rows,
+            events=events,
+            run_id=pkg.get("run_id"),
+            generation=int(self._runtime_generation),
+            width=width,
+            height=height,
+            max_episode_details=int(max_episode_details),
+            focus_ticks=None,  # current-run: percentile + recent, not seed-17 focus ticks
+            source_label="CURRENT_RUN",
+            telemetry_schema=pkg.get("telemetry_schema"),
+            coverage=("SPARSE" if trunc else pkg.get("coverage")),
+            runtime_status=pkg.get("runtime_status"),
+            cutoff_tick=pkg.get("analysis_cutoff_tick"),
+            meta={
+                **(pkg.get("scientific_meta") or {}),
+                **(pkg.get("identity") or {}),
+                "runtime_mechanism_manifest": (
+                    (pkg.get("scientific_meta") or {}).get("runtime_mechanism_manifest")
+                    or (pkg.get("runtime_mechanism_integrity") or {})
+                ),
+            },
+            seed=(pkg.get("identity") or {}).get("seed") or getattr(self.runtime, "seed", None),
+        )
+        # Ensure identity agreement with Analyzer package
+        result["evidence_package_run_id"] = pkg.get("run_id")
+        result["evidence_package_cutoff"] = pkg.get("analysis_cutoff_tick")
+        result["evidence_agreement"] = {
+            "run_id_match": result.get("run_id") == pkg.get("run_id"),
+            "cutoff_match": result.get("cutoff_tick") == pkg.get("analysis_cutoff_tick"),
+            "analyzer_same_authority": True,
+        }
+        result["accepted"] = True
+        result["evidence_authority"] = "scientific_evidence_package"
+        result["live_buffer_independent"] = True
+        result["reference_fixture_auto_loaded"] = False
+        live_sum = self.signal_context_live_summary()
+        result["live_snapshot"] = {
+            "n_episodes": live_sum.get("n_episodes"),
+            "n_receptions_buffered": live_sum.get("n_receptions_buffered"),
+            "note": "LIVE buffer is not historical authority.",
+        }
+        return result
+
+    def v3_evidence_health(self) -> dict[str, Any]:
+        """Explicit V3 writer health — never silent about CORE capture failure."""
+        w = self._v3_writer
+        health = w.health if w is not None else None
+        return {
+            "writer_attached": w is not None,
+            "last_error": self._v3_last_error,
+            "health": health,
+            "live_dir": str(self._sci_live_dir) if self._sci_live_dir else None,
+        }
 
     def finalize_run(self, *, reason: str = "USER_STOP_SAVED") -> dict[str, Any]:
         """Persist current run. Idempotent for the same generation+tick+reason."""
@@ -1043,41 +1822,171 @@ class ObserverSession:
                 self._termination_reason = "SAVE_FAILED"
             return result
 
-    def stop(self, *, save: bool = False, reason: str | None = None) -> dict[str, Any]:
-        """Stop simulation. save=True → finalize then STOPPED; save=False → STOPPED without artifact."""
-        before = self._control_state()
-        if self.status == "FINALIZING":
-            # Wait for in-flight finalize (idempotent)
-            with self._finalize_lock:
-                fin = deepcopy(self._last_finalize) if self._last_finalize else {
-                    "accepted": False, "reason": "finalization in progress",
+    def save_job_status(self) -> dict[str, Any]:
+        """Layered Save/Stop progress. Compact — never the Observer world graph."""
+        job = dict(self._save_job or {})
+        thread = self._save_job_thread
+        alive = bool(thread is not None and thread.is_alive())
+        if self.status == "FINALIZING" and not alive and job.get("finalize") not in {"succeeded", "failed"}:
+            # Worker vanished without a terminal status (should not stick forever).
+            self.status = "SAVE_FAILED"
+            job["finalize"] = "failed"
+            job["save"] = "unknown"
+            job["error"] = job.get("error") or "finalize worker ended while status was FINALIZING"
+            job["lifecycle"] = "SAVE_FAILED"
+            self._save_job = job
+            if not (self._last_finalize or {}).get("accepted"):
+                self._last_finalize = {
+                    "accepted": False,
+                    "saved": False,
+                    "error": job["error"],
+                    "termination_reason": "SAVE_FAILED",
+                    "final_tick": None,
                 }
-            out = self._with_receipt(
-                self._clone_published(status=self.status), "STOP",
-                {"save": save, "reason": reason}, before,
-                accepted=bool(fin.get("accepted")),
-                reason="idempotent finalize while FINALIZING",
-            )
-            if fin.get("final_tick") is not None:
-                out["control_receipt"]["tick"] = int(fin["final_tick"])
-                out["control_receipt"]["verified_final_tick"] = int(fin["final_tick"])
-            out["finalize"] = fin
-            return out
+        fin = self._last_finalize or {}
+        save_layer = job.get("save") or (
+            "succeeded" if fin.get("accepted") and fin.get("saved")
+            else "failed" if fin.get("accepted") is False
+            else "not_started"
+        )
+        return {
+            "schema": "mm.psy_observer_web.save_job.v1",
+            "job_id": job.get("job_id"),
+            "lifecycle": self.status,
+            "save": save_layer,
+            "finalize": job.get("finalize") or (
+                "succeeded" if fin.get("accepted") else "failed" if fin else "not_started"
+            ),
+            "http": "n/a_server",
+            "runtime": {
+                "tick": int(self.runtime.tick) if getattr(self, "runtime", None) is not None else None,
+                "status": self.status,
+                "worker_alive": alive,
+            },
+            "error": job.get("error") or fin.get("error"),
+            "phases": list(fin.get("phases") or job.get("phases") or []),
+            "run_dir": fin.get("run_dir") or job.get("run_dir"),
+            "final_tick": fin.get("final_tick"),
+            "pending": self.status == "FINALIZING",
+            "layers": {
+                "save": save_layer,
+                "finalize": job.get("finalize") or ("pending" if self.status == "FINALIZING" else "idle"),
+                "http": "n/a_server",
+                "runtime": self.status,
+            },
+        }
 
-        request = {"save": bool(save), "reason": reason}
-        if save:
-            term = reason or "USER_STOP_SAVED"
-            self._stop_flag = True
-            self.status = "FINALIZING"
-            self._join_runner()
-            # Freeze current generation, then capture one atomic frame for visibility
+    def _compact_stop_frame(self, *, status: str | None = None) -> dict[str, Any]:
+        hdr = {
+            "status": status or self.status,
+            "tick": int(self.runtime.tick),
+            "runtime_generation": int(self._runtime_generation),
+            "compact_control": True,
+        }
+        return {"header": hdr}
+
+    def _mark_save_job(self, **fields: Any) -> None:
+        job = dict(self._save_job or {})
+        job.update(fields)
+        job["lifecycle"] = self.status
+        self._save_job = job
+
+    def _begin_save_stop_job(self, *, reason: str | None, before: dict[str, Any]) -> dict[str, Any]:
+        request = {"save": True, "reason": reason, "wait": False}
+        if self.status == "FINALIZING":
+            out = self._with_receipt(
+                self._compact_stop_frame(), "STOP", request, before,
+                accepted=True, reason="SAVE_STOP_IN_PROGRESS",
+            )
+            out["finalize"] = {"accepted": None, "pending": True, **(self._last_finalize or {})}
+            out["save_job"] = self.save_job_status()
+            return out
+        if self.status == "STOPPED" and (self._last_finalize or {}).get("accepted"):
+            out = self._with_receipt(
+                self._compact_stop_frame(status="STOPPED"), "STOP", request, before,
+                accepted=True, reason="already STOPPED",
+            )
+            out["finalize"] = deepcopy(self._last_finalize)
+            out["save_job"] = self.save_job_status()
+            return out
+        job_id = uuid.uuid4().hex[:12]
+        self._stop_flag = True
+        self.status = "FINALIZING"
+        self._save_job = {
+            "job_id": job_id,
+            "save": "pending",
+            "finalize": "pending",
+            "phases": ["requested"],
+        }
+        self._join_runner()
+        thread = threading.Thread(
+            target=self._save_stop_worker,
+            args=(reason or "USER_STOP_SAVED", before, request),
+            name="psy-observer-save-stop",
+            daemon=False,
+        )
+        self._save_job_thread = thread
+        thread.start()
+        out = self._with_receipt(
+            self._compact_stop_frame(status="FINALIZING"), "STOP", request, before,
+            accepted=True, reason="SAVE_STOP_STARTED",
+        )
+        out["finalize"] = {"accepted": None, "pending": True, "job_id": job_id}
+        out["save_job"] = self.save_job_status()
+        self._maybe_push({**self._clone_published(status="FINALIZING"), "save_job": out["save_job"]}, force=True)
+        return out
+
+    def _save_stop_worker(self, reason: str, before: dict[str, Any], request: dict[str, Any]) -> None:
+        try:
+            self._execute_save_stop(reason=reason, before=before, request=request)
+        except Exception as exc:
+            self.status = "SAVE_FAILED"
+            fin = {
+                "accepted": False,
+                "saved": False,
+                "error": str(exc),
+                "termination_reason": "SAVE_FAILED",
+                "final_tick": None,
+            }
+            self._last_finalize = fin
+            self._mark_save_job(save="failed", finalize="failed", error=str(exc))
+            out = self._with_receipt(
+                self._clone_published(status="SAVE_FAILED"), "STOP", request, before,
+                accepted=False, reason=str(exc),
+                error=self._lifecycle_error("STOP", str(exc), code="SAVE_FAILED", recoverable=True),
+            )
+            out["finalize"] = fin
+            out["save_job"] = self.save_job_status()
+            self._maybe_push(out, force=True)
+        finally:
+            if self.status == "FINALIZING":
+                self.status = "SAVE_FAILED"
+                self._mark_save_job(
+                    save="failed",
+                    finalize="failed",
+                    error="finalize ended still FINALIZING",
+                )
+
+    def _execute_save_stop(
+        self,
+        *,
+        reason: str,
+        before: dict[str, Any],
+        request: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Synchronous save-stop body. Never returns while status is FINALIZING."""
+        term = reason or "USER_STOP_SAVED"
+        self._stop_flag = True
+        self.status = "FINALIZING"
+        self._mark_save_job(finalize="pending", save="pending")
+        self._join_runner()
+        try:
             with self._step_lock:
                 with self._lock:
                     boundary_tick = int(self.runtime.tick)
                     boundary_generation = int(self._runtime_generation)
                     boundary_runtime_type = type(self.runtime).__name__
                     self._capture_locked()
-                    # Capture must not advance scientific state; tick must hold.
                     if int(self.runtime.tick) != boundary_tick:
                         self.status = "SAVE_FAILED"
                         fin = {
@@ -1092,23 +2001,35 @@ class ObserverSession:
                             "termination_reason": "SAVE_FAILED",
                             "final_tick": None,
                         }
+                        self._last_finalize = fin
+                        self._mark_save_job(save="failed", finalize="failed", error=fin["error"])
                         out = self._with_receipt(
                             self._clone_published(status="SAVE_FAILED"), "STOP", request, before,
                             accepted=False, reason=fin["error"],
+                            error=self._lifecycle_error("STOP", fin["error"], code="SAVE_FAILED", recoverable=True),
                         )
                         out["finalize"] = fin
-                        self._last_finalize = fin
+                        out["save_job"] = self.save_job_status()
                         self._maybe_push(out, force=True)
                         return out
+            self._mark_save_job(phases=["saving_snapshot"])
             fin = self.finalize_run(reason=term)
             if not fin.get("accepted"):
                 self.status = "SAVE_FAILED"
+                self._mark_save_job(save="failed", finalize="failed", error=fin.get("error"))
                 out = self._with_receipt(
                     self._clone_published(status="SAVE_FAILED"), "STOP", request, before,
                     accepted=False,
                     reason=fin.get("error") or "save failed; runtime preserved",
+                    error=self._lifecycle_error(
+                        "STOP",
+                        fin.get("error") or "save failed; runtime preserved",
+                        code="SAVE_FAILED",
+                        recoverable=True,
+                    ),
                 )
                 out["finalize"] = fin
+                out["save_job"] = self.save_job_status()
                 self._maybe_push(out, force=True)
                 return out
             verified_tick = int(fin["final_tick"])
@@ -1116,7 +2037,6 @@ class ObserverSession:
             if fin_gen is None:
                 fin_gen = boundary_generation
             if verified_tick != boundary_tick or int(fin_gen) != boundary_generation:
-                # Should be unreachable after finalize guards; refuse success if it happens.
                 self.status = "SAVE_FAILED"
                 fin = {
                     **fin,
@@ -1134,14 +2054,18 @@ class ObserverSession:
                     "final_tick": None,
                 }
                 self._last_finalize = fin
+                self._mark_save_job(save="failed", finalize="failed", error=fin["error"])
                 out = self._with_receipt(
                     self._clone_published(status="SAVE_FAILED"), "STOP", request, before,
                     accepted=False, reason=fin["error"],
+                    error=self._lifecycle_error("STOP", fin["error"], code="SAVE_FAILED", recoverable=True),
                 )
                 out["finalize"] = fin
+                out["save_job"] = self.save_job_status()
                 self._maybe_push(out, force=True)
                 return out
             self.status = "STOPPED"
+            self._mark_save_job(save="succeeded", finalize="succeeded", run_dir=fin.get("run_dir"))
             out = self._with_receipt(
                 self._clone_published(status="STOPPED"), "STOP", request, before,
                 reason=(
@@ -1149,14 +2073,76 @@ class ObserverSession:
                     f"saved to {fin.get('run_dir')}"
                 ),
             )
-            # Success tick is the verified persisted boundary — never a pre-save UI guess.
             out["control_receipt"]["tick"] = verified_tick
             out["control_receipt"]["verified_final_tick"] = verified_tick
             out["finalize"] = fin
+            out["save_job"] = self.save_job_status()
             self._maybe_push(out, force=True)
             return out
+        finally:
+            if self.status == "FINALIZING":
+                self.status = "SAVE_FAILED"
+                err = "finalize aborted still FINALIZING"
+                self._mark_save_job(save="failed", finalize="failed", error=err)
+                if not (self._last_finalize or {}).get("accepted"):
+                    self._last_finalize = {
+                        "accepted": False,
+                        "saved": False,
+                        "error": err,
+                        "termination_reason": "SAVE_FAILED",
+                        "final_tick": None,
+                    }
 
-        # Stop without saving
+    def stop(self, *, save: bool = False, reason: str | None = None, wait: bool = True) -> dict[str, Any]:
+        """Stop simulation. save=True → finalize then STOPPED; save=False → STOPPED without artifact.
+
+        wait=False (HTTP Save & Stop): start finalize on a backend thread and return
+        immediately so the browser does not hold one fragile fetch across snapshot I/O.
+        """
+        before = self._control_state()
+        request = {"save": bool(save), "reason": reason, "wait": bool(wait)}
+        if save and not wait:
+            return self._begin_save_stop_job(reason=reason, before=before)
+
+        if self.status == "FINALIZING":
+            thread = self._save_job_thread
+            if wait and thread is not None and thread.is_alive():
+                thread.join(timeout=3600.0)
+            fin = deepcopy(self._last_finalize) if self._last_finalize else {
+                "accepted": False, "reason": "finalization in progress",
+            }
+            pending = self.status == "FINALIZING" and not fin.get("accepted")
+            out = self._with_receipt(
+                self._clone_published(status=self.status), "STOP",
+                request, before,
+                accepted=True if pending else bool(fin.get("accepted")),
+                reason="SAVE_STOP_IN_PROGRESS" if pending else "idempotent finalize while FINALIZING",
+                error=(
+                    None if pending or fin.get("accepted")
+                    else self._lifecycle_error(
+                        "STOP",
+                        fin.get("error") or "idempotent finalize while FINALIZING",
+                        code="SAVE_FAILED" if self.status == "SAVE_FAILED" else "INVALID_TRANSITION",
+                    )
+                ),
+            )
+            if not (pending or fin.get("accepted")):
+                out["control_receipt"]["accepted"] = False
+                out["control_receipt"]["ok"] = False
+            if fin.get("final_tick") is not None:
+                out["control_receipt"]["tick"] = int(fin["final_tick"])
+                out["control_receipt"]["verified_final_tick"] = int(fin["final_tick"])
+            out["finalize"] = fin
+            out["save_job"] = self.save_job_status()
+            return out
+
+        if save:
+            return self._execute_save_stop(
+                reason=reason or "USER_STOP_SAVED",
+                before=before,
+                request=request,
+            )
+
         term = reason or "USER_STOP_NO_SAVE"
         self.status = "STOPPED"
         self._stop_flag = True
@@ -1174,6 +2160,7 @@ class ObserverSession:
             "termination_reason": term,
             "run_dir": None,
         }
+        out["save_job"] = self.save_job_status()
         self._maybe_push(out, force=True)
         return out
 
@@ -1184,9 +2171,15 @@ class ObserverSession:
                 self._clone_published(), "STEP", {"n": int(n)}, before,
                 accepted=False, reason="finalization in progress",
             )
+        blocked = self._require_preflight_ready("STEP", before, {"n": int(n)})
+        if blocked is not None:
+            return blocked
         if self._run_started_at is None:
             self._run_started_at = datetime.now(timezone.utc).isoformat()
             self._active_run_id = new_run_id()
+            if self._runtime_mechanism_manifest is not None:
+                self._runtime_mechanism_manifest = dict(self._runtime_mechanism_manifest)
+                self._runtime_mechanism_manifest["run_id"] = self._active_run_id
         self.mode = "LIVE"
         self.inspect_tick = None
         self.status = "PAUSED"
@@ -1203,15 +2196,30 @@ class ObserverSession:
                     self._append_scientific_locked()
                     self._update_perf_locked(tick=True)
             with self._lock:
-                frame = self._capture_locked(detail="full")
-        self._maybe_push(frame, force=True)
-        return self._with_receipt(frame, "STEP", {"n": int(n)}, before)
+                # Demand-driven: FULL preset keeps inspect-grade detail on STEP;
+                # MINIMAL/NORMAL stay compact to avoid multi-MB JSON on every step.
+                _det = "full" if self._observer_interest.preset == "FULL" else "compact"
+                frame = self._capture_locked(detail=_det)
+        out = self._with_receipt(frame, "STEP", {"n": int(n)}, before)
+        out["preflight"] = self._preflight_result
+        out["mechanism_integrity"] = self.mechanism_integrity_status()
+        self._maybe_push(out, force=True)
+        return out
 
     def _scientific_step_once_unlocked(self) -> None:
         """One scientific tick with experimenter pre/post hooks (caller holds step_lock)."""
-        self._experimenter_pre_step_unlocked()
-        self.runtime.step(1)
-        self._experimenter_post_step_unlocked()
+        self._tick_in_progress = True
+        self._tick_started_mono = time.monotonic()
+        try:
+            self._experimenter_pre_step_unlocked()
+            self.runtime.step(1)
+            self._experimenter_post_step_unlocked()
+        finally:
+            self._last_tick_wall_ms = (time.monotonic() - self._tick_started_mono) * 1000.0
+            self._last_tick_completed_mono = time.monotonic()
+            self._tick_in_progress = False
+        # Safe boundary: apply deferred LIVE mechanism/vision requests before next tick.
+        self._drain_live_apply_queue_unlocked()
 
     def set_live_interpreters(
         self,
@@ -1249,6 +2257,122 @@ class ObserverSession:
                 f"wall-clock throttle only; 1x period={BASE_TICK_PERIOD_1X}s; "
                 f"MAX={MAX_SPEED}; scientific ticks never skipped; frame_detail={detail}"
             ),
+        )
+        self._maybe_push(out, force=True)
+        return out
+
+    def set_execution_mode(self, mode: str, *, target_tick: int | None = None) -> dict[str, Any]:
+        """Set LIVE/FAST/MAX/HEADLESS presentation policy without changing science.
+
+        Same simulated ticks; only wall-clock throttle + observer sample cadence +
+        whether live presentation capture runs.
+        """
+        before = self._control_state()
+        key = str(mode or "LIVE").strip().upper()
+        if key not in EXECUTION_MODE_PRESETS:
+            return self._with_receipt(
+                self._clone_published(),
+                "SET_EXECUTION_MODE",
+                {"mode": mode},
+                before,
+                accepted=False,
+                reason=f"unknown execution_mode; allowed={sorted(EXECUTION_MODE_PRESETS)}",
+            )
+        preset = EXECUTION_MODE_PRESETS[key]
+        self.config.execution_mode = key
+        self.config.speed = float(preset["speed"])
+        self.config.ui_hz = float(preset["ui_hz"])
+        if target_tick is not None:
+            self.config.target_tick = int(target_tick) if int(target_tick) > 0 else None
+        detail = self._frame_detail_for_speed()
+        with self._step_lock:
+            with self._lock:
+                frame = self._capture_locked(detail=detail)
+        out = self._with_receipt(
+            frame,
+            "SET_EXECUTION_MODE",
+            {
+                "mode": key,
+                "speed": float(self.config.speed),
+                "ui_hz": float(self.config.ui_hz),
+                "observer_hz": float(self.config.ui_hz),
+                "target_tick": self.config.target_tick,
+                "capture": bool(preset["capture"]),
+            },
+            before,
+            reason=(
+                "presentation policy only; scientific ticks never skipped; "
+                "dt/physics/cognition unchanged"
+            ),
+        )
+        self._maybe_push(out, force=True)
+        return out
+
+    def set_target_tick(self, target_tick: int | None) -> dict[str, Any]:
+        before = self._control_state()
+        self.config.target_tick = (
+            int(target_tick) if target_tick is not None and int(target_tick) > 0 else None
+        )
+        with self._step_lock:
+            with self._lock:
+                frame = self._capture_locked(detail=self._frame_detail_for_speed())
+        out = self._with_receipt(
+            frame, "SET_TARGET_TICK", {"target_tick": self.config.target_tick}, before,
+        )
+        self._maybe_push(out, force=True)
+        return out
+
+    def set_evidence_mode(self, mode: str) -> dict[str, Any]:
+        """FULL_SCIENTIFIC vs SEARCH_COMPACT — evidence notebook only, not physics."""
+        before = self._control_state()
+        key = str(mode or "FULL_SCIENTIFIC").strip().upper()
+        allowed = {"FULL_SCIENTIFIC", "SEARCH_COMPACT"}
+        if key not in allowed:
+            return self._with_receipt(
+                self._clone_published(),
+                "SET_EVIDENCE_MODE",
+                {"mode": mode},
+                before,
+                accepted=False,
+                reason=f"unknown evidence_mode; allowed={sorted(allowed)}",
+            )
+        # Switching mid-run closes current writer; next scientific tick opens new policy.
+        with self._lock:
+            self._close_scientific_locked(clear_live_dir=False)
+            self.config.evidence_mode = key
+        with self._step_lock:
+            with self._lock:
+                frame = self._capture_locked(detail=self._frame_detail_for_speed())
+        out = self._with_receipt(
+            frame,
+            "SET_EVIDENCE_MODE",
+            {
+                "mode": key,
+                "note": (
+                    "COMPACT EVIDENCE — same organism/world; bounded notebook only"
+                    if key == "SEARCH_COMPACT"
+                    else "full scientific evidence retained"
+                ),
+            },
+            before,
+            reason="evidence capture policy only; runtime dynamics unchanged",
+        )
+        self._maybe_push(out, force=True)
+        return out
+
+    def set_observer_hz(self, hz: float) -> dict[str, Any]:
+        """Observer sample rate only — does not change simulation tick rate."""
+        before = self._control_state()
+        self.config.ui_hz = float(max(0.1, min(60.0, hz)))
+        with self._step_lock:
+            with self._lock:
+                frame = self._capture_locked(detail=self._frame_detail_for_speed())
+        out = self._with_receipt(
+            frame,
+            "SET_OBSERVER_HZ",
+            {"observer_hz": float(self.config.ui_hz)},
+            before,
+            reason="observer sample Hz only; simulation tick rate independent",
         )
         self._maybe_push(out, force=True)
         return out
@@ -1319,50 +2443,191 @@ class ObserverSession:
         self._maybe_push(out, force=True)
         return out
 
+    def set_psc_motor_resolution(self, mode: str) -> dict[str, Any]:
+        """Observer control: PSC MOTOR RESOLUTION (LOCO_FACTORIZED | OBSERVED_COMPOSITE).
+
+        Does not reset history/SMC/body. Records config intervention.
+        """
+        before = self._control_state() if hasattr(self, "_control_state") else {}
+        rt = self.runtime
+        if hasattr(rt, "set_psc_motor_resolution"):
+            result = rt.set_psc_motor_resolution(mode)
+        else:
+            result = {"accepted": False, "reason": "runtime_unsupported"}
+        # config history on session
+        ch = getattr(self, "_config_history", None)
+        if not isinstance(ch, list):
+            ch = []
+            self._config_history = ch
+        ch.append({
+            "tick": int(getattr(rt, "tick", 0) or 0),
+            "field": "psc_motor_resolution",
+            "result": result,
+            "history_reset": False,
+            "cognition_reset": False,
+            "smc_reset": False,
+            "body_reset": False,
+        })
+        out = {"ok": bool(result.get("accepted")), **result, "before": before}
+        return out
+
     def set_mechanism(self, mechanism_id: str, enabled: bool) -> dict[str, Any]:
+        """LIVE mechanism toggle.
+
+        When RUNNING and a tick currently holds `_step_lock`, queue the change and
+        return immediately with WAITING_FOR_TICK_BOUNDARY (never multi-minute HTTP stall).
+        Applied at the next tick boundary; no mid-tick mutation.
+        """
         before = self._control_state()
         request = {"mechanism_id": mechanism_id, "enabled": enabled}
-        with self._step_lock:
-            previous = self.runtime.mechanisms()
-            item = next(
-                (m for m in previous.get("mechanisms", []) if m.get("id") == mechanism_id),
-                None,
-            )
-            if item is None:
-                return self._with_receipt(
-                    self._clone_published(), "TOGGLE_MECHANISM", request,
-                    before, accepted=False, reason="unknown mechanism",
+        if self.status == "RUNNING":
+            got = self._step_lock.acquire(blocking=False)
+            if not got:
+                previous = self.runtime.mechanisms()
+                item = next(
+                    (m for m in previous.get("mechanisms", []) if m.get("id") == mechanism_id),
+                    None,
                 )
-            if not item.get("ablatable", True):
-                return self._with_receipt(
-                    self._clone_published(), "TOGGLE_MECHANISM", request,
-                    before, accepted=False, reason="mechanism is read-only / not ablatable",
+                if item is None:
+                    return self._with_receipt(
+                        self._clone_published(), "TOGGLE_MECHANISM", request,
+                        before, accepted=False, reason="unknown mechanism",
+                    )
+                if not item.get("ablatable", True):
+                    return self._with_receipt(
+                        self._clone_published(), "TOGGLE_MECHANISM", request,
+                        before, accepted=False, reason="mechanism is read-only / not ablatable",
+                    )
+                if bool(item.get("enabled")) == bool(enabled):
+                    out = self._with_receipt(
+                        self._clone_published(), "TOGGLE_MECHANISM",
+                        {**request, "live": True, "noop": True}, before,
+                    )
+                    out["mechanism_result"] = previous
+                    out["toggle_runtime_applied"] = True
+                    return out
+                req = self._enqueue_live_apply(
+                    "mechanism",
+                    {"mechanism_id": str(mechanism_id), "enabled": bool(enabled)},
                 )
-            old_en = bool(item.get("enabled"))
-            if old_en == bool(enabled):
-                with self._lock:
-                    frame = self._capture_locked()
                 out = self._with_receipt(
-                    frame, "TOGGLE_MECHANISM",
-                    {"mechanism_id": mechanism_id, "enabled": bool(enabled), "live": True, "noop": True},
+                    self._clone_published(),
+                    "TOGGLE_MECHANISM",
+                    {**request, "live": True, "deferred": True},
                     before,
+                    accepted=True,
+                    reason="WAITING_FOR_TICK_BOUNDARY",
                 )
+                out["pending_live_apply"] = req
+                out["toggle_runtime_applied"] = False
                 out["mechanism_result"] = previous
-                self._maybe_push(out, force=True)
+                out["integrity_status"] = "PENDING_APPLY"
                 return out
-            from mechanistic_mind.ui.psy_observer_web.live_intervention import fingerprint_for_runtime
-            fp_before = fingerprint_for_runtime(self.runtime)
-            snap = self.runtime.set_mechanism(mechanism_id, bool(enabled))
-            self._record_live_intervention_locked(
-                category="mechanism",
-                changes={
-                    f"mechanism.{mechanism_id}": {"old": old_en, "new": bool(enabled)},
-                },
-                fingerprint_before=fp_before,
-                source="api/mechanisms",
+            try:
+                return self._apply_mechanism_now_unlocked(str(mechanism_id), bool(enabled), before=before)
+            finally:
+                self._step_lock.release()
+        with self._step_lock:
+            return self._apply_mechanism_now_unlocked(str(mechanism_id), bool(enabled), before=before)
+
+    def _apply_mechanism_now_unlocked(
+        self,
+        mechanism_id: str,
+        enabled: bool,
+        *,
+        before: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Apply mechanism toggle under `_step_lock` (safe tick boundary / paused)."""
+        if before is None:
+            before = self._control_state()
+        request = {"mechanism_id": mechanism_id, "enabled": enabled}
+        previous = self.runtime.mechanisms()
+        item = next(
+            (m for m in previous.get("mechanisms", []) if m.get("id") == mechanism_id),
+            None,
+        )
+        if item is None:
+            return self._with_receipt(
+                self._clone_published(), "TOGGLE_MECHANISM", request,
+                before, accepted=False, reason="unknown mechanism",
             )
+        if not item.get("ablatable", True):
+            return self._with_receipt(
+                self._clone_published(), "TOGGLE_MECHANISM", request,
+                before, accepted=False, reason="mechanism is read-only / not ablatable",
+            )
+        old_en = bool(item.get("enabled"))
+        if old_en == bool(enabled):
             with self._lock:
                 frame = self._capture_locked()
+            out = self._with_receipt(
+                frame, "TOGGLE_MECHANISM",
+                {"mechanism_id": mechanism_id, "enabled": bool(enabled), "live": True, "noop": True},
+                before,
+            )
+            out["mechanism_result"] = previous
+            out["toggle_runtime_applied"] = True
+            self._maybe_push(out, force=True)
+            return out
+        from mechanistic_mind.ui.psy_observer_web.live_intervention import fingerprint_for_runtime
+        fp_before = fingerprint_for_runtime(self.runtime)
+        snap = self.runtime.set_mechanism(mechanism_id, bool(enabled))
+        if str(mechanism_id) == "prospective_scenario_competition" and bool(enabled):
+            if getattr(self, "_psc_enabled_after_ticks", None) is None:
+                try:
+                    self._psc_enabled_after_ticks = int(getattr(self.runtime, "tick", 0) or 0)
+                except Exception:
+                    self._psc_enabled_after_ticks = None
+        from mechanistic_mind.physical_system.mechanism_configuration import (
+            ResolvedMechanismConfig,
+            build_runtime_manifest,
+            run_preflight,
+        )
+        prev_res = self._resolved_mechanism_config
+        if prev_res is not None:
+            resolved = ResolvedMechanismConfig(
+                mechanisms=dict(prev_res.mechanisms),
+                params=dict(prev_res.params),
+                provenance=dict(prev_res.provenance),
+                version=prev_res.version,
+                source="LIVE_INTERVENTION",
+            )
+        else:
+            en = dict(snap.get("enabled") or {})
+            resolved = ResolvedMechanismConfig(
+                mechanisms={k: bool(v) for k, v in en.items()},
+                params={},
+                provenance={k: "RUNTIME" for k in en},
+                source="LIVE_INTERVENTION",
+            )
+        resolved.mechanisms[str(mechanism_id)] = bool(enabled)
+        resolved.provenance[str(mechanism_id)] = "EXPLICIT"
+        planet = getattr(getattr(self.runtime, "config", None), "planet", None)
+        te = getattr(planet, "terrain", None) if planet else None
+        amb = getattr(planet, "ambient", None) if planet else None
+        resolved.mechanisms["terrain_geography"] = bool(getattr(te, "enabled", False)) if te else False
+        resolved.mechanisms["ambient_physical_dynamics"] = bool(getattr(amb, "enabled", False)) if amb else False
+        preflight = run_preflight(self.runtime, resolved)
+        self._resolved_mechanism_config = resolved
+        self._preflight_result = preflight.to_dict()
+        if preflight.status == "READY":
+            self._runtime_mechanism_manifest = build_runtime_manifest(
+                runtime=self.runtime,
+                resolved=resolved,
+                preflight=preflight,
+                run_id=self._active_run_id,
+                generation=self._runtime_generation,
+            )
+        self._record_live_intervention_locked(
+            category="mechanism",
+            changes={
+                f"mechanism.{mechanism_id}": {"old": old_en, "new": bool(enabled)},
+            },
+            fingerprint_before=fp_before,
+            source="api/mechanisms",
+        )
+        with self._lock:
+            frame = self._capture_locked()
         out = self._with_receipt(
             frame, "TOGGLE_MECHANISM",
             {"mechanism_id": mechanism_id, "enabled": bool(enabled), "live": True},
@@ -1374,6 +2639,18 @@ class ObserverSession:
             ),
         )
         out["mechanism_result"] = snap
+        out["preflight"] = self._preflight_result
+        out["mechanism_integrity"] = self.mechanism_integrity_status()
+        item_after = next(
+            (m for m in (snap.get("mechanisms") or []) if m.get("id") == mechanism_id),
+            None,
+        )
+        runtime_matches = bool(item_after and bool(item_after.get("enabled")) == bool(enabled))
+        out["toggle_runtime_applied"] = runtime_matches
+        if not runtime_matches or (self._preflight_result or {}).get("status") != "READY":
+            out["integrity_status"] = "MISMATCH"
+        else:
+            out["integrity_status"] = "READY"
         out["dependency_warnings"] = [
             {
                 "mechanism_id": mechanism_id,
@@ -1388,82 +2665,153 @@ class ObserverSession:
     def set_vision_radius(self, radius: int) -> dict[str, Any]:
         """LIVE physical vision Moore radius R∈{1,2,3}. No world/cognition/history reset."""
         from mechanistic_mind.physical_system.near_field_exteroception import (
+            clamp_vision_radius,
+        )
+        before = self._control_state()
+        new = clamp_vision_radius(radius)
+        request = {"radius": new, "path": "physical_near_field_vision.radius"}
+        if self.status == "RUNNING":
+            got = self._step_lock.acquire(blocking=False)
+            if not got:
+                req = self._enqueue_live_apply("vision_radius", {"radius": int(new)})
+                out = self._with_receipt(
+                    self._clone_published(),
+                    "SET_VISION_RADIUS",
+                    {**request, "live": True, "deferred": True},
+                    before,
+                    accepted=True,
+                    reason="WAITING_FOR_TICK_BOUNDARY",
+                )
+                out["pending_live_apply"] = req
+                out["vision_radius"] = {"accepted": True, "pending": True, "new": int(new)}
+                return out
+            try:
+                return self._apply_vision_radius_now_unlocked(int(new), before=before)
+            finally:
+                self._step_lock.release()
+        with self._step_lock:
+            return self._apply_vision_radius_now_unlocked(int(new), before=before)
+
+    def _apply_vision_radius_now_unlocked(
+        self,
+        radius: int,
+        *,
+        before: dict | None = None,
+    ) -> dict[str, Any]:
+        """Apply vision radius under `_step_lock`."""
+        from mechanistic_mind.physical_system.near_field_exteroception import (
             DEFAULT_VISION_RADIUS,
             clamp_vision_radius,
             moore_max_candidates,
         )
         from mechanistic_mind.ui.psy_observer_web.live_intervention import fingerprint_for_runtime
 
-        before = self._control_state()
+        if before is None:
+            before = self._control_state()
         new = clamp_vision_radius(radius)
         request = {"radius": new, "path": "physical_near_field_vision.radius"}
-        with self._step_lock:
-            # Read current radius from primary config
-            nfe = None
-            slots = getattr(self.runtime, "slots", None)
-            if slots:
-                nfe = getattr(slots[0].config, "near_field_exteroception", None)
-            else:
-                nfe = getattr(getattr(self.runtime, "config", None), "near_field_exteroception", None)
-            old = clamp_vision_radius(getattr(nfe, "radius", DEFAULT_VISION_RADIUS) if nfe else DEFAULT_VISION_RADIUS)
-            if old == new:
-                with self._lock:
-                    frame = self._capture_locked()
-                out = self._with_receipt(
-                    frame, "SET_VISION_RADIUS",
-                    {**request, "old": old, "new": new, "live": True, "noop": True},
-                    before,
-                )
-                out["vision_radius"] = {"accepted": True, "old": old, "new": new, "noop": True}
-                self._maybe_push(out, force=True)
-                return out
-            fp_before = fingerprint_for_runtime(self.runtime)
-            snap = self.runtime.set_vision_radius(new)
-            # Always record radius change even if fingerprint helpers lag (explicit path).
-            ev = self._record_live_intervention_locked(
-                category="sensor",
-                changes={
-                    "physical_near_field_vision.radius": {"old": old, "new": new},
-                },
-                fingerprint_before=fp_before,
-                source="api/vision/radius",
-            )
-            if ev is None:
-                # Fingerprint unchanged (should not happen once radius is in eff config) —
-                # still emit an explicit intervention for Analyzer regime boundaries.
-                from mechanistic_mind.ui.psy_observer_web.live_intervention import (
-                    build_world_intervention_event,
-                    fingerprint_for_runtime as fp_rt,
-                )
-                fp_after = fp_rt(self.runtime)
-                ev = build_world_intervention_event(
-                    simulation_tick=int(getattr(self.runtime, "tick", 0) or 0),
-                    runtime_generation=int(self._runtime_generation),
-                    session_instance_id=self._session_instance_id(),
-                    category="sensor",
-                    changes={"physical_near_field_vision.radius": {"old": old, "new": new}},
-                    fingerprint_before=fp_before,
-                    fingerprint_after=fp_after or fp_before + f"|radius={new}",
-                    history_reset=False,
-                    cognition_reset=False,
-                    body_reset=False,
-                    source="api/vision/radius",
-                    extra={
-                        "reset": {
-                            "world": False,
-                            "body": False,
-                            "cognition": False,
-                            "history": False,
-                        },
-                    },
-                )
-                self._world_interventions.append(ev)
-                try:
-                    self._event_ring.append(ev)
-                except Exception:
-                    pass
+        # Read current radius from primary config
+        nfe = None
+        slots = getattr(self.runtime, "slots", None)
+        if slots:
+            nfe = getattr(slots[0].config, "near_field_exteroception", None)
+        else:
+            nfe = getattr(getattr(self.runtime, "config", None), "near_field_exteroception", None)
+        old = clamp_vision_radius(getattr(nfe, "radius", DEFAULT_VISION_RADIUS) if nfe else DEFAULT_VISION_RADIUS)
+        if old == new:
             with self._lock:
                 frame = self._capture_locked()
+            out = self._with_receipt(
+                frame, "SET_VISION_RADIUS",
+                {**request, "old": old, "new": new, "live": True, "noop": True},
+                before,
+            )
+            out["vision_radius"] = {"accepted": True, "old": old, "new": new, "noop": True}
+            self._maybe_push(out, force=True)
+            return out
+        fp_before = fingerprint_for_runtime(self.runtime)
+        snap = self.runtime.set_vision_radius(new)
+        # Keep resolved CONFIG authority aligned with LIVE runtime radius
+        # so preflight does not report CONFIG R≠RUNTIME R after a valid set.
+        from mechanistic_mind.physical_system.mechanism_configuration import (
+            ResolvedMechanismConfig,
+            build_runtime_manifest,
+            run_preflight,
+        )
+        prev_res = self._resolved_mechanism_config
+        if prev_res is not None:
+            resolved = ResolvedMechanismConfig(
+                mechanisms=dict(prev_res.mechanisms),
+                params=dict(prev_res.params),
+                provenance=dict(prev_res.provenance),
+                version=prev_res.version,
+                source="LIVE_INTERVENTION",
+            )
+        else:
+            resolved = ResolvedMechanismConfig(
+                mechanisms={"physical_near_field_vision": True},
+                params={"vision_radius": new},
+                provenance={"vision_radius": "EXPLICIT", "physical_near_field_vision": "RUNTIME"},
+                source="LIVE_INTERVENTION",
+            )
+        resolved.params["vision_radius"] = int(new)
+        resolved.provenance["vision_radius"] = "EXPLICIT"
+        preflight = run_preflight(self.runtime, resolved)
+        self._resolved_mechanism_config = resolved
+        self._preflight_result = preflight.to_dict()
+        if preflight.status == "READY":
+            self._runtime_mechanism_manifest = build_runtime_manifest(
+                runtime=self.runtime,
+                resolved=resolved,
+                preflight=preflight,
+                run_id=self._active_run_id,
+                generation=self._runtime_generation,
+            )
+        # Always record radius change even if fingerprint helpers lag (explicit path).
+        ev = self._record_live_intervention_locked(
+            category="sensor",
+            changes={
+                "physical_near_field_vision.radius": {"old": old, "new": new},
+            },
+            fingerprint_before=fp_before,
+            source="api/vision/radius",
+        )
+        if ev is None:
+            # Fingerprint unchanged (should not happen once radius is in eff config) —
+            # still emit an explicit intervention for Analyzer regime boundaries.
+            from mechanistic_mind.ui.psy_observer_web.live_intervention import (
+                build_world_intervention_event,
+                fingerprint_for_runtime as fp_rt,
+            )
+            fp_after = fp_rt(self.runtime)
+            ev = build_world_intervention_event(
+                simulation_tick=int(getattr(self.runtime, "tick", 0) or 0),
+                runtime_generation=int(self._runtime_generation),
+                session_instance_id=self._session_instance_id(),
+                category="sensor",
+                changes={"physical_near_field_vision.radius": {"old": old, "new": new}},
+                fingerprint_before=fp_before,
+                fingerprint_after=fp_after or fp_before + f"|radius={new}",
+                history_reset=False,
+                cognition_reset=False,
+                body_reset=False,
+                source="api/vision/radius",
+                extra={
+                    "reset": {
+                        "world": False,
+                        "body": False,
+                        "cognition": False,
+                        "history": False,
+                    },
+                },
+            )
+            self._world_interventions.append(ev)
+            try:
+                self._event_ring.append(ev)
+            except Exception:
+                pass
+        with self._lock:
+            frame = self._capture_locked()
         out = self._with_receipt(
             frame, "SET_VISION_RADIUS",
             {
@@ -1480,6 +2828,8 @@ class ObserverSession:
         )
         out["vision_radius"] = snap
         out["intervention"] = ev
+        out["preflight"] = self._preflight_result
+        out["mechanism_integrity"] = self.mechanism_integrity_status()
         self._maybe_push(out, force=True)
         return out
 
@@ -1487,7 +2837,7 @@ class ObserverSession:
     SNAPSHOT_SCHEMA_TWO = "mm.physical_system.two_agent.snapshot.v1"
 
     def _clear_world_interventions_locked(self) -> None:
-        self._world_interventions = []
+        self._world_interventions = deque(maxlen=LIVE_WORLD_INTERVENTION_SESSION_MAX)
         self._world_intervention_fp0 = None
 
     def _session_instance_id(self) -> str | None:
@@ -1507,6 +2857,9 @@ class ObserverSession:
             return {
                 "runtime_generation": int(self._runtime_generation),
                 "n_interventions": len(items),
+                "session_cap": LIVE_WORLD_INTERVENTION_SESSION_MAX,
+                "live_authority": "session_ring_not_scientific_history",
+                "scientific_authority": "scientific_events.jsonl",
                 "interventions": items,
                 "regimes": regimes,
             }
@@ -1526,7 +2879,14 @@ class ObserverSession:
         )
         fp_before = fingerprint_before or fingerprint_for_runtime(self.runtime)
         fp_after = fingerprint_for_runtime(self.runtime)
-        if fp_before == fp_after:
+        # World fingerprint covers ecology/climate/resources, not cognition mechanisms.
+        # Explicit mechanism toggles (e.g. PSC) must still enter configuration history.
+        mechanism_change = (
+            str(category) == "mechanism"
+            and isinstance(changes, dict)
+            and any(str(k).startswith("mechanism.") for k in changes)
+        )
+        if fp_before == fp_after and not mechanism_change:
             # No effective configuration change — do not fabricate a regime boundary.
             return None
         if self._world_intervention_fp0 is None:
@@ -1644,6 +3004,42 @@ class ObserverSession:
                                 self.runtime.world.ensure_terrain(te)
                     except Exception:
                         pass
+                    # Ecology presets may overwrite climate/resources/terrain.
+                    # Re-stamp resolved mechanism authority so CONFIG/RUNTIME stay aligned
+                    # (same rule as APPLY & RESET: resolved climate wins over ecology stamp).
+                    if self._resolved_mechanism_config is not None:
+                        from mechanistic_mind.physical_system.mechanism_configuration import (
+                            apply_resolved_to_runtime,
+                            build_runtime_manifest,
+                            run_preflight,
+                        )
+                        apply_resolved_to_runtime(self.runtime, self._resolved_mechanism_config)
+                        preflight = run_preflight(self.runtime, self._resolved_mechanism_config)
+                        self._preflight_result = preflight.to_dict()
+                        if preflight.status == "READY":
+                            self._runtime_mechanism_manifest = build_runtime_manifest(
+                                runtime=self.runtime,
+                                resolved=self._resolved_mechanism_config,
+                                preflight=preflight,
+                                run_id=self._active_run_id,
+                                generation=self._runtime_generation,
+                            )
+                        # Record climate after re-stamp if ecology had flipped it.
+                        planet = getattr(self.runtime.config, "planet", None)
+                        ce = getattr(planet, "climate_ecology", None) if planet else None
+                        if ce is not None:
+                            clim_on = bool(getattr(ce, "enabled", False))
+                            want = bool(
+                                self._resolved_mechanism_config.mechanisms.get(
+                                    "spatiotemporal_climate_ecology", False
+                                )
+                            )
+                            if clim_on != want:
+                                changes["climate_ecology.enabled_after_resolve"] = {
+                                    "old": clim_on,
+                                    "new": want,
+                                    "note": "resolved mechanism authority reapplied after ecology",
+                                }
 
             # Mechanism map in payload (same shape as Apply mechanisms dict).
             mechs = payload.get("mechanisms") or {}
@@ -1715,7 +3111,9 @@ class ObserverSession:
                 frame = self._capture_locked(detail="full")
                 if hasattr(frame, "get"):
                     frame = dict(frame)
-                    frame["world_interventions"] = list(self._world_interventions)
+                    frame["world_interventions"] = tail_list(
+                        self._world_interventions, LIVE_WORLD_INTERVENTION_EMBED
+                    )
                     frame["live_intervention"] = ev
 
         out = self._with_receipt(
@@ -1736,7 +3134,11 @@ class ObserverSession:
             reason=None if ev is not None else "no effective configuration change",
         )
         out["world_intervention"] = ev
-        out["world_interventions"] = list(self._world_interventions)
+        out["world_interventions"] = tail_list(
+            self._world_interventions, LIVE_WORLD_INTERVENTION_EMBED
+        )
+        out["preflight"] = getattr(self, "_preflight_result", None)
+        out["mechanism_integrity"] = self.mechanism_integrity_status()
         self._maybe_push(out, force=True)
         return out
 
@@ -1897,6 +3299,503 @@ class ObserverSession:
         self._maybe_push(out, force=True)
         return out
 
+    
+
+    def observer_interest_snapshot(self) -> dict[str, Any]:
+        return self._observer_interest.snapshot()
+
+    def set_observer_detail_preset(self, preset: str) -> dict[str, Any]:
+        """MINIMAL|NORMAL|FULL — Observer display only; does not touch cognition/science."""
+        snap = self._observer_interest.set_preset(preset)
+        # Force a fresh capture so UI sees deferred stubs immediately (no runtime reset).
+        try:
+            detail = "compact" if self.status == "RUNNING" else (
+                "full" if self._observer_interest.preset == "FULL" else "compact"
+            )
+            with self._step_lock:
+                with self._lock:
+                    frame = self._capture_locked(detail=detail)
+            self._maybe_push(frame, force=True)
+        except Exception:
+            pass
+        return {"interest": snap, "runtime_tick": int(getattr(self.runtime, "tick", 0) or 0),
+                "runtime_generation": int(self._runtime_generation), "status": self.status}
+
+    def set_observer_products(self, products: list[str] | tuple[str, ...] | None) -> dict[str, Any]:
+        snap = self._observer_interest.set_products(products or [])
+        return {"interest": snap, "runtime_tick": int(getattr(self.runtime, "tick", 0) or 0),
+                "runtime_generation": int(self._runtime_generation)}
+
+    def update_observer_product(self, product: str, enabled: bool) -> dict[str, Any]:
+        if enabled:
+            snap = self._observer_interest.add(product)
+        else:
+            snap = self._observer_interest.remove(product)
+        return {"interest": snap}
+
+    def sensorimotor_consequence_panel(self) -> dict:
+        if not self._observer_interest.wants(PRODUCT_SMC):
+            return {"schema": "mm.observer.sensorimotor_consequence.v1", "agents": [], **stub_deferred(PRODUCT_SMC)}
+        """Compact CURRENT MM — SENSORIMOTOR CONSEQUENCES (Observer UI)."""
+        from mechanistic_mind.physical_system import sensorimotor_consequence as smc
+        out = {"schema": "mm.observer.sensorimotor_consequence.v1", "agents": []}
+        rt = getattr(self, "runtime", None)
+        if rt is None:
+            return out
+        slots = getattr(rt, "slots", None) or []
+        for i, slot in enumerate(slots):
+            cog = getattr(slot, "cognition", None)
+            if not isinstance(cog, dict):
+                # PhysicalSystemRuntime single-agent
+                continue
+            store = cog.get("sensorimotor_consequence") or {}
+            last = cog.get("last_selection") or {}
+            diag = smc.diagnostic(store) if store else {"enabled": False}
+            preds = last.get("sensorimotor_candidate_predictions") or []
+            # Neutral presentation: motor signature → support + predicted delta
+            top = []
+            for p in preds[:8]:
+                top.append({
+                    "motor": p.get("candidate_locomotion") or p.get("motor_signature"),
+                    "status": p.get("status"),
+                    "support": p.get("support"),
+                    "predicted_sensory_delta": p.get("predicted_delta"),
+                })
+            out["agents"].append({
+                "slot": i,
+                "agent_id": getattr(slot, "agent_id", None) or f"agent_{i}",
+                "diagnostic": diag,
+                "candidate_predictions": top,
+                "withheld_from_psc": bool(last.get("sensorimotor_withheld_from_psc")),
+                "selected_action": last.get("action"),
+            })
+        # TwoAgentRuntime uses slots; also try agents list
+        if not out["agents"] and hasattr(rt, "agents"):
+            for i, ag in enumerate(getattr(rt, "agents") or []):
+                cog = getattr(ag, "cognition", None) or (ag.get("cognition") if isinstance(ag, dict) else None)
+                if not isinstance(cog, dict):
+                    continue
+                store = cog.get("sensorimotor_consequence") or {}
+                last = cog.get("last_selection") or {}
+                diag = smc.diagnostic(store) if store else {"enabled": False}
+                preds = last.get("sensorimotor_candidate_predictions") or []
+                top = [{
+                    "motor": p.get("candidate_locomotion") or p.get("motor_signature"),
+                    "status": p.get("status"),
+                    "support": p.get("support"),
+                    "predicted_sensory_delta": p.get("predicted_delta"),
+                } for p in preds[:8]]
+                out["agents"].append({
+                    "slot": i,
+                    "diagnostic": diag,
+                    "candidate_predictions": top,
+                    "withheld_from_psc": bool(last.get("sensorimotor_withheld_from_psc")),
+                    "selected_action": last.get("action"),
+                })
+        return out
+
+
+
+    def signal_sensorimotor_panel(self, *, include_shadow: bool = False) -> dict:
+        """Demand-driven SIGNAL → PREDICTION → PSC panel (Observer display only).
+
+        Analysis-only PSC shadow replay is NOT run unless ``include_shadow`` is True.
+        Default polls must stay cheap while RUNNING.
+        """
+        if not self._observer_interest.wants(PRODUCT_SIGNAL_SENSORIMOTOR):
+            return {**stub_deferred(PRODUCT_SIGNAL_SENSORIMOTOR), "schema": "mm.observer.signal_sensorimotor.v1"}
+        self._observer_interest.record_producer(PRODUCT_SIGNAL_SENSORIMOTOR)
+        # Selected agent cognition + observation — no store scans / no history recompute.
+        out = {
+            "schema": "mm.observer.signal_sensorimotor.v1",
+            "observer_only": True,
+            "note": "osc L/R bands are agent-accessible but NOT in SMC; FIELD_A/B are.",
+        }
+        rt = getattr(self, "runtime", None)
+        if rt is None:
+            out["error"] = "no_runtime"
+            return out
+        slot = rt
+        slots = getattr(rt, "slots", None)
+        if slots:
+            idx = int(getattr(rt, "selected_index", 0) or 0)
+            idx = max(0, min(idx, len(slots) - 1))
+            slot = slots[idx]
+            out["agent_id"] = getattr(slot, "agent_id", None) or f"agent_{idx}"
+        else:
+            out["agent_id"] = "agent_0"
+        try:
+            obs = slot.agent_observation() if hasattr(slot, "agent_observation") else {}
+        except TypeError:
+            obs = slot.agent_observation(foreign_bodies=None) if hasattr(slot, "agent_observation") else {}
+        except Exception:
+            obs = {}
+        if not isinstance(obs, dict):
+            obs = {}
+        field = {k: float(obs.get(k) or 0.0) for k in ("local.FIELD_A", "local.FIELD_B")}
+        L = [float(obs.get(f"osc_l_{i}") or 0.0) for i in range(6)]
+        R = [float(obs.get(f"osc_r_{i}") or 0.0) for i in range(6)]
+        tot_l, tot_r = sum(L), sum(R)
+        out["signal_input"] = {
+            "FIELD_A": field["local.FIELD_A"],
+            "FIELD_B": field["local.FIELD_B"],
+            "L_bands": L,
+            "R_bands": R,
+            "derived_display_only": {
+                "TOTAL_L": tot_l,
+                "TOTAL_R": tot_r,
+                "R_minus_L": tot_r - tot_l,
+                "ASYMMETRY": (tot_r - tot_l) / (tot_r + tot_l + 1e-9),
+                "label": "DERIVED DISPLAY ONLY — NOT AN AGENT VARIABLE",
+            },
+        }
+        # Bounded recent FIELD strip from session telemetry if present
+        telem = list(getattr(self, "_telemetry", []) or [])[-64:]
+        strip = []
+        for row in telem:
+            if not isinstance(row, dict):
+                continue
+            strip.append({
+                "tick": row.get("tick"),
+                "FIELD_A": row.get("FIELD_A") or row.get("field_a"),
+                "FIELD_B": row.get("FIELD_B") or row.get("field_b"),
+            })
+        out["recent_accessible_signal"] = {
+            "points": strip,
+            "capacity": 64,
+            "label": "RECENT AGENT-ACCESSIBLE SIGNAL (bounded UI history)",
+        }
+        cog = getattr(slot, "cognition", None) if not isinstance(slot, dict) else None
+        if not isinstance(cog, dict):
+            cog = getattr(rt, "cognition", {}) if hasattr(rt, "cognition") else {}
+        sel = (cog or {}).get("last_selection") or {}
+        smc_preds = sel.get("sensorimotor_candidate_predictions") or []
+        signal_cands = []
+        for p in smc_preds[:12]:
+            if not isinstance(p, dict):
+                continue
+            d = p.get("predicted_delta") if isinstance(p.get("predicted_delta"), dict) else {}
+            sd = {k: d[k] for k in ("local.FIELD_A", "local.FIELD_B") if k in d}
+            osc_d = {k: d[k] for k in d if str(k).startswith("osc_")}
+            L = [float(osc_d.get(f"osc_l_{i}", 0.0)) for i in range(6)] if osc_d else None
+            R = [float(osc_d.get(f"osc_r_{i}", 0.0)) for i in range(6)] if osc_d else None
+            # Predicted L'/R' ≈ current + delta (display only for UI)
+            cur_L = [float(obs.get(f"osc_l_{i}") or 0.0) for i in range(6)]
+            cur_R = [float(obs.get(f"osc_r_{i}") or 0.0) for i in range(6)]
+            Lp = [cur_L[i] + (L[i] if L else 0.0) for i in range(6)] if osc_d else None
+            Rp = [cur_R[i] + (R[i] if R else 0.0) for i in range(6)] if osc_d else None
+            tot_l = sum(cur_L); tot_r = sum(cur_R)
+            asym0 = (tot_r - tot_l) / (tot_r + tot_l + 1e-9)
+            if Lp is not None and Rp is not None:
+                tl, tr = sum(Lp), sum(Rp)
+                asym1 = (tr - tl) / (tr + tl + 1e-9)
+                dasym = asym1 - asym0
+            else:
+                dasym = None
+            signal_cands.append({
+                "motor": p.get("motor") or p.get("motor_signature"),
+                "status": p.get("status"),
+                "support": p.get("support"),
+                "signal_predicted_delta": sd or None,
+                "osc_predicted_delta": osc_d or None,
+                "L_prime": Lp,
+                "R_prime": Rp,
+                "delta_asymmetry_derived": dasym,
+            })
+        hss = sel.get("o_prime_history_bridge") or {}
+        hss_cands = sel.get("o_prime_history_candidates") or []
+        cfg = (cog or {}).get("config") or {}
+        psc_on = str(sel.get("prospective_selection_mode") or cfg.get("prospective_selection") or "").upper() == "SCENARIO_COMPETITION"
+        # also check config cognition object
+        if hasattr(slot, "config") and getattr(slot.config, "cognition", None) is not None:
+            cc = slot.config.cognition
+            if str(getattr(cc, "prospective_selection", "")).upper() == "SCENARIO_COMPETITION":
+                psc_on = True
+        # Bilateral SMC status (no directional semantics)
+        cog_cfg = (cog or {}).get("config") if isinstance(cog, dict) else {}
+        bil_on = True
+        if isinstance(cog_cfg, dict):
+            bil_on = bool(cog_cfg.get("sensorimotor_consequence_bilateral", True))
+        elif hasattr(slot, "config") and getattr(getattr(slot, "config", None), "cognition", None) is not None:
+            bil_on = bool(getattr(slot.config.cognition, "sensorimotor_consequence_bilateral", True))
+        smc_store = (cog or {}).get("sensorimotor_consequence") if isinstance(cog, dict) else None
+        if isinstance(smc_store, dict) and "bilateral" in smc_store:
+            bil_on = bool(smc_store.get("bilateral"))
+        has_osc_pred = any(isinstance(c, dict) and c.get("osc_predicted_delta") for c in signal_cands)
+        if not bil_on:
+            bil_status = "WITHHELD"
+        elif has_osc_pred:
+            bil_status = "ACTIVE"
+        elif bool((cog or {}).get("sensorimotor_consequence", {}).get("enabled") if isinstance(cog, dict) else False) or any(True for _ in []):
+            bil_status = "LEARNING"
+        else:
+            bil_status = "NOT AVAILABLE"
+        # Prefer LEARNING when SMC enabled but no osc preds yet
+        smc_en = False
+        if isinstance(smc_store, dict):
+            smc_en = bool(smc_store.get("enabled"))
+        if bil_on and smc_en and not has_osc_pred:
+            bil_status = "LEARNING"
+        elif bil_on and has_osc_pred:
+            bil_status = "ACTIVE"
+        out["bilateral_smc"] = {
+            "status": bil_status,
+            "enabled": bil_on,
+            "predictions_available": has_osc_pred,
+        }
+        out["psc"] = {
+            "enabled": bool(psc_on),
+            "selected_action": sel.get("action"),
+            "selection_source": sel.get("source"),
+            "signal_candidates": signal_cands,
+            "hss_meta": {
+                "enabled": hss.get("enabled"),
+                "withheld_from_psc": hss.get("withheld_from_psc"),
+                "history_support_differentiated": hss.get("history_support_differentiated"),
+                "selection_differs_from_withheld_cf": hss.get("selection_differs_from_withheld_cf"),
+            } if isinstance(hss, dict) else None,
+            "hss_candidates": hss_cands[:12] if isinstance(hss_cands, list) else [],
+            "status_line": (
+                "PSC OFF — accumulating sensorimotor history" if not psc_on
+                else (
+                    "SIGNAL FUTURES DIFFERENTIATED" if len({
+                        tuple(sorted((c.get("signal_predicted_delta") or {}).items()))
+                        for c in signal_cands if c.get("signal_predicted_delta")
+                    }) >= 2
+                    else ("SIGNAL PREDICTIONS AVAILABLE" if signal_cands else "SIGNAL PRESENT")
+                )
+            ),
+        }
+        # Vision badge: Observer context only if available from last perception bundle
+        out["no_foreign_body_vision_badge"] = None
+        try:
+            # Prefer optical provenance on published frame if present
+            frame = getattr(self, "_published", None) or {}
+            # conservative: unknown
+            out["vision_context"] = {"foreign_body_visual_exposure": None, "label": "OBSERVER CONTEXT"}
+        except Exception:
+            pass
+        # Embodied predictive coverage (Observer diagnostic)
+        from mechanistic_mind.physical_system import sensorimotor_consequence as _smc
+        smc_store = (cog or {}).get("sensorimotor_consequence") if isinstance(cog, dict) else None
+        ch_list = list((smc_store or {}).get("channel_list") or _smc.SENSORY_CHANNELS)
+        fam_cov = {}
+        for fam, keys in _smc.FAMILY_CHANNELS.items():
+            n = len(keys)
+            hit = sum(1 for k in keys if k in ch_list)
+            fam_cov[fam] = {"modeled": hit, "total": n}
+        last_motor = (cog or {}).get("last_motor_output") if isinstance(cog, dict) else None
+        sig = None
+        if isinstance(last_motor, dict):
+            sig = _smc.motor_signature_from_composite(last_motor)
+        out["embodied_prediction"] = {
+            "sensory_coverage": fam_cov,
+            "allowlist_n": len(ch_list),
+            "motor": last_motor,
+            "smc_action_signature": sig,
+            "psc_query_aliasing": True,
+            "aliasing_note": "PSC query_candidates conditions on locomotion only; learning uses full composite signature",
+            "warning": "SMC ACTION ALIASING at PSC query path" if True else None,
+        }
+        out["tick"] = int(getattr(rt, "tick", 0) or 0)
+        
+        # --- PRODUCTION motor resolution (live mode; not shadow) ---
+        try:
+            from mechanistic_mind.physical_system import observed_composite_psc as _ocpsc
+            cog_d = cog if isinstance(cog, dict) else {}
+            ls = cog_d.get("last_selection") or {}
+            mode = _ocpsc.normalize_mode(
+                ls.get("psc_motor_resolution")
+                or (cog_d.get("config") or {}).get("psc_motor_resolution")
+                or getattr(getattr(getattr(rt, "config", None), "cognition", None), "psc_motor_resolution", None)
+            )
+            oc_meta = ls.get("observed_composite_selection") if isinstance(ls.get("observed_composite_selection"), dict) else {}
+            mo = cog_d.get("last_motor_output") if isinstance(cog_d.get("last_motor_output"), dict) else {}
+            out["psc_motor_resolution"] = mode
+            out["motor_resolution_production"] = {
+                "mode": mode,
+                "experimental": mode == _ocpsc.MODE_OBSERVED,
+                "label": "EXPERIMENTAL" if mode == _ocpsc.MODE_OBSERVED else "DEFAULT",
+                "candidate_count": oc_meta.get("n_candidates"),
+                "exact_composite_matches": oc_meta.get("exact_composite_matches"),
+                "selected_composite": oc_meta.get("selected_signature") or (
+                    mo.get("display") if mo.get("selection_source") == "OBSERVED_COMPOSITE_PSC" else None
+                ),
+                "selection_source": mo.get("selection_source"),
+                "match_provenance": oc_meta.get("status"),
+                "analysis_separates_shadow": True,
+            }
+        except Exception as _e:
+            out["motor_resolution_production"] = {"error": str(_e), "mode": "LOCO_FACTORIZED"}
+
+        # --- MOTOR RESOLUTION shadow (analysis only; does not affect agent) ---
+        try:
+            from mechanistic_mind.physical_system.full_composite_psc_shadow import replay_tick as _fc_replay
+            from mechanistic_mind.physical_system import sensorimotor_consequence as _smc
+            cog_d = cog if isinstance(cog, dict) else {}
+            store = cog_d.get("sensorimotor_consequence") or {}
+            prosp = cog_d.get("prospection") or {}
+            motor = cog_d.get("last_motor_output")
+            ls = cog_d.get("last_selection") or {}
+            locos = list(ls.get("select_actions") or ["WAIT", "MOVE:N", "MOVE:S", "MOVE:E", "MOVE:W"])
+            obs_f = {k: float(v) for k, v in (obs or {}).items() if isinstance(v, (int, float))}
+            detail = str(getattr(getattr(self, "_observer_interest", None), "preset", None) or "NORMAL").upper()
+            if detail == "MINIMAL" or not include_shadow:
+                out["motor_resolution_shadow"] = {
+                    "schema": "mm.observer.full_composite_psc_shadow.v1",
+                    "status": "DEFERRED",
+                    "reason": "MINIMAL" if detail == "MINIMAL" else "not_requested",
+                    "analysis_only": True,
+                    "does_not_affect_agent": True,
+                    "label": "ANALYSIS ONLY — DOES NOT AFFECT AGENT",
+                }
+            else:
+                prod_loco = (motor or {}).get("locomotion") if isinstance(motor, dict) else ls.get("action")
+                seed = int(getattr(rt, "seed", 0) or 0)
+                tick = int(getattr(rt, "tick", 0) or 0)
+                self._psc_shadow_replay_count = int(self._psc_shadow_replay_count) + 1
+                rep = _fc_replay(
+                    observation=obs_f,
+                    smc_store=store if isinstance(store, dict) else {},
+                    prospection=prosp if isinstance(prosp, dict) else {},
+                    compression=cog_d.get("compression"),
+                    loco_candidates=locos,
+                    seed=seed,
+                    tick=tick,
+                    production_selected_loco=prod_loco,
+                    production_realized_motor=motor if isinstance(motor, dict) else None,
+                    run_adaptive=True,
+                    divergence_refine_threshold=0.02,
+                )
+                fc = rep.get("full_composite") or {}
+                ad = rep.get("adaptive") or {}
+                cls = rep.get("classification")
+                banner = None
+                if cls == "DIFFERENT_LOCOMOTION":
+                    banner = "SHADOW LOCOMOTION DIFFERENCE"
+                elif cls == "SAME_LOCOMOTION_DIFFERENT_COMPOSITE":
+                    banner = "SHADOW COMPOSITE DIFFERENCE"
+                compact = {
+                    "schema": "mm.observer.full_composite_psc_shadow.v1",
+                    "analysis_only": True,
+                    "does_not_affect_agent": True,
+                    "label": "ANALYSIS ONLY — DOES NOT AFFECT AGENT",
+                    "banner": banner,
+                    "classification": cls,
+                    "production": {
+                        "mode": "LOCO_ONLY",
+                        "selected_loco": prod_loco,
+                        "realized_composite": (rep.get("production") or {}).get("realized_composite_sig"),
+                    },
+                    "full_composite_shadow": {
+                        "candidate_count": fc.get("n_actions"),
+                        "winning_composite": fc.get("selected_sig"),
+                        "winning_loco": fc.get("selected_loco"),
+                    },
+                    "adaptive_shadow": {
+                        "refined": bool(ad.get("refined_locos")),
+                        "candidate_count": ad.get("n_candidates"),
+                        "winning_composite": ad.get("selected_sig"),
+                    },
+                }
+                if detail == "FULL":
+                    compact["full_details"] = {
+                        "earliest_divergence": rep.get("earliest_divergence"),
+                        "motor_dimension_attribution": rep.get("motor_dimension_attribution"),
+                        "sensory_family_attribution": rep.get("sensory_family_attribution"),
+                        "compete_outcome": fc.get("compete_outcome"),
+                        "mutation_ok": (rep.get("mutation_audit") or {}).get("smc_counters_unchanged"),
+                    }
+                out["motor_resolution_shadow"] = compact
+        except Exception as _e:
+            out["motor_resolution_shadow"] = {
+                "schema": "mm.observer.full_composite_psc_shadow.v1",
+                "error": str(_e),
+                "analysis_only": True,
+                "does_not_affect_agent": True,
+                "label": "ANALYSIS ONLY — DOES NOT AFFECT AGENT",
+            }
+
+        return out
+
+    def historical_sensorimotor_selection_panel(self) -> dict:
+        """Lightweight READY/ACTIVE status for O′→history→PSC bridge (no store scans)."""
+        if not self._observer_interest.wants(PRODUCT_HISTORICAL_SENSORIMOTOR):
+            return {**stub_deferred(PRODUCT_HISTORICAL_SENSORIMOTOR),
+                    "schema": "mm.observer.historical_sensorimotor_selection.v1",
+                    "agents": [], "ui_state": "OFF", "bridge_enabled": False, "psc_enabled": False}
+        out = {
+            "schema": "mm.observer.historical_sensorimotor_selection.v1",
+            "agents": [],
+            "bridge_enabled": False,
+            "psc_enabled": False,
+            "ui_state": "OFF",
+            "experience_ticks": None,
+            "psc_enabled_after_ticks": getattr(self, "_psc_enabled_after_ticks", None),
+        }
+        try:
+            tick = int(getattr(getattr(self, "runtime", None), "tick", None)
+                       or getattr(getattr(getattr(self, "runtime", None), "world", None), "tick", 0)
+                       or 0)
+        except Exception:
+            tick = 0
+        out["experience_ticks"] = tick
+        agents = []
+        # TwoAgent or single
+        slots = []
+        rt = getattr(self, "runtime", None)
+        if rt is None:
+            return out
+        if hasattr(rt, "slots"):
+            slots = list(rt.slots or [])
+        elif hasattr(rt, "cognition"):
+            slots = [rt]
+        bridge_any = False
+        psc_any = False
+        for i, slot in enumerate(slots):
+            cog = getattr(slot, "cognition", None)
+            if not isinstance(cog, dict):
+                continue
+            cfg = cog.get("config") or {}
+            if hasattr(slot, "config") and getattr(slot.config, "cognition", None) is not None:
+                cc = slot.config.cognition
+                bridge_on = bool(getattr(cc, "historical_sensorimotor_selection_bridge", False))
+                psc_on = str(getattr(cc, "prospective_selection", "")).upper() == "SCENARIO_COMPETITION"
+            else:
+                bridge_on = bool(cfg.get("historical_sensorimotor_selection_bridge"))
+                psc_on = str(cfg.get("prospective_selection") or "").upper() == "SCENARIO_COMPETITION"
+            bridge_any = bridge_any or bridge_on
+            psc_any = psc_any or psc_on
+            last = cog.get("last_selection") or {}
+            meta = last.get("o_prime_history_bridge") or {}
+            agents.append({
+                "slot": i,
+                "agent_id": getattr(slot, "agent_id", None) or getattr(slot, "seed", i),
+                "bridge_enabled": bridge_on,
+                "psc_enabled": psc_on,
+                "ui_state": (
+                    "OFF" if not bridge_on else ("ACTIVE" if psc_on else "READY")
+                ),
+                "last_bridge_meta": {
+                    "enabled": meta.get("enabled"),
+                    "withheld_from_psc": meta.get("withheld_from_psc"),
+                    "n_history_match": meta.get("n_history_match"),
+                    "history_support_differentiated": meta.get("history_support_differentiated"),
+                    "selection_differs_from_withheld_cf": meta.get("selection_differs_from_withheld_cf"),
+                } if isinstance(meta, dict) else None,
+            })
+        out["agents"] = agents
+        out["bridge_enabled"] = bridge_any
+        out["psc_enabled"] = psc_any
+        if not bridge_any:
+            out["ui_state"] = "OFF"
+        elif not psc_any:
+            out["ui_state"] = "READY"
+        else:
+            out["ui_state"] = "ACTIVE"
+        return out
+
+
     def diagnostics(self) -> dict[str, Any]:
         published = self._published
         if published is not None:
@@ -1926,12 +3825,30 @@ class ObserverSession:
         frame_tick = int(hdr.get("frame_tick") or hdr.get("tick") or sim_tick)
         hdr["live_runtime_tick"] = sim_tick
         hdr["sim_tick"] = sim_tick
+        hdr["tick"] = sim_tick if str(self.config.execution_mode or "LIVE").upper() == "HEADLESS" else hdr.get("tick", frame_tick)
         hdr["observer_lag_ticks"] = max(0, sim_tick - frame_tick)
+        hdr["execution_mode"] = str(self.config.execution_mode or "LIVE")
+        hdr["evidence_mode"] = str(getattr(self.config, "evidence_mode", None) or "FULL_SCIENTIFIC")
+        if hdr["evidence_mode"] == "SEARCH_COMPACT":
+            hdr["evidence_label"] = "COMPACT EVIDENCE"
+        hdr["observer_hz"] = float(self.config.ui_hz)
+        hdr["target_tick"] = self.config.target_tick
+        hdr["max_ticks"] = self.config.target_tick
+        exec_mode = str(self.config.execution_mode or "LIVE").upper()
+        hdr["display_frozen"] = bool(exec_mode == "HEADLESS" and self.status == "RUNNING")
+        hdr["display_tick"] = frame_tick
         if self.status == "RUNNING":
             hdr["sim_ticks_per_sec"] = round(float(self._perf_sim_tps), 1)
             hdr["observer_fps"] = round(float(self._perf_obs_fps), 1)
         else:
             hdr["sim_ticks_per_sec"] = 0.0
+        # ETA is operational UI only — never written into cognition/scientific state.
+        target = self.config.target_tick
+        if target is not None and self.status == "RUNNING" and self._perf_sim_tps > 0:
+            remain = max(0, int(target) - sim_tick)
+            hdr["eta_wall_seconds"] = round(remain / float(self._perf_sim_tps), 1)
+        else:
+            hdr["eta_wall_seconds"] = None
         return {**frame, "header": hdr}
 
     def published_json(self) -> str | None:
@@ -1939,17 +3856,16 @@ class ObserverSession:
         return self._published_json
 
     def _clone_published(self, status: str | None = None) -> dict[str, Any]:
-        """Deep copy for control receipts that mutate the returned dict."""
-        frame = self._published
-        if frame is None:
-            with self._step_lock:
-                with self._lock:
-                    if self._published is None:
-                        self._capture_locked(detail="full")
-                    frame = self._published
-        out = deepcopy(frame)
+        """Shallow wrap of the published Observer frame for control receipts.
+
+        Nested payload is treated as immutable. Control receipts must not deepcopy
+        the world/agent graphs — scientific Decision/Motor receipts are unchanged.
+        """
+        out = self.current_frame()
         if status:
-            out.setdefault("header", {})["status"] = status
+            hdr = dict(out.get("header") or {})
+            hdr["status"] = status
+            out = {**out, "header": hdr}
         return out
 
     def _loop(self) -> None:
@@ -1984,10 +3900,12 @@ class ObserverSession:
                     self._update_perf_locked(tick=True)
                 now = time.monotonic()
                 capture_period = observer_capture_period(speed, ui_hz)
-                if now - last_capture >= capture_period:
+                headless = str(self.config.execution_mode or "LIVE").upper() == "HEADLESS"
+                if (not headless) and now - last_capture >= capture_period:
                     request_capture = True
                     last_capture = now
             # Observer capture is asynchronous — SIM must not wait for live_frame.
+            # HEADLESS skips presentation capture entirely (scientific ticks unchanged).
             if request_capture:
                 self._request_observer_capture(detail=self._frame_detail_for_speed())
             sleep_s = tick_sleep_seconds(speed)
@@ -2288,29 +4206,67 @@ class ObserverSession:
         run_id: str | None = None,
     ) -> dict[str, Any]:
         from mechanistic_mind.physical_system.two_agent import TwoAgentRuntime
-        from mechanistic_mind.ui.psy_observer_web.experimenter_control import spawn_experimenter_body
+        from mechanistic_mind.physical_system.runtime import PhysicalSystemRuntime
+        from mechanistic_mind.ui.psy_observer_web.experimenter_control import (
+            promote_physical_to_two_agent_host,
+            spawn_experimenter_body,
+        )
 
         before = self._control_state()
         if run_id is not None and self._active_run_id and str(run_id) != str(self._active_run_id):
-            return {"accepted": False, "error": "stale run_id"}
+            return {"accepted": False, "error": "SPAWN_REJECTED:STALE_RUN_ID"}
         with self._step_lock:
             with self._lock:
                 ctrl = self._ensure_experimenter_locked()
-                if not isinstance(self.runtime, TwoAgentRuntime):
+                if self.runtime is None:
                     return {
                         "accepted": False,
-                        "error": "TwoAgentRuntime required — apply experiment with agent_count>=2",
+                        "error": "SPAWN_REJECTED:RUNTIME_UNAVAILABLE",
                     }
-                if near_agent is not None and 0 <= int(near_agent) < len(self.runtime.slots):
-                    b = self.runtime.slots[int(near_agent)].body
+                # Single-agent worlds use PhysicalSystemRuntime; experimenter spawn
+                # appends onto TwoAgentRuntime.slots. Promote host without replacing
+                # the autonomous agent object (preserves cognition/body state).
+                if not isinstance(self.runtime, TwoAgentRuntime):
+                    if not isinstance(self.runtime, PhysicalSystemRuntime):
+                        return {
+                            "accepted": False,
+                            "error": "SPAWN_REJECTED:RUNTIME_UNAVAILABLE",
+                            "detail": type(self.runtime).__name__,
+                        }
+                    self.runtime = promote_physical_to_two_agent_host(self.runtime)
+                n_slots = len(self.runtime.slots)
+                if near_agent is not None:
+                    ni = int(near_agent)
+                    if not (0 <= ni < n_slots) or (
+                        self.runtime.experimenter_slot is not None
+                        and ni == int(self.runtime.experimenter_slot)
+                    ):
+                        return {
+                            "accepted": False,
+                            "error": "SPAWN_REJECTED:NO_VALID_TARGET",
+                            "detail": f"near_agent={ni} slots={n_slots}",
+                        }
+                    b = self.runtime.slots[ni].body
                     x = float(b.x) + 2.0
                     y = float(b.y)
                 if x is None or y is None:
+                    if n_slots < 1:
+                        return {
+                            "accepted": False,
+                            "error": "SPAWN_REJECTED:NO_VALID_TARGET",
+                        }
                     x = float(self.runtime.slots[0].body.x) + 3.0
                     y = float(self.runtime.slots[0].body.y)
-                out = spawn_experimenter_body(
-                    self.runtime, x=float(x), y=float(y), theta=float(theta), controller=ctrl,
-                )
+                try:
+                    out = spawn_experimenter_body(
+                        self.runtime, x=float(x), y=float(y), theta=float(theta), controller=ctrl,
+                    )
+                except Exception as exc:  # noqa: BLE001 — surface to Interaction Lab
+                    return {
+                        "accepted": False,
+                        "error": "SPAWN_REJECTED:RUNTIME_UNAVAILABLE",
+                        "detail": str(exc),
+                    }
                 if out.get("accepted"):
                     self._experimenter_intervention_ever = True
                     ctrl.begin_recording(self.runtime)
@@ -3485,34 +5441,6 @@ class ObserverSession:
                 )
             self._geo_prev_bodies[aid] = cur
 
-    def _record_motion_locked(self) -> None:
-        self._trajectory.append({
-            "tick": int(self.runtime.tick),
-            "x": float(self.runtime.body.x),
-            "y": float(self.runtime.body.y),
-        })
-        # GEO-02: also record all-agent trajectory markers on selected body path only —
-        # multi-agent paths come from geometry events overlay.
-        self._observe_geometry_tick_locked()
-        self._observe_action_realization_locked()
-        self._observe_work_ecology_locked()
-        self._observe_locomotor_economy_locked()
-        work = getattr(self.runtime, "last_work_allocation", None) or {}
-        self._telemetry.append({
-            "tick": int(self.runtime.tick),
-            "work_reservoir": float(getattr(self.runtime.body, "mechanical_work_reservoir", 0.0) or 0.0),
-            "resource_A": float(getattr(self.runtime.body, "R_A_site", []).sum()) if getattr(self.runtime.body, "R_A_site", None) is not None else 0.0,
-            "resource_B": float(getattr(self.runtime.body, "R_B_site", []).sum()) if getattr(self.runtime.body, "R_B_site", None) is not None else 0.0,
-            "speed": float((self.runtime.body.vx ** 2 + self.runtime.body.vy ** 2) ** 0.5),
-            "omega": float(getattr(self.runtime.body, "omega", 0.0)),
-            "action_requested": float(work.get("requested_action") or 0.0),
-            "action_allocated": float(work.get("allocated_action") or 0.0),
-            "motor_requested": float(work.get("requested_motor") or 0.0),
-            "motor_allocated": float(work.get("allocated_motor") or 0.0),
-            "deformation_requested": float(work.get("requested_deformation") or 0.0),
-            "deformation_allocated": float(work.get("allocated_deformation") or 0.0),
-        })
-
     def _halt_runner(self, status: str) -> None:
         with self._lock:
             self.status = status
@@ -3615,16 +5543,64 @@ class ObserverSession:
                         cfg.planet.terrain.terrain_seed = int(t_override)
                     except (TypeError, ValueError):
                         pass
+                public_preset = str(payload.get("public_preset") or payload.get("preset") or "").strip().upper()
+                beta3_recommended = public_preset in {
+                    "BETA3_RECOMMENDED",
+                    "BETA3",
+                    "MM_1_0_TIKTAALIK_PUBLIC_BETA_3",
+                    "MM 1.0 — TIKTAALIK PUBLIC BETA 3",
+                }
                 agent_count = int(payload.get("agent_count") or 1)
-                # Non-cognition experiment mechanisms (world/signal/climate, …) are not
-                # CognitionConfig fields — apply them after construction so Apply & reset
-                # honors the same toggles the EXPERIMENT UI posts.
+                if beta3_recommended:
+                    agent_count = 2
+                # Resolve mechanism configuration BEFORE construction (backend authority).
+                from mechanistic_mind.physical_system.mechanism_configuration import (
+                    resolve_mechanism_config,
+                    stamp_config_mechanisms,
+                )
+                mech_payload = {}
+                if not beta3_recommended:
+                    if isinstance(cognition, dict):
+                        mech_payload.update(cognition)
+                    if isinstance(payload.get("mechanisms"), dict):
+                        for k, v in payload["mechanisms"].items():
+                            mech_payload[k] = v
+                if "cognition_enabled" in payload:
+                    mech_payload["cognition_enabled"] = bool(payload["cognition_enabled"])
+                if "vision_radius" in payload:
+                    mech_payload["vision_radius"] = payload["vision_radius"]
+                elif isinstance(payload.get("world"), dict) and "vision_radius" in payload["world"]:
+                    mech_payload["vision_radius"] = payload["world"]["vision_radius"]
+                # Explicit map present → preserve overrides; empty → fresh defaults.
+                has_explicit = (not beta3_recommended) and any(
+                    k in mech_payload
+                    for k in (
+                        "physical_near_field_vision", "articulated_head", "physical_push",
+                        "physical_vestibular_sensing", "neck_proprioception",
+                        "experimental_physical_signal", "spatiotemporal_climate_ecology",
+                        "resource_ecology_A", "resource_ecology_B", "illumination_cycle",
+                        "terrain_geography", "ambient_physical_dynamics",
+                    )
+                )
+                resolved = resolve_mechanism_config(
+                    mech_payload if (has_explicit or mech_payload) else None,
+                    vision_radius=mech_payload.get("vision_radius"),
+                    source_hint="EXPLICIT" if has_explicit else "NEW_EXPERIMENT",
+                    apply_fresh_defaults=True,
+                )
+                stamp_config_mechanisms(cfg, resolved)
+                # Non-cognition experiment mechanisms also applied post-construct via bind.
                 non_cog = {
-                    k: v for k, v in cognition.items()
-                    if k not in allowed and k != "cognition_enabled"
+                    k: v for k, v in mech_payload.items()
+                    if k not in allowed and k not in {"cognition_enabled", "vision_radius"}
                 }
                 if agent_count >= 2:
-                    signal_on = bool(non_cog.get("experimental_physical_signal", False))
+                    signal_on = bool(
+                        resolved.mechanisms.get(
+                            "experimental_physical_signal",
+                            non_cog.get("experimental_physical_signal", False),
+                        )
+                    )
                     self.runtime = TwoAgentRuntime(
                         seed=seed, config=cfg, signal_enabled=signal_on,
                     )
@@ -3640,12 +5616,40 @@ class ObserverSession:
                         seed=seed,
                         spec=getattr(cfg, "_baseline_patch_spec", None),
                     )
-                for mid, val in non_cog.items():
-                    try:
-                        self.runtime.set_mechanism(str(mid), bool(val))
-                    except (KeyError, ValueError, TypeError):
-                        pass
                 self._runtime_generation += 1
+                self._clear_integrity_locked()
+                from mechanistic_mind.physical_system.mechanism_configuration import (
+                    apply_resolved_to_runtime,
+                    build_runtime_manifest,
+                    run_preflight,
+                )
+                apply_resolved_to_runtime(self.runtime, resolved)
+                if beta3_recommended:
+                    mode = str(payload.get("psc_motor_resolution") or "OBSERVED_COMPOSITE")
+                    setter = getattr(self.runtime, "set_psc_motor_resolution", None)
+                    if callable(setter):
+                        setter(mode)
+                preflight = run_preflight(self.runtime, resolved)
+                if preflight.status != "READY":
+                    apply_resolved_to_runtime(self.runtime, resolved)
+                    preflight = run_preflight(self.runtime, resolved)
+                self._resolved_mechanism_config = resolved
+                self._preflight_result = preflight.to_dict()
+                if preflight.status == "READY":
+                    self._runtime_mechanism_manifest = build_runtime_manifest(
+                        runtime=self.runtime,
+                        resolved=resolved,
+                        preflight=preflight,
+                        run_id=self._active_run_id,
+                        generation=self._runtime_generation,
+                    )
+                else:
+                    self._runtime_mechanism_manifest = None
+                integrity = {
+                    "resolved": resolved.to_dict(),
+                    "preflight": self._preflight_result,
+                    "manifest": self._runtime_mechanism_manifest,
+                }
                 self.config.cognition_enabled = cog.cognition_enabled
                 self.status = "PAUSED"
                 self.mode = "LIVE"
@@ -3662,8 +5666,8 @@ class ObserverSession:
                 self._reset_action_realization_locked()
                 self._reset_work_ecology_locked()
                 self._reset_locomotor_economy_locked()
-                self._trajectory = deque(maxlen=max(256, int(self.config.buffer_capacity) * 4))
-                self._telemetry = deque(maxlen=max(256, int(self.config.buffer_capacity) * 4))
+                self._trajectory = deque(maxlen=max(LIVE_TRAJECTORY_RING_MIN, int(self.config.buffer_capacity) * LIVE_TRAJECTORY_RING_MULT))
+                self._telemetry = deque(maxlen=max(LIVE_TELEMETRY_RING_MIN, int(self.config.buffer_capacity) * LIVE_TRAJECTORY_RING_MULT))
                 self._historical_compat = None
                 self._published = None
                 self._published_json = None
@@ -3691,10 +5695,14 @@ class ObserverSession:
                     self._world_intervention_fp0 = None
                 frame = self._capture_locked(detail="full")
         self._maybe_push(frame, force=True)
-        return self._with_receipt(
+        out = self._with_receipt(
             frame, "APPLY_AND_RESET_WORLD", deepcopy(payload), before,
             requires_reset=True,
         )
+        out["preflight"] = integrity.get("preflight")
+        out["mechanism_result"] = self.runtime.mechanisms()
+        out["mechanism_integrity"] = self.mechanism_integrity_status()
+        return out
 
 
 # process singleton

@@ -1,16 +1,37 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import './styles/app.css';
 import type { ObserverFrame, ViewMode } from './types';
+import { ObserverHeader } from './chrome/ObserverHeader';
+import { LifecycleBanners } from './chrome/LifecycleBanners';
+import { RunWorkspace } from './workspaces/RunWorkspace';
+import { InspectWorkspace } from './workspaces/InspectWorkspace';
+import { InspectorAccordion } from './inspectors/primitives';
+import { AnalyzeWorkspace } from './workspaces/AnalyzeWorkspace';
+import { AuxPollDriver, ClockDriver, InterestDriver } from './observer/drivers';
+import {
+  frameStore,
+  lifecycleStore,
+  inspectorUiStore,
+  noteRender,
+  slimStatusFromFrame,
+  statusStore,
+  workspaceStore,
+} from './observer/stores';
+import { applyRailDestination, railSelectedTool } from './observer/railNav';
+import { useWorkspaceStore } from './observer/useExternalStore';
 import {
   applyExperiment, applyLiveIntervention, connectLive, getSnapshot, getSnapshotMeta, getState, getTimeline,
-  getStopInfo, inspectTick, postControl, replayTick,
-  listRuns, getAnalysisEvidence, saveAnalysisReport,
+  getStopInfo, getSaveJob, inspectTick, postControl, replayTick,
+  listRuns, saveAnalysisReport,
+  startAnalysisJob, getAnalysisJob, getAnalysisJobResult,
   setGeometryAgentFilter, getGeometryCell, hydrateGeometryRun,
   geometryUseLive, geometryClearSaved,
 } from './api/client';
+import { mergeMechanismWarmState } from './lifecycleReceipt';
 import { WorldMap } from './components/WorldMap';
 import { GeometryPanel } from './components/GeometryPanel';
 import { SignalContextPanel } from './components/SignalContextPanel';
+import { ObserveV2Panel } from './components/ObserveV2Panel';
 import { InteractPanel } from './components/InteractPanel';
 import { useExperimenterKeyboard } from './useExperimenterKeyboard';
 import {
@@ -22,6 +43,18 @@ import { ActionDecisionInspector } from './components/ActionDecisionInspector';
 import { MotionCausalInspector } from './components/MotionCausalInspector';
 import { WhyDidItRotate } from './components/WhyDidItRotate';
 import { NearFieldSensorPanel } from './components/NearFieldSensorPanel';
+import {
+  VisionExperimenterControl,
+  visionRowFromIntegrity,
+} from './components/VisionExperimenterControl';
+import { VestibularProprioceptionPanel } from './components/VestibularProprioceptionPanel';
+import { OscillatorySignalingPanel } from './components/OscillatorySignalingPanel';
+import { SensorimotorConsequencePanel } from './components/SensorimotorConsequencePanel';
+import { HistoricalSensorimotorSelectionPanel } from './components/HistoricalSensorimotorSelectionPanel';
+import { SignalSensorimotorPanel } from './components/SignalSensorimotorPanel';
+import { PscMotorResolutionControl } from './components/PscMotorResolutionControl';
+import { ContextualProspectiveControlPanel } from './components/ContextualProspectiveControlPanel';
+import { MechanismPreflightPanel } from './components/MechanismPreflightPanel';
 import { WhyDidItsShapeChange } from './components/WhyDidItsShapeChange';
 import { CausalChain } from './components/CausalChain';
 import {
@@ -31,6 +64,12 @@ import {
   requestedAgentId,
   shouldAcceptLiveFrame,
 } from './observerProjection';
+import {
+  LIVE_FE_EVENTS_DISPLAY_MAX,
+  LIVE_FE_TIMELINE_DISPLAY_MAX,
+  LIVE_FE_TRAJECTORY_DISPLAY_DEFAULT,
+  projectLiveAuxState,
+} from './liveBounds';
 import { scalarGrid } from './rendererMath';
 import {
   buildRunAnalysis,
@@ -55,18 +94,32 @@ import type { ObserverRunRecord } from './analysis/types';
 import { AnalyzeResultsPanel, type AnalysisSourceMode, type RunCatalogEntry } from './components/AnalyzeResultsPanel';
 import { OverviewPanel } from './components/OverviewPanel';
 import { compressConsecutiveEvents, compressedEventSummary } from './eventCompression';
-import { ControlDevice } from './desktop/ControlDevice';
-import { FloatingWindowHost } from './desktop/FloatingWindowHost';
+import { eventCategory as sharedEventCategory } from './observe/eventCategory';
 import {
-  closeWindow, configPending, focusWindow, moveWindow, openOrFocusWindow,
-  resetWindowPosition, resizeWindow, toggleMaximize,
+  invalidateEventsOnRunOrGeneration,
+  observeBufferIdentityFromFrame,
+  type ObserveBufferIdentity,
+} from './observe/bufferIdentity';
+import { ControlDevice } from './desktop/ControlDevice';
+import {
+  configPending, openOrFocusWindow,
 } from './desktop/floatingWindows';
-import { SignalSequence, VisionBars } from './desktop/liveWidgets';
+import { MechanismAwareSignals, VisionBars } from './desktop/liveWidgets';
 import type { DeviceTool, ExperimentScreen, FloatingWindowId, FloatingWindowState } from './desktop/types';
 
 const TABS = ['WORLD', 'INTERACT', 'AGENT', 'MIND', 'TIMELINE', 'EXPERIMENT', 'DATA', 'ANALYZE RESULTS', 'OVERVIEW'] as const;
 const DESKTOP_PREFS_KEY = 'psy-observer-desktop';
-const SPEEDS = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 50];
+const _SPEEDS = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 50];
+void _SPEEDS;
+
+function tabToExperimentScreen(tab: string): ExperimentScreen {
+  if (tab === 'world') return 'set_world';
+  if (tab === 'model' || tab === 'cognition') return 'set_model';
+  if (tab === 'ecology') return 'set_ecology';
+  if (tab === 'body') return 'set_resources';
+  if (tab === 'predictive') return 'set_predictive';
+  return 'experimental';
+}
 const EVENT_FILTERS = ['ALL', 'BODY', 'WORK', 'RESOURCE', 'ACTION', 'COGNITION', 'MATERIAL', 'SIGNAL'] as const;
 const AGENT_EVENT_FILTERS = ['ALL AGENTS', 'AGENT_0', 'AGENT_1'] as const;
 const PREFS_KEY = 'psy-observer-display';
@@ -82,15 +135,7 @@ function loadPrefs(): any {
   catch { return {}; }
 }
 function eventCategory(type: string) {
-  const t = String(type || '');
-  if (t.includes('SIGNAL') || t.includes('FIELD_')) return 'SIGNAL';
-  if (t.startsWith('BODY_') || t.startsWith('SITE_')) return 'BODY';
-  if (t.includes('RESOURCE') || t.includes('COMPLEMENTARY')) return 'RESOURCE';
-  if (t.includes('MOTOR') || t.includes('ACTION') || t.includes('DISCRETE')) return 'ACTION';
-  if (t.includes('DEFORM') || t.includes('WORK')) return 'WORK';
-  if (t.includes('SCENARIO') || t.includes('PREDICTION') || t.includes('OBSERVATION')) return 'COGNITION';
-  if (t.includes('MATERIAL') || t.includes('INTERNAL') || t.includes('ENVIRONMENT')) return 'MATERIAL';
-  return 'OTHER';
+  return sharedEventCategory(type);
 }
 const num = (v: any, digits = 4) => Number.isFinite(Number(v)) ? Number(v).toFixed(digits) : '—';
 const show = (v: any, digits = 4): string => {
@@ -116,28 +161,82 @@ function Status({ value }: { value: string }) {
 }
 
 export default function App() {
+  noteRender('App');
   const prefs = loadPrefs();
   let desktopPrefs: any = {};
   try { desktopPrefs = JSON.parse(localStorage.getItem(DESKTOP_PREFS_KEY) || '{}') || {}; } catch { /* ignore */ }
-  const [tab, setTab] = useState<(typeof TABS)[number]>(
+  const [tab] = useState<(typeof TABS)[number]>(
     (TABS as readonly string[]).includes(prefs.tab) ? prefs.tab : 'WORLD',
   );
   const [deviceTool, setDeviceTool] = useState<DeviceTool>(desktopPrefs.tool || 'home');
   const [experimentScreen, setExperimentScreen] = useState<ExperimentScreen>('menu');
-  const [deviceCollapsed, setDeviceCollapsed] = useState(Boolean(desktopPrefs.collapsed));
+  const inspUi = useSyncExternalStore(inspectorUiStore.subscribe, inspectorUiStore.get, inspectorUiStore.get);
+  const [deviceCollapsed, setDeviceCollapsed] = useState(
+    desktopPrefs.collapsed === undefined ? true : Boolean(desktopPrefs.collapsed),
+  );
   const [floatWindows, setFloatWindows] = useState<FloatingWindowState[]>([]);
+  void floatWindows;
   const [simBounds, setSimBounds] = useState({ width: 800, height: 600 });
   const simWorkspaceRef = useRef<HTMLDivElement | null>(null);
   const [appliedConfig, setAppliedConfig] = useState<Record<string, string | boolean | number> | null>(null);
-  const [legacyPanels, setLegacyPanels] = useState(false);
-  const [liveFrame, setLiveFrame] = useState<ObserverFrame | null>(null);
-  const [viewFrame, setViewFrame] = useState<ObserverFrame | null>(null);
+  const liveFrameRef = useRef<ObserverFrame | null>(null);
+  const viewFrameRef = useRef<ObserverFrame | null>(null);
+  const setLiveFrame = (f: ObserverFrame | null) => {
+    liveFrameRef.current = f;
+    if (f) {
+      frameStore.setLive(f);
+      const cur = statusStore.get();
+      statusStore.replace(slimStatusFromFrame(f, {
+        connection: cur.connection === 'CONNECTING' ? 'CONNECTED' : cur.connection,
+        lastArrival: Date.now(),
+        pendingApply: cur.pendingApply,
+        heartbeat: cur.heartbeat,
+      }));
+    }
+  };
+  const setViewFrame = (f: ObserverFrame | null | ((prev: ObserverFrame | null) => ObserverFrame | null)) => {
+    const next = typeof f === 'function' ? f(viewFrameRef.current) : f;
+    viewFrameRef.current = next;
+    if (next) frameStore.setView(next);
+  };
+  const liveFrame = liveFrameRef.current;
+  const viewFrame = viewFrameRef.current;
   const [mode, setMode] = useState<ViewMode>('LIVE');
-  const [connection, setConnection] = useState('CONNECTING');
-  const [lastArrival, setLastArrival] = useState(0);
-  const [now, setNow] = useState(0);
+  const setConnection = (c: string) => statusStore.patch({ connection: c });
+  const setLastArrival = (n: number) => statusStore.patch({ lastArrival: n });
+  const setSimHeartbeat = (hb: any) => {
+    if (!hb) {
+      statusStore.patch({ lastArrival: Date.now() });
+      return;
+    }
+    const patch: Record<string, unknown> = {
+      heartbeat: hb,
+      lastArrival: Date.now(),
+    };
+    if (hb.status) patch.status = String(hb.status);
+    if (hb.tick != null) {
+      patch.tick = hb.tick;
+      patch.simTick = hb.tick;
+    }
+    if (hb.execution_mode != null) patch.executionMode = String(hb.execution_mode);
+    if (Object.prototype.hasOwnProperty.call(hb, 'display_frozen')) {
+      patch.displayFrozen = Boolean(hb.display_frozen);
+    }
+    if (hb.display_tick != null) patch.displayTick = hb.display_tick;
+    if (hb.sim_ticks_per_sec != null) patch.simTps = hb.sim_ticks_per_sec;
+    if (hb.observer_fps != null) patch.observerFps = hb.observer_fps;
+    statusStore.patch(patch as any);
+  };
+  const setLiveApplyPending = (p: any) => statusStore.patch({ pendingApply: p });
+  const connection = statusStore.get().connection;
+  const lastArrival = statusStore.get().lastArrival;
+  const simHeartbeat = statusStore.get().heartbeat;
+  const liveApplyPending = statusStore.get().pendingApply;
+  const now = 0;
+  const mechanismCatalogGenRef = useRef<number | null>(null);
   const [events, setEvents] = useState<any[]>([]);
   const [timeline, setTimeline] = useState<any[]>([]);
+  const observeBufIdRef = useRef<ObserveBufferIdentity | null>(null);
   const [mechanisms, setMechanisms] = useState<any[]>([]);
   const [gearbox, setGearbox] = useState<any>(null);
   const [packs, setPacks] = useState<any[]>([]);
@@ -156,13 +255,13 @@ export default function App() {
   const [opacity, setOpacity] = useState(Number.isFinite(prefs.opacity) ? prefs.opacity : .9);
   const [showGrid, setShowGrid] = useState(Boolean(prefs.showGrid));
   const [layers, setLayers] = useState<Record<string, boolean>>({ ...DEFAULT_LAYERS, ...(prefs.layers || {}) });
-  const [trajectoryLength, setTrajectoryLength] = useState(Number.isFinite(prefs.trajectoryLength) ? prefs.trajectoryLength : 500);
+  const [trajectoryLength, setTrajectoryLength] = useState(Number.isFinite(prefs.trajectoryLength) ? prefs.trajectoryLength : LIVE_FE_TRAJECTORY_DISPLAY_DEFAULT);
   const [seed, setSeed] = useState('17');
   const [width, setWidth] = useState('32');
   const [height, setHeight] = useState('32');
-  const [preset, setPreset] = useState('MM 1.0 — Tiktaalik');
+  const [preset, setPreset] = useState('MM 1.0 — Tiktaalik Public Beta 3');
   const [cognitionEnabled, setCognitionEnabled] = useState(true);
-  const [twoAgentExperimental, setTwoAgentExperimental] = useState(false);
+  const [twoAgentExperimental, setTwoAgentExperimental] = useState(true);
   const [ecologyPreset, setEcologyPreset] = useState<string>('BASELINE_CLIMATE_DEFAULT');
   const [terrainSeedOverride, setTerrainSeedOverride] = useState<string>('');
   const [targetTick, setTargetTick] = useState('');
@@ -205,6 +304,7 @@ export default function App() {
   const [savedRunCatalog, setSavedRunCatalog] = useState<RunCatalogEntry[]>([]);
   const [selectedSavedRunId, setSelectedSavedRunId] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState<string>('');
   useEffect(() => { modeRef.current = mode; }, [mode]);
   useEffect(() => {
     try {
@@ -220,7 +320,7 @@ export default function App() {
     ro?.observe(el);
     window.addEventListener('resize', measure);
     return () => { ro?.disconnect(); window.removeEventListener('resize', measure); };
-  }, [deviceCollapsed, liveFrame]);
+  }, [deviceCollapsed]);
 
   function openFloat(id: FloatingWindowId) {
     setFloatWindows((prev) => openOrFocusWindow(prev, id, simBounds, prev.length));
@@ -241,13 +341,44 @@ export default function App() {
     }
   }
 
+  async function pollAnalysisJob(jobId: string) {
+    for (;;) {
+      const st = await getAnalysisJob(jobId);
+      const phase = String(st.phase || st.status || 'QUEUED');
+      const ticks = st.ticks_reconstructed ?? st.records_processed ?? '';
+      const last = st.last_tick_processed ?? '';
+      setAnalysisProgress(`ANALYSIS: ${phase} · stories=${ticks} · last_tick=${last}`);
+      if (phase === 'COMPLETE' || st.status === 'COMPLETE') return st;
+      if (phase === 'FAILED' || st.status === 'FAILED') {
+        throw new Error(String(st.error || 'analysis failed'));
+      }
+      if (phase === 'CANCELLED' || st.status === 'CANCELLED') {
+        throw new Error('analysis cancelled');
+      }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  }
+
+  async function runHeavyAnalysis(source: 'current' | 'saved', runId: string | null) {
+    const started = await startAnalysisJob({ source, run_id: runId });
+    if (!started.accepted) {
+      throw new Error(String(started.error || 'job not accepted'));
+    }
+    setAnalysisProgress(`ANALYSIS: QUEUED ${started.job_id}`);
+    await pollAnalysisJob(started.job_id);
+    const pkg = await getAnalysisJobResult(started.job_id);
+    pkg.source = source;
+    return pkg;
+  }
+
   async function runExplicitAnalysis() {
     setAnalyzing(true);
+    setAnalysisProgress('ANALYSIS: QUEUED');
     try {
-      const pkg = await getAnalysisEvidence({
-        source: analysisSource,
-        run_id: analysisSource === 'saved' ? selectedSavedRunId : null,
-      });
+      const pkg = await runHeavyAnalysis(
+        analysisSource,
+        analysisSource === 'saved' ? selectedSavedRunId : null,
+      );
       if (pkg.error) {
         setAnalysisCopyMsg(String(pkg.error));
         return;
@@ -257,7 +388,6 @@ export default function App() {
         mechanisms,
       });
       setRunAnalysis(built);
-      // Persist versioned report for saved runs (never overwrite prior analyses).
       if (analysisSource === 'saved' && selectedSavedRunId && built.analysis_log) {
         try {
           await saveAnalysisReport({
@@ -281,6 +411,7 @@ export default function App() {
       setAnalysisCopyMsg(String(err));
     } finally {
       setAnalyzing(false);
+      setAnalysisProgress('');
     }
   }
 
@@ -291,30 +422,19 @@ export default function App() {
    */
   async function runAnalyzeCurrent() {
     setAnalyzing(true);
+    setAnalysisProgress('ANALYSIS: QUEUED');
     try {
       const frame = liveFrame ?? viewFrame ?? undefined;
-      let pkg: any = null;
-      try {
-        pkg = await getAnalysisEvidence({ source: 'current' });
-      } catch (err) {
-        pkg = { error: String(err), scientific_rows: [] };
-      }
-      if (!pkg?.error && Array.isArray(pkg?.scientific_rows) && pkg.scientific_rows.length > 0) {
-        const built = analyzeEvidencePackage(pkg, { frame, mechanisms });
-        setRunAnalysis(built);
-        if (!built.lifecycle.insufficient) ensureCurrentRun(built, frame);
-        return;
-      }
-      // No historical evidence — live-frame fallback (NOT_AVAILABLE for run history).
-      rebuildAnalysis({ frame, mode: 'LIVE' });
-      if (pkg?.error) {
-        setAnalysisCopyMsg(`Evidence unavailable (${pkg.error}); showing live-frame Visual Forensics fallback.`);
-      }
+      const pkg = await runHeavyAnalysis('current', null);
+      const built = analyzeEvidencePackage(pkg, { frame, mechanisms });
+      setRunAnalysis(built);
+      if (!built.lifecycle.insufficient) ensureCurrentRun(built, frame);
     } catch (err) {
       setAnalysisCopyMsg(String(err));
       rebuildAnalysis({ frame: liveFrame ?? viewFrame ?? undefined, mode: 'LIVE' });
     } finally {
       setAnalyzing(false);
+      setAnalysisProgress('');
     }
   }
 
@@ -420,17 +540,39 @@ export default function App() {
 
   async function refreshAux() {
     const safe = (url: string): Promise<any> => fetch(url).then(r => r.ok ? r.json() : ({})).catch(() => ({}));
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+    const running = liveFrameRef.current?.header?.status === 'RUNNING' && modeRef.current === 'LIVE';
+    const gen = Number(liveFrameRef.current?.header?.runtime_generation);
+    const needCatalog = mechanismCatalogGenRef.current == null
+      || (Number.isFinite(gen) && mechanismCatalogGenRef.current !== gen);
+    const mechUrl = (!running || needCatalog) ? '/api/mechanisms' : '/api/mechanisms/state';
+    // While RUNNING: skip packs catalog (disk scan) and gearbox — Analyzer isolation.
+    // COLD mechanism catalog is fetched only on load / runtime generation change.
     const [tl, ev, me, ge, pa, meta] = await Promise.all([
-      getTimeline(400).catch(() => ({ events: [] })),
-      safe('/api/events?limit=200'), safe('/api/mechanisms'),
-      safe('/api/evidence/gearbox'), safe('/api/results/packs'),
+      getTimeline(LIVE_FE_TIMELINE_DISPLAY_MAX).catch(() => ({ events: [] })),
+      safe(`/api/events?limit=${LIVE_FE_EVENTS_DISPLAY_MAX}`), safe(mechUrl),
+      running ? Promise.resolve({}) : safe('/api/evidence/gearbox'),
+      running ? Promise.resolve({ packs: [] }) : safe('/api/results/packs'),
       getSnapshotMeta().catch(() => ({})),
     ]);
     const tlEvents = (tl as any).events || [];
     const evEvents = ev.events || [];
-    const mechs = me.mechanisms || [];
-    setTimeline(tlEvents); setEvents(evEvents);
-    setMechanisms(mechs); setGearbox(ge); setPacks(pa.packs || []);
+    const mechs = mergeMechanismWarmState(mechanisms, me);
+    const projected = projectLiveAuxState({
+      timeline: tlEvents,
+      events: evEvents,
+      world_interventions: liveFrameRef.current?.world_interventions,
+      // Intentionally unused by LIVE — Analyzer loads evidence package separately.
+      scientific_rows: undefined,
+    });
+    setTimeline(projected.timeline); setEvents(projected.events);
+    setMechanisms(mechs);
+    if (me.catalog_included !== false && Array.isArray(me.mechanisms) && me.mechanisms.length) {
+      if (Number.isFinite(gen)) mechanismCatalogGenRef.current = gen;
+    }
+    if (!running) {
+      setGearbox(ge); setPacks(pa.packs || []);
+    }
     setSnapshotMeta(meta);
     // Do not continuously rebuild analysis on aux refresh — Analyze Current /
     // Run explicit analysis are button-triggered snapshots.
@@ -514,8 +656,26 @@ export default function App() {
             setViewFrame(prev => modeRef.current === 'LIVE' ? p2 : prev);
           }).catch(() => undefined);
         }
+        if (f?.pending_live_apply) setLiveApplyPending(f.pending_live_apply);
+        else if (f?.toggle_runtime_applied === true || f?.pending_live_apply === null) {
+          setLiveApplyPending(null);
+        }
+        if (f?.mechanism_result?.mechanisms) setMechanisms(f.mechanism_result.mechanisms);
         setLiveFrame(projected);
         setViewFrame(prev => modeRef.current === 'LIVE' ? projected : prev);
+      }, (hb) => {
+        setConnection('CONNECTED');
+        setLastArrival(Date.now());
+        setSimHeartbeat(hb);
+        if (hb && Object.prototype.hasOwnProperty.call(hb, 'pending_live_apply')) {
+          const pending = hb.pending_live_apply || null;
+          setLiveApplyPending(pending);
+          if (!pending) {
+            setControlMessage((prev: any) => (
+              prev?.reason === 'WAITING_FOR_TICK_BOUNDARY' ? null : prev
+            ));
+          }
+        }
       });
       socket.onclose = () => {
         setConnection('DISCONNECTED');
@@ -527,25 +687,12 @@ export default function App() {
     return () => { stopped = true; clearTimeout(timer); socket?.close(); };
   }, []);
 
+  const refreshAuxRef = useRef(refreshAux);
+  refreshAuxRef.current = refreshAux;
+  const refreshAuxStable = useCallback(() => { refreshAuxRef.current().catch(() => undefined); }, []);
   useEffect(() => {
-    const t = window.setInterval(() => setNow(Date.now()), 500);
-    return () => clearInterval(t);
-  }, []);
-  // Debounced aux refresh: avoid /api/results/packs storms when Step or an
-  // external client advances many ticks while the SPA is open and not RUNNING.
-  useEffect(() => {
-    const running = liveFrame?.header?.status === 'RUNNING' && mode === 'LIVE';
-    if (running) return;
-    if (!liveFrame?.header?.tick && liveFrame?.header?.tick !== 0) return;
-    const t = window.setTimeout(() => { refreshAux().catch(() => undefined); }, 350);
-    return () => clearTimeout(t);
-  }, [liveFrame?.header?.tick, liveFrame?.header?.status, mode]);
-  useEffect(() => {
-    if (!(liveFrame?.header?.status === 'RUNNING' && mode === 'LIVE')) return;
-    const interval = Number(liveFrame?.header?.simulation_speed) >= 5 ? 1500 : 2000;
-    const t = window.setInterval(() => { refreshAux().catch(() => undefined); }, interval);
-    return () => clearInterval(t);
-  }, [liveFrame?.header?.status, liveFrame?.header?.simulation_speed, mode]);
+    lifecycleStore.set({ controlMessage, saveBanner, finalizing });
+  }, [controlMessage, saveBanner, finalizing]);
   useEffect(() => {
     try {
       localStorage.setItem(PREFS_KEY, JSON.stringify({
@@ -554,8 +701,53 @@ export default function App() {
     } catch { /* display prefs only */ }
   }, [tab, layer, worldView, renderMode, opacity, showGrid, layers, trajectoryLength, geoAgentFilter]);
 
+  // Observe V2 buffer identity — MUST stay above any early return (Rules of Hooks).
+  // Missing liveFrame must not crash the SPA into a blank #root.
+  useEffect(() => {
+    const raw = mode === 'LIVE' ? liveFrame : viewFrame;
+    if (!raw) return;
+    const agentId = desiredAgentId || requestedAgentId(raw);
+    const projected = applyProjectionToFrame(raw, agentId);
+    const sel = String(
+      projected.observer?.selected_agent_id
+      || projected.header?.selected_agent_id
+      || agentId
+      || '',
+    );
+    const next = observeBufferIdentityFromFrame(projected, {
+      run_id: currentRunId,
+      agent_id: sel,
+    });
+    const prev = observeBufIdRef.current;
+    if (invalidateEventsOnRunOrGeneration(prev, next)) {
+      setEvents([]);
+      setTimeline([]);
+      setSelectedEvent(null);
+    } else if (prev && String(prev.agent_id) !== String(next.agent_id) && next.agent_id && prev.agent_id) {
+      setSelectedEvent(null);
+    }
+    observeBufIdRef.current = next;
+  }, [
+    currentRunId,
+    desiredAgentId,
+    mode,
+    liveFrame,
+    viewFrame,
+  ]);
+
+  const lab = useWorkspaceStore();
+  const worldPrefs = { layer, worldView, renderMode, opacity, showGrid, layers, trajectoryLength };
+
   const rawFrame = mode === 'LIVE' ? liveFrame : viewFrame;
-  if (!rawFrame) return <div className="loading">Connecting to MM 1.0 — Tiktaalik…</div>;
+  if (!rawFrame) {
+    return (
+      <div className="desktop app">
+        <ClockDriver />
+        <InterestDriver />
+        <div className="loading">Connecting to MM 1.0 — Tiktaalik…</div>
+      </div>
+    );
+  }
   const agentForProjection = desiredAgentId || requestedAgentId(rawFrame);
   // Atomic projection: identity + mind + body + seed always from the same agents_views entry
   const frame = applyProjectionToFrame(rawFrame, agentForProjection);
@@ -580,6 +772,7 @@ export default function App() {
     selectionSeqRef.current += 1;
     const seq = selectionSeqRef.current;
     setDesiredAgentId(agentId);
+    setSelectedEvent(null);
     // Immediate optimistic re-projection of the current frame (same tick) — invalidates old agent data now
     if (mode === 'LIVE' && liveFrame) {
       setLiveFrame(applyProjectionToFrame(liveFrame, agentId));
@@ -620,24 +813,43 @@ export default function App() {
     || null;
   const visionAuthorityOn =
     visionMechOn
-    || nfSel?.vision_contributes === true
-    || nfSel?.perception_enabled === true;
+    || nfSel?.vision_contributes === true;
+  // Do NOT treat perception_enabled alone as authority (inert while mode=OFF).
   // Terrain scalars are Observer GT overlays only — keep base field buttons on physics/ecology fields.
   const fields = (world.fields_available || []).filter((f: any) =>
     f.kind === 'scalar'
     && !String(f.id || '').startsWith('terrain_')
     && !String(f.id || '').startsWith('resource_geo_'));
   const staleSeconds = Math.max(1, Number(liveFrame?.observation?.stale_after_seconds || 2));
-  const stale = connection === 'CONNECTED' && now - lastArrival > staleSeconds * 1000 &&
-    liveFrame?.header?.status === 'RUNNING';
-  const displayStatus = connection === 'DISCONNECTED' ? 'DISCONNECTED' : stale ? 'STALE' : header.status || 'UNKNOWN';
+  const heartbeatFresh = simHeartbeat?.heartbeat_mono != null
+    && (now - lastArrival) <= staleSeconds * 1000;
+  const computingTick = Boolean(simHeartbeat?.tick_in_progress) && heartbeatFresh;
+  const pendingApply = liveApplyPending || simHeartbeat?.pending_live_apply;
+  // STALE only when RUNNING and we have neither frames nor heartbeats — not during a long tick.
+  const stale = connection === 'CONNECTED'
+    && liveFrame?.header?.status === 'RUNNING'
+    && (now - lastArrival > staleSeconds * 1000)
+    && !computingTick;
+  const displayStatus = connection === 'DISCONNECTED'
+    ? 'DISCONNECTED'
+    : stale
+      ? 'STALE'
+      : computingTick
+        ? 'RUNNING'
+        : header.status || 'UNKNOWN';
+  void displayStatus;
+  const statusDetail = computingTick
+    ? 'COMPUTING_TICK'
+    : pendingApply
+      ? 'PENDING — WAITING FOR TICK BOUNDARY'
+      : (simHeartbeat?.status_detail || null);
+  void statusDetail;
   const tickMismatch = frame.observation && !frame.observation.tick_consistent;
   const historical = frame.historical_compatibility;
   const identity = null; // desktop-top replaces legacy identity strip
   void identity;
   void historical;
   void tickMismatch;
-  void saveBanner;
   void rawOpen;
   void setRawOpen;
   const recordedTick = Number(timeline[timeline.length - 1]?.tick ?? liveFrame?.header?.tick ?? header.tick);
@@ -646,7 +858,13 @@ export default function App() {
 
   async function control(op: string, payload?: any) {
     if (finalizing && op !== 'stop') return;
-    if (op === 'reset' || op === 'apply' || op === 'restart') resetGeoEmpiricalCache();
+    if (op === 'reset' || op === 'apply' || op === 'restart') {
+      resetGeoEmpiricalCache();
+      setEvents([]);
+      setTimeline([]);
+      setSelectedEvent(null);
+      observeBufIdRef.current = null;
+    }
     const f = await postControl(op, payload);
     setControlMessage(f.control_receipt);
     const agent = desiredAgentIdRef.current || requestedAgentId(f);
@@ -685,59 +903,125 @@ export default function App() {
   async function saveAndStop() {
     setStopDialog(null);
     setFinalizing('Finalizing run…');
-    try {
-      setFinalizing('Flushing telemetry…');
-      setFinalizing('Saving snapshot…');
-      const f = await postControl('stop', { save: true, reason: 'USER_STOP_SAVED' });
-      setControlMessage(f.control_receipt);
-      setLiveFrame(f);
-      setViewFrame(f);
-      setMode('LIVE');
-      if (f.finalize?.accepted && f.finalize?.final_tick != null) {
-        setFinalizing('Saving results…');
-        const verifiedTick = f.finalize.final_tick;
-        setSaveBanner({
-          tick: verifiedTick,
-          seed: f.finalize.seed,
-          path: f.finalize.run_dir,
-          reason: f.finalize.termination_reason,
-          verified: true,
-        });
-        setControlMessage({
-          ...(f.control_receipt || {}),
-          accepted: true,
-          operation: 'STOP',
-          tick: verifiedTick,
-          verified_final_tick: verifiedTick,
-          reason: f.control_receipt?.reason || `SAVED · t${verifiedTick}`,
-        });
-        setFinalizing(null);
-      } else {
-        setFinalizing(null);
-        const liveT = f.finalize?.live_tick;
-        const capT = f.finalize?.captured_tick ?? f.finalize?.persisted_tick;
-        const mismatch =
-          f.finalize?.persistence_integrity_error && liveT != null && capT != null
-            ? ` · live tick: ${liveT} · captured tick: ${capT} · reason: persistence integrity mismatch`
-            : '';
-        setControlMessage({
-          ...(f.control_receipt || {}),
-          accepted: false,
-          operation: 'STOP',
-          reason: (f.finalize?.error || f.control_receipt?.reason || 'SAVE_FAILED') + mismatch,
-        });
-        setSaveBanner({
-          failed: true,
-          error: (f.finalize?.error || 'Save failed — runtime preserved') + mismatch,
-          liveTick: liveT,
-          capturedTick: capT,
-        });
+    const applyFinalizeFrame = (f: any) => {
+      if (f?.header && !f.header.compact_control) {
+        setLiveFrame(f);
+        setViewFrame(f);
+        setMode('LIVE');
       }
-      await refreshAux();
+      if (f?.control_receipt) setControlMessage(f.control_receipt);
+    };
+    const applySuccess = (fin: any, receipt?: any) => {
+      const verifiedTick = fin.final_tick;
+      setSaveBanner({
+        tick: verifiedTick,
+        seed: fin.seed,
+        path: fin.run_dir,
+        reason: fin.termination_reason,
+        verified: true,
+      });
+      setControlMessage({
+        ...(receipt || {}),
+        accepted: true,
+        operation: 'STOP',
+        tick: verifiedTick,
+        verified_final_tick: verifiedTick,
+        reason: receipt?.reason || `SAVED · t${verifiedTick}`,
+      });
+      setFinalizing(null);
+    };
+    const applySaveFailed = (fin: any, receipt?: any) => {
+      setFinalizing(null);
+      const liveT = fin?.live_tick;
+      const capT = fin?.captured_tick ?? fin?.persisted_tick;
+      const mismatch =
+        fin?.persistence_integrity_error && liveT != null && capT != null
+          ? ` · live tick: ${liveT} · captured tick: ${capT} · reason: persistence integrity mismatch`
+          : '';
+      setControlMessage({
+        ...(receipt || {}),
+        accepted: false,
+        operation: 'STOP',
+        reason: (fin?.error || receipt?.reason || 'SAVE_FAILED') + mismatch,
+        error: receipt?.error || { code: 'SAVE_FAILED', message: fin?.error || 'SAVE_FAILED', recoverable: true },
+      });
+      setSaveBanner({
+        failed: true,
+        layer: 'save',
+        error: (fin?.error || 'Save failed — runtime preserved') + mismatch,
+        liveTick: liveT,
+        capturedTick: capT,
+      });
+    };
+    const applyHttpFailure = (err: unknown) => {
+      setControlMessage({
+        operation: 'STOP',
+        accepted: false,
+        reason: String(err),
+        error: { code: 'HTTP_FAILED', message: String(err), recoverable: true },
+      });
+      setSaveBanner({
+        failed: true,
+        layer: 'http',
+        error:
+          'HTTP/network failure during Save & Stop (connection closed or server died). '
+          + 'This is not a confirmed disk serialization error. Check /api/control/save-job and live/tmp run dirs. '
+          + String(err),
+      });
+    };
+    try {
+      setFinalizing('Requesting backend finalize…');
+      const f = await postControl('stop', { save: true, reason: 'USER_STOP_SAVED', wait: false });
+      applyFinalizeFrame(f);
+      if (f.finalize?.accepted && f.finalize?.final_tick != null) {
+        applySuccess(f.finalize, f.control_receipt);
+        await refreshAux();
+        return;
+      }
+      if (f.finalize && f.finalize.accepted === false) {
+        applySaveFailed(f.finalize, f.control_receipt);
+        await refreshAux();
+        return;
+      }
+      setFinalizing('Backend owns finalize — polling status…');
+      const deadline = Date.now() + 30 * 60 * 1000;
+      let lastHttpErr: unknown = null;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 500));
+        try {
+          const job = await getSaveJob();
+          lastHttpErr = null;
+          const life = String(job.lifecycle || job.header?.status || '');
+          setFinalizing(`Finalizing… ${life} · save=${job.save} · ${job.phases?.slice(-1)[0] || ''}`);
+          if (life === 'STOPPED' && (job.save === 'succeeded' || job.finalize === 'succeeded')) {
+            applySuccess({
+              final_tick: job.final_tick,
+              seed: job.seed,
+              run_dir: job.run_dir,
+              termination_reason: 'USER_STOP_SAVED',
+            }, { operation: 'STOP', accepted: true });
+            await refreshAux();
+            return;
+          }
+          if (life === 'SAVE_FAILED' || job.save === 'failed' || job.finalize === 'failed') {
+            applySaveFailed({
+              accepted: false,
+              error: job.error,
+              live_tick: job.runtime?.tick,
+            }, { operation: 'STOP', accepted: false, error: { code: 'SAVE_FAILED', message: job.error } });
+            await refreshAux();
+            return;
+          }
+        } catch (pollErr) {
+          lastHttpErr = pollErr;
+          setFinalizing('Polling interrupted — retrying save-job…');
+        }
+      }
+      setFinalizing(null);
+      applyHttpFailure(lastHttpErr || 'save-job poll timed out');
     } catch (err) {
       setFinalizing(null);
-      setControlMessage({ operation: 'STOP', accepted: false, reason: String(err) });
-      setSaveBanner({ failed: true, error: String(err) });
+      applyHttpFailure(err);
     }
   }
 
@@ -762,20 +1046,44 @@ export default function App() {
       setControlMessage({ operation: replay ? 'REPLAY' : 'INSPECT', accepted: false, tick, reason: String(err) });
     }
   }
-  async function toggleMechanism(m: any) {
+  async function toggleMechanism(m: any, enabled?: boolean) {
+    const next = typeof enabled === 'boolean' ? enabled : !m.enabled;
+    setMechanisms((prev: any[]) => (prev || []).map((x: any) => (
+      x.id === m.id ? { ...x, enabled: next } : x
+    )));
     const f = await fetch(`/api/mechanisms/${m.id}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: !m.enabled }),
+      body: JSON.stringify({ enabled: next }),
     }).then(r => r.json());
     setControlMessage(f.control_receipt);
+    if (f.pending_live_apply || f.control_receipt?.reason === 'WAITING_FOR_TICK_BOUNDARY') {
+      setLiveApplyPending(f.pending_live_apply || {
+        mechanism_id: m.id,
+        enabled: next,
+        status: 'WAITING_FOR_TICK_BOUNDARY',
+      });
+      return;
+    }
     if (f.control_receipt?.accepted) {
+      setLiveApplyPending(null);
       const agent = desiredAgentIdRef.current || requestedAgentId(f);
       const projected = applyProjectionToFrame(f, agent);
       setLiveFrame(projected);
       setViewFrame(mode === 'LIVE' ? projected : viewFrame);
-      setMechanisms(f.mechanism_result?.mechanisms || []);
+      if (f.mechanism_result?.mechanisms) setMechanisms(f.mechanism_result.mechanisms);
     }
   }
+
+  function mechanismHelp(m: any): string | null {
+    if (m?.id === 'prospective_scenario_competition') {
+      return 'Recommended: let the organism explore for a while before enabling PSC. This allows sensorimotor and predictive history to form first. PSC can be enabled during a running simulation without resetting the organism. (~1000 ticks is a reasonable experimental starting point.)';
+    }
+    if (m?.id === 'historical_sensorimotor_selection_bridge') {
+      return 'Predicted sensory consequences of candidate actions are queried against accumulated history; continuation evidence can participate in prospective scenario competition.';
+    }
+    return null;
+  }
+
   async function setVisionRadius(radius: number) {
     const f = await fetch('/api/vision/radius', {
       method: 'POST',
@@ -788,6 +1096,7 @@ export default function App() {
       const projected = applyProjectionToFrame(f, agent);
       setLiveFrame(projected);
       setViewFrame(mode === 'LIVE' ? projected : viewFrame);
+      if (f.mechanism_result?.mechanisms) setMechanisms(f.mechanism_result.mechanisms);
     }
   }
   async function inspectCell(info: any) {
@@ -1071,6 +1380,41 @@ export default function App() {
     </Card>
     <Card title="Requested vs realized">
       <div className="selected-action">{physical.selected_action || header.selected_action || '—'}</div>
+      {frame.motor_control ? (() => {
+        const mc = frame.motor_control;
+        const out = mc.current_motor_output || {};
+        const eff = mc.active_effectors || {};
+        const sens = mc.passive_input || {};
+        const osc = out.oscillator || {};
+        return (
+          <div className="motor-control-panel" style={{marginTop: 8}}>
+            <div className="section-label">CURRENT MOTOR OUTPUT</div>
+            <KV name="Locomotion" value={out.locomotion}/>
+            <KV name="Neck" value={out.neck}/>
+            <KV name="Osc freq Δ" value={osc.freq_delta}/>
+            <KV name="Osc amp Δ" value={osc.amp_delta}/>
+            <KV name="Emit trigger" value={osc.emit_trigger ? 'YES' : 'NO'}/>
+            <KV name="Push" value={out.push ? 'YES' : 'NO'}/>
+            <div className="subtle">{out.display || ''}</div>
+            <div className="section-label" style={{marginTop: 8}}>ACTIVE EFFECTORS</div>
+            <KV name="Locomotor force" value={eff.body_locomotor_force}/>
+            <KV name="Neck torque" value={eff.neck_torque}/>
+            <KV name="Head angle" value={eff.head_angle}/>
+            <KV name="Head omega" value={eff.head_omega}/>
+            <KV name="Oscillator" value={eff.oscillator}/>
+            <KV name="Frequency" value={eff.osc_freq}/>
+            <KV name="Amplitude" value={eff.osc_amp}/>
+            <KV name="Remaining" value={eff.osc_remaining}/>
+            <div className="section-label" style={{marginTop: 8}}>PASSIVE INPUT</div>
+            <KV name="Vision" value={sens.vision}/>
+            <KV name="Osc reception" value={sens.osc_reception}/>
+            <KV name="Vestibular" value={sens.vestibular}/>
+            <KV name="Neck proprioception" value={sens.neck_proprioception}/>
+            <KV name="Legacy fields" value={sens.legacy_fields}/>
+            <div className="subtle">{sens.note || 'Passive — not an action.'}</div>
+          </div>
+        );
+      })() : null}
       {(frame.geometry_interpretation?.agents || []).filter((a: any) => a.agent_id === selectedAgentId).map((a: any) => {
         const s = a.since_prev_capture;
         return <div key={a.agent_id}>
@@ -1295,6 +1639,7 @@ export default function App() {
   </div>;
 
   const worldWithInspector = <div className="world-click-wrapper">{worldTab}</div>;
+  void worldWithInspector;
 
   const agentCount = Number(frame.experiment?.runtime?.agent_count || frame.agents_observer?.length || 1);
   const agentTab = <div className="dashboard-grid">
@@ -1339,6 +1684,27 @@ export default function App() {
         onToggleMechanism={toggleMechanism}
         onSetVisionRadius={setVisionRadius}
       />
+      <VestibularProprioceptionPanel
+        physical={physical}
+        agentObservation={agentObservation}
+        mechanisms={mechanisms}
+        onToggleMechanism={toggleMechanism}
+      />
+        <OscillatorySignalingPanel
+          physical={physical}
+          agentObservation={agentObservation}
+          mechanisms={mechanisms}
+          onToggleMechanism={toggleMechanism}
+        />
+        <SensorimotorConsequencePanel />
+        <HistoricalSensorimotorSelectionPanel />
+        <SignalSensorimotorPanel />
+        <ContextualProspectiveControlPanel
+          frame={frame}
+          agentId={desiredAgentId || requestedAgentId(frame)}
+          detail={frame?.observer?.frame_detail}
+        />
+
     </Card>
     <Card title="Why did its shape change?"><WhyDidItsShapeChange whyMove={frame.causal_chain?.why_did_it_move} physical={physical}/></Card>
     <Card title="Physical channels">
@@ -1443,7 +1809,21 @@ export default function App() {
       {(frame.signal_forensics?.signals_received || []).length ? ((frame.signal_forensics?.signals_received || []).map((r:any,i:number) =>
         <div key={i} className="subtle">t{r.tick} {r.agent} {r.channel} inten={show(r.intensity)} source={r.counterparty || r.source || 'UNKNOWN'} · {r.pairing}</div>
       )) : <div className="na">NONE / NOT RECORDED</div>}
-      <SignalContextPanel live={frame.signal_context_interpretation} selectedEvent={selectedEvent} />
+      <SignalContextPanel
+        live={frame.signal_context_interpretation}
+        selectedEvent={selectedEvent}
+        sourceMeta={{
+          run_id: currentRunId,
+          generation: header.runtime_generation,
+          tick: header.tick,
+          telemetry_schema:
+            frame.scientific_history?.telemetry_schema
+            || frame.header?.telemetry_schema
+            || 'SCIENTIFIC_TELEMETRY_V2',
+          motor_schema: frame.motor_control?.schema || 'COMPOSITE_MOTOR_V1',
+          coverage: Number(header.tick) > 0 ? 'LIVE CURRENT RUN' : 't0 — NO EVIDENCE YET',
+        }}
+      />
     </Card>
     <Card title="Active cognition mechanisms" className="wide">
       <div className="mechanism-grid">{mechanisms.filter(m => m.category === 'COGNITION').map(m =>
@@ -1494,7 +1874,21 @@ export default function App() {
           <KV name="Competition outcome" value={selectedEvent.evidence.outcome_class}/>
         )}
         <SignalEventDetails event={selectedEvent}/>
-        <SignalContextPanel live={frame.signal_context_interpretation} selectedEvent={selectedEvent} />
+        <SignalContextPanel
+        live={frame.signal_context_interpretation}
+        selectedEvent={selectedEvent}
+        sourceMeta={{
+          run_id: currentRunId,
+          generation: header.runtime_generation,
+          tick: header.tick,
+          telemetry_schema:
+            frame.scientific_history?.telemetry_schema
+            || frame.header?.telemetry_schema
+            || 'SCIENTIFIC_TELEMETRY_V2',
+          motor_schema: frame.motor_control?.schema || 'COMPOSITE_MOTOR_V1',
+          coverage: Number(header.tick) > 0 ? 'LIVE CURRENT RUN' : 't0 — NO EVIDENCE YET',
+        }}
+      />
         <h4>Evidence payload</h4>
         <EvidenceTree value={selectedEvent.evidence != null ? selectedEvent.evidence : selectedEvent}/>
       </>}
@@ -1518,8 +1912,17 @@ export default function App() {
   const experiment = frame.experiment || {};
   const experimentTab = <div className="dashboard-grid">
     <Card title="Run setup">
-      <label>Preset<select value={preset} onChange={e => setPreset(e.target.value)}>
-        <option>MM 1.0 — Tiktaalik</option><option>CUSTOM</option>
+      <label>Preset<select value={preset} onChange={e => {
+        const v = e.target.value;
+        setPreset(v);
+        if (v === 'MM 1.0 — Tiktaalik Public Beta 3') {
+          setTwoAgentExperimental(true);
+          setCognitionEnabled(true);
+        }
+      }}>
+        <option>MM 1.0 — Tiktaalik Public Beta 3</option>
+        <option>MM 1.0 — Tiktaalik</option>
+        <option>CUSTOM</option>
       </select></label>
       <label>Seed<input value={seed} onChange={e => setSeed(e.target.value)}/></label>
       <label>Width<input value={width} onChange={e => setWidth(e.target.value)}/></label>
@@ -1531,7 +1934,13 @@ export default function App() {
       <label>Body mass<input value={bodyMass} onChange={e => { setBodyMass(e.target.value); setPreset('CUSTOM'); }}/></label>
       <label>Body v_max<input value={bodyVMax} onChange={e => { setBodyVMax(e.target.value); setPreset('CUSTOM'); }}/></label>
       <label className="check"><input type="checkbox" checked={cognitionEnabled} onChange={e => { setCognitionEnabled(e.target.checked); setPreset('CUSTOM'); }}/>Cognition enabled</label>
-      <label className="check"><input type="checkbox" checked={twoAgentExperimental} onChange={e => { setTwoAgentExperimental(e.target.checked); setPreset('CUSTOM'); }}/>Experimental two-agent runtime (default OFF)</label>
+      <label className="check"><input type="checkbox" checked={twoAgentExperimental} onChange={e => { setTwoAgentExperimental(e.target.checked); setPreset('CUSTOM'); }}/>Two-agent runtime (required for the recommended Beta 3 first run)</label>
+      <div className="subtle" style={{ marginTop: 8, marginBottom: 8 }}>
+        <strong>RECOMMENDED FIRST RUN:</strong> Apply the Public Beta 3 preset
+        (two-agent, PSC off, Climate Control off). Before Play, open
+        Experiment → Predictive and select <strong>OBSERVED_COMPOSITE</strong>.
+        Run ~1000 ticks with PSC off, then enable PSC without resetting history.
+      </div>
       <div style={{ marginTop: 8 }}>
       <div className="metric"><span>World ecology</span><strong>LIVE via Apply Live · structural via APPLY &amp; RESET WORLD</strong></div>
         <div className="toolbar-row" style={{ gap: 8, flexWrap: 'wrap' }}>
@@ -1629,7 +2038,18 @@ export default function App() {
           world: { width: +width, height: +height, boundary_mode: 'WRAP_PERIODIC' },
           agent_body: { mass: +bodyMass, v_max: +bodyVMax },
         };
-        if (twoAgentExperimental) payload.agent_count = 2;
+        if (preset === 'MM 1.0 — Tiktaalik Public Beta 3') {
+          payload.public_preset = 'BETA3_RECOMMENDED';
+          payload.psc_motor_resolution = 'OBSERVED_COMPOSITE';
+          payload.agent_count = 2;
+        } else {
+          payload.mechanisms = Object.fromEntries(
+            (mechanisms || [])
+              .filter((m: any) => m && m.id && m.ablatable !== false)
+              .map((m: any) => [m.id, !!m.enabled]),
+          );
+          if (twoAgentExperimental) payload.agent_count = 2;
+        }
         if (targetTick.trim() !== '' && Number.isFinite(+targetTick)) payload.target_tick = +targetTick;
         if (Number.isFinite(+uiHz)) payload.ui_hz = +uiHz;
         if (Number.isFinite(+bufferCapacity)) payload.buffer_capacity = Math.max(8, +bufferCapacity);
@@ -1640,6 +2060,10 @@ export default function App() {
         const f = await applyExperiment(payload);
         resetGeoEmpiricalCache();
         setControlMessage(f.control_receipt);
+        if (Array.isArray(f.mechanism_result?.mechanisms)) {
+          setMechanisms(f.mechanism_result.mechanisms);
+        }
+        await refreshAux().catch(() => undefined);
         setAppliedConfig({
           seed, width, height, ecologyPreset, cognitionEnabled, twoAgentExperimental,
           bodyMass, bodyVMax, targetTick, uiHz, bufferCapacity, terrainSeedOverride,
@@ -1791,11 +2215,16 @@ export default function App() {
       <KV name="R_B max y" value={experiment.observer_ground_truth.R_B_max_y}/>
     </Card> : null}
     <Card title="Runtime mechanisms" className="wide">
+      <PscMotorResolutionControl
+        pscEnabled={Boolean((mechanisms || []).find((m: any) => m.id === 'prospective_scenario_competition')?.enabled)}
+        compact
+        refreshKey={`rtmech-${header?.tick ?? ''}`}
+      />
       <label>Search<input value={mechanismQuery} onChange={e => setMechanismQuery(e.target.value)} placeholder="id, label, category"/></label>
       <div className="mechanism-list">{filteredMechanisms.map(m => <div key={m.id}>
         <div><b>{m.label}</b><small>{m.promotion_class || '—'} · {m.category} · {m.scientific_status} · {m.toggle_policy}</small></div>
         <button disabled={!m.ablatable} onClick={() => toggleMechanism(m)}>{m.ablatable ? (m.enabled ? 'ON' : 'OFF') : 'READ ONLY'}</button>
-        <p>{m.description}</p><p>Dependencies: {m.dependencies?.join(', ') || 'none'}</p>
+        <p>{m.description}{mechanismHelp(m) ? (` — ` + mechanismHelp(m)) : ''}</p><p>Dependencies: {m.dependencies?.join(', ') || 'none'}</p>
       </div>)}</div>
     </Card>
     <Card title="Snapshot">
@@ -1831,6 +2260,7 @@ export default function App() {
       <div className="subtle">{snapshotMeta?.historical_policy || 'Missing newer keys activate documented historical compatibility behavior.'}</div>
     </Card>
   </div>;
+  void experimentTab;
 
   const series = frame.telemetry?.series || [];
   const dataTab = <div className="dashboard-grid">
@@ -1863,6 +2293,7 @@ export default function App() {
   const analyzePanel = <AnalyzeResultsPanel
         analysis={runAnalysis}
         analyzing={analyzing}
+        analysisProgress={analysisProgress}
         analysisSource={analysisSource}
         onAnalysisSourceChange={setAnalysisSource}
         savedRuns={savedRunCatalog}
@@ -1929,6 +2360,7 @@ export default function App() {
   const overrideCount = Array.isArray(effWorld?.overrides) ? effWorld.overrides.length : 0;
   const undercoverIn = String(frame?.experimenter_interaction?.status || '') === 'CONTROL_ACTIVE';
   const agentsObs = frame.agents_observer || [];
+  void agentsObs;
 
   const climateMechs = (mechanisms || []).filter((m: any) =>
     String(m.id || '').includes('spatiotemporal_climate')
@@ -1946,16 +2378,14 @@ export default function App() {
   const otherAblatable = (mechanisms || []).filter((m: any) =>
     m.ablatable && !climateMechs.includes(m) && !resourceEcoMechs.includes(m) && !visionMechs.includes(m),
   );
+  const integrity = (frame as any)?.mechanism_integrity
+    || (liveFrame as any)?.mechanism_integrity
+    || null;
 
-  function deviceBody() {
-    if (deviceTool === 'experiment') {
-      if (experimentScreen === 'menu') return (
-        <div className="subtle">
-          Set World rebuilds the runtime (APPLY &amp; RESET WORLD).
-          Other sections apply LIVE interventions when supported.
-        </div>
-      );
-      if (experimentScreen === 'set_world') return (
+  function deviceBody(which: DeviceTool = deviceTool) {
+    if (which === 'experiment') {
+      const tabId = inspUi.tabs.EXPERIMENT || 'ecology';
+      if (tabId === 'world') return (
         <div className="device-form">
           {pending && <div className="pending-banner">PENDING — APPLY &amp; RESET WORLD required</div>}
           <div className="section-gt subtle">WORLD-STRUCTURAL · creates new runtime generation</div>
@@ -1968,14 +2398,44 @@ export default function App() {
           <button type="button" onClick={() => openFloat('interventions')}>
             Interventions · {Number(frame?.world_intervention_summary?.n || frame?.world_interventions?.length || 0)}
           </button>
+          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <button type="button" className="active" onClick={applyFromDevice} disabled={!!finalizing}>
+              APPLY &amp; RESET WORLD
+            </button>
+            {pending && appliedConfig && (
+              <button type="button" onClick={() => {
+                setSeed(String(appliedConfig.seed));
+                setWidth(String(appliedConfig.width));
+                setHeight(String(appliedConfig.height));
+                setEcologyPreset(String(appliedConfig.ecologyPreset));
+                setCognitionEnabled(Boolean(appliedConfig.cognitionEnabled));
+                setTwoAgentExperimental(Boolean(appliedConfig.twoAgentExperimental));
+                setBodyMass(String(appliedConfig.bodyMass));
+                setBodyVMax(String(appliedConfig.bodyVMax));
+                setTargetTick(String(appliedConfig.targetTick ?? ''));
+                setUiHz(String(appliedConfig.uiHz));
+                setBufferCapacity(String(appliedConfig.bufferCapacity));
+                setTerrainSeedOverride(String(appliedConfig.terrainSeedOverride ?? ''));
+              }}>Discard pending</button>
+            )}
+          </div>
         </div>
       );
-      if (experimentScreen === 'set_model') return (
+      if (tabId === 'model' || tabId === 'cognition') return (
         <div className="device-form">
           <div className="flag" style={{ alignSelf: 'flex-start' }}>LIVE</div>
           <div className="subtle">Cognition toggle applies LIVE. Agent count / body mass / v_max are WORLD-STRUCTURAL (use Set World).</div>
-          <label>Preset<select value={preset} onChange={e => setPreset(e.target.value)}>
-            <option>MM 1.0 — Tiktaalik</option><option>CUSTOM</option>
+          <label>Preset<select value={preset} onChange={e => {
+            const v = e.target.value;
+            setPreset(v);
+            if (v === 'MM 1.0 — Tiktaalik Public Beta 3') {
+              setTwoAgentExperimental(true);
+              setCognitionEnabled(true);
+            }
+          }}>
+            <option>MM 1.0 — Tiktaalik Public Beta 3</option>
+            <option>MM 1.0 — Tiktaalik</option>
+            <option>CUSTOM</option>
           </select></label>
           <label className="check"><input type="checkbox" checked={cognitionEnabled} onChange={e => { setCognitionEnabled(e.target.checked); setPreset('CUSTOM'); }}/>Cognition enabled</label>
           <label className="check"><input type="checkbox" checked={twoAgentExperimental} onChange={e => { setTwoAgentExperimental(e.target.checked); setPreset('CUSTOM'); }}/>Two-agent runtime <span className="na">(requires world reset)</span></label>
@@ -1986,9 +2446,15 @@ export default function App() {
           <label>History frames<input value={bufferCapacity} onChange={e => setBufferCapacity(e.target.value)}/></label>
           <div className="subtle">CURRENT RUNTIME: {experiment.runtime?.type || '—'} · agents {experiment.runtime?.agent_count ?? '—'}</div>
           <button type="button" onClick={() => openFloat('mechanisms')}>Mechanisms detail</button>
+          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <button type="button" className="active" onClick={applyLiveFromDevice} disabled={!!finalizing}>
+              APPLY LIVE
+            </button>
+            <div className="subtle">Does not rebuild agents · records WORLD_INTERVENTION when config changes. Body mass / v_max / two-agent require World tab reset.</div>
+          </div>
         </div>
       );
-      if (experimentScreen === 'set_ecology') return (
+      if (tabId === 'ecology') return (
         <div className="device-form">
           <div className="flag" style={{ alignSelf: 'flex-start' }}>LIVE INTERVENTION</div>
           <div className="subtle">Ecology preset stamps onto the current runtime — agents &amp; history continue.</div>
@@ -2012,29 +2478,12 @@ export default function App() {
           )}
           <div className="metric"><span>Live preset</span><strong>{experiment.ecology_preset || header.ecology_preset || '—'}</strong></div>
           {overrideCount > 0 && <div className="flag overrides">Overrides: {overrideCount}</div>}
-        </div>
-      );
-      if (experimentScreen === 'set_resources') return (
-        <div className="device-form section-gt">
-          <div className="flag" style={{ alignSelf: 'flex-start' }}>LIVE</div>
-          <div className="subtle">WORLD GT — R_A / R_B (anonymous environmental quantities). Ecology gated independently via Experimental (Climate / R_A / R_B).</div>
-          <KV name="R_A mean" value={effWorld?.resources_now?.R_A?.mean ?? experiment.observer_ground_truth?.resources?.R_A_mean}/>
-          <KV name="R_A max" value={effWorld?.resources_now?.R_A?.max}/>
-          <KV name="R_B mean" value={effWorld?.resources_now?.R_B?.mean ?? experiment.observer_ground_truth?.resources?.R_B_mean}/>
-          <KV name="R_B max" value={effWorld?.resources_now?.R_B?.max}/>
-          <button type="button" onClick={() => openFloat('effective_world')}>Effective World</button>
-        </div>
-      );
-      if (experimentScreen === 'experimental') return (
-        <div className="device-form">
-          <div className="flag" style={{ alignSelf: 'flex-start' }}>LIVE INTERVENTION</div>
-          <div className="availability">Independent climate vs resource ecology gates — not food/hunger semantics</div>
           <div className="section-label">Climate dynamics</div>
-          <div className="subtle">Temporal thermal / insolation ecology (T_eq, seasonal cycle). Does not erase R_A/R_B.</div>
+          <div className="subtle">Temporal thermal / insolation ecology (T_eq, seasonal cycle). Does not erase R_A/R_B. LIVE.</div>
           {climateMechs.map((m: any) => (
             <div key={m.id} className="metric" style={{ alignItems: 'center' }}>
               <span>{m.label || m.id}</span>
-              <button type="button" disabled={!m.ablatable} onClick={() => toggleMechanism(m)}>
+              <button type="button" disabled={!m.ablatable} title={!m.ablatable ? 'NOT INDEPENDENTLY ABLATABLE' : 'LIVE mutable'} onClick={() => toggleMechanism(m)}>
                 {m.ablatable ? (m.enabled ? 'ON' : 'OFF') : 'READ ONLY'}
               </button>
             </div>
@@ -2057,76 +2506,246 @@ export default function App() {
             </div>
           ))}
           {!resourceEcoMechs.length && <div className="na">Resource ecology mechanism rows not in registry</div>}
-          <div className="section-label">Vision / illumination</div>
-          <div className="subtle">Physical near-field vision and illumination cycle — independent LIVE gates.</div>
-          {visionMechs.map((m: any) => (
+          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <button type="button" className="active" onClick={applyLiveFromDevice} disabled={!!finalizing}>
+              APPLY LIVE
+            </button>
+            <div className="subtle">Does not rebuild agents · records WORLD_INTERVENTION when config changes.</div>
+          </div>
+        </div>
+      );
+      if (tabId === 'body') return (
+        <div className="device-form section-gt">
+          <div className="flag" style={{ alignSelf: 'flex-start' }}>LIVE</div>
+          <div className="subtle">WORLD GT — R_A / R_B (anonymous environmental quantities). Ecology gated independently via Experimental (Climate / R_A / R_B).</div>
+          <KV name="R_A mean" value={effWorld?.resources_now?.R_A?.mean ?? experiment.observer_ground_truth?.resources?.R_A_mean}/>
+          <KV name="R_A max" value={effWorld?.resources_now?.R_A?.max}/>
+          <KV name="R_B mean" value={effWorld?.resources_now?.R_B?.mean ?? experiment.observer_ground_truth?.resources?.R_B_mean}/>
+          <KV name="R_B max" value={effWorld?.resources_now?.R_B?.max}/>
+          <button type="button" onClick={() => openFloat('effective_world')}>Effective World</button>
+        </div>
+      );
+      if (tabId === 'predictive') {
+        const pscMech = (mechanisms || []).find((m: any) => m.id === 'prospective_scenario_competition');
+        const smcMech = (mechanisms || []).find((m: any) => m.id === 'sensorimotor_consequence_model');
+        const hssMech = (mechanisms || []).find((m: any) => m.id === 'historical_sensorimotor_selection_bridge');
+        const cpoMech = (mechanisms || []).find((m: any) => m.id === 'contextual_predictive_organization');
+        const cgpMech = (mechanisms || []).find((m: any) => m.id === 'context_grounded_prospection');
+        const ppcMech = (mechanisms || []).find((m: any) => m.id === 'persistent_prospective_control');
+        const pscOn = Boolean(pscMech?.enabled);
+        const renderMech = (m: any, extraTitle?: string) => {
+          if (!m) return null;
+          const deps = (m.dependencies || []) as string[];
+          const missing = deps.filter((d) => !(mechanisms || []).find((x: any) => x.id === d && x.enabled));
+          return (
             <div key={m.id} className="metric" style={{ alignItems: 'center' }}>
-              <span title={m.description}>{m.label || m.id}</span>
-              <button type="button" onClick={() => toggleMechanism(m)}>{m.enabled ? 'ON' : 'OFF'}</button>
+              <span title={(m.description || '') + (mechanismHelp(m) ? (' — ' + mechanismHelp(m)) : '') + (extraTitle ? (' — ' + extraTitle) : '')}>
+                {m.label || m.id}
+              </span>
+              <button type="button" disabled={!m.ablatable} onClick={() => toggleMechanism(m)}>
+                {m.enabled ? 'ON' : 'OFF'}
+              </button>
+              {missing.length > 0 && (
+                <span className="subtle" title="Dependency-aware Observer hint — does not auto-enable">
+                  requires {missing.join(', ')}
+                </span>
+              )}
             </div>
-          ))}
-          <div className="na">ACTIVE_SENSOR_ORIENTATION = NOT_AVAILABLE</div>
-          <div className="section-label">Other ablatable mechanisms</div>
-          <div style={{ maxHeight: 160, overflow: 'auto' }}>
-            {otherAblatable.slice(0, 40).map((m: any) => (
+          );
+        };
+        return (
+          <div className="device-form">
+            <div className="flag" style={{ alignSelf: 'flex-start' }}>LIVE</div>
+            <div className="subtle">
+              Predictive / PSC controls. Motor resolution is a MODE, not an ON/OFF mechanism.
+              Hot-toggle preserves history, SMC, and body.
+            </div>
+            <div className="section-label">PROSPECTIVE SCENARIO COMPETITION</div>
+            {pscMech ? (
+              <div className="metric" style={{ alignItems: 'center' }}>
+                <span title={(pscMech.description || '') + (mechanismHelp(pscMech) ? (' — ' + mechanismHelp(pscMech)) : '')}>
+                  {pscMech.label || pscMech.id}
+                </span>
+                <button type="button" disabled={!pscMech.ablatable} onClick={() => toggleMechanism(pscMech)}>
+                  {pscMech.enabled ? 'ON' : 'OFF'}
+                </button>
+              </div>
+            ) : (
+              <div className="na">PSC mechanism not in registry snapshot</div>
+            )}
+            <PscMotorResolutionControl
+              pscEnabled={pscOn}
+              refreshKey={`${header?.tick ?? ''}-${header?.run_id ?? ''}-${String(pscOn)}`}
+            />
+            <div className="section-label">4.26–4.28 Context → Prospection → Control</div>
+            <div className="subtle">
+              Experimental. Primary labels are scientific. “Intention-like” is Observer interpretation only — no INTENTION variable in cognition.
+            </div>
+            {renderMech(cpoMech, 'Reusable higher-order predictive organization formed from repeated relational experience.')}
+            {renderMech(cgpMech, 'Prospective composition using learned higher-order contextual structures.')}
+            {renderMech(ppcMech, 'Selected prospective continuation may remain causally relevant while predictive support persists. Observer interpretation: intention-like prospective control.')}
+            <div className="section-label">Related predictive mechanisms</div>
+            {[smcMech, hssMech].filter(Boolean).map((m: any) => (
               <div key={m.id} className="metric" style={{ alignItems: 'center' }}>
-                <span title={m.description}>{m.label || m.id}</span>
-                <button type="button" onClick={() => toggleMechanism(m)}>{m.enabled ? 'ON' : 'OFF'}</button>
+                <span title={(m.description || '') + (mechanismHelp(m) ? (' — ' + mechanismHelp(m)) : '')}>
+                  {m.label || m.id}
+                </span>
+                <button type="button" disabled={!m.ablatable} onClick={() => toggleMechanism(m)}>
+                  {m.enabled ? 'ON' : 'OFF'}
+                </button>
               </div>
             ))}
           </div>
-          <div className="section-label">Flow channel ablations</div>
-          <div className="na">Direct / wave thermal-body coupling — NOT independently available in runtime (see CLIMATE_AUTHORITY_AUDIT_01). No fake switches.</div>
-          <button type="button" onClick={() => openFloat('effective_world')}>Effective World truth</button>
-          <button type="button" onClick={() => openFloat('mechanisms')}>All mechanisms</button>
-          <button type="button" onClick={() => openFloat('interventions')}>
-            Interventions · {Number(frame?.world_intervention_summary?.n || 0)}
-          </button>
+        );
+      }
+      if (tabId === 'perception' || tabId === 'ablations') return (
+        <div className="device-form">
+          <div className="flag" style={{ alignSelf: 'flex-start' }}>LIVE INTERVENTION</div>
+          {tabId === 'perception' && (
+            <>
+              <div className="section-label">Vision / illumination</div>
+              <div className="subtle">Physical near-field vision and illumination cycle — independent LIVE gates.</div>
+              {visionMechs.map((m: any) => (
+                <div key={m.id} className="metric" style={{ alignItems: 'center' }}>
+                  <span title={(m.description || '') + (mechanismHelp(m) ? (' — ' + mechanismHelp(m)) : '')}>{m.label || m.id}</span>
+                  <button type="button" onClick={() => toggleMechanism(m)}>{m.enabled ? 'ON' : 'OFF'}</button>
+                </div>
+              ))}
+              {(() => {
+                const aso = String(
+                  physical?.orientation?.ACTIVE_SENSOR_ORIENTATION
+                  || physical?.near_field_exteroception?.ACTIVE_SENSOR_ORIENTATION
+                  || 'NOT_AVAILABLE',
+                );
+                const headOn = Boolean(physical?.orientation?.articulated_head_enabled);
+                const headHeading = physical?.orientation?.head_world_heading
+                  ?? physical?.near_field_exteroception?.head_world_heading;
+                const bodyTheta = physical?.orientation?.theta
+                  ?? physical?.near_field_exteroception?.body_theta;
+                return (
+                  <>
+                    <div className="metric">
+                      <span>ACTIVE_SENSOR_ORIENTATION</span>
+                      <strong>{aso}</strong>
+                    </div>
+                    {aso === 'AVAILABLE' ? (
+                      <div className="metric">
+                        <span>head_world_heading (Observer GT)</span>
+                        <strong>{headHeading == null ? '—' : Number(headHeading).toFixed(4)}</strong>
+                      </div>
+                    ) : (
+                      <div className="subtle">
+                        NOT_AVAILABLE = articulated head OFF — no independent sensor DOF.
+                        Vision FOV still uses body θ={bodyTheta == null ? '—' : Number(bodyTheta).toFixed(4)} (locomotion heading).
+                        {headOn ? ' (config claims head ON — check runtime authority)' : ''}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </>
+          )}
+          {tabId === 'ablations' && (
+            <>
+              <div className="section-label">Other ablatable mechanisms</div>
+              {otherAblatable.slice(0, 40).map((m: any) => (
+                <div key={m.id} className="metric" style={{ alignItems: 'center' }}>
+                  <span title={(m.description || '') + (mechanismHelp(m) ? (' — ' + mechanismHelp(m)) : '')}>{m.label || m.id}</span>
+                  <button type="button" onClick={() => toggleMechanism(m)}>{m.enabled ? 'ON' : 'OFF'}</button>
+                </div>
+              ))}
+              <div className="section-label">Flow channel ablations</div>
+              <div className="na">Direct / wave thermal-body coupling — NOT independently available in runtime (see CLIMATE_AUTHORITY_AUDIT_01). No fake switches.</div>
+              <button type="button" onClick={() => openFloat('effective_world')}>Effective World truth</button>
+              <button type="button" onClick={() => openFloat('mechanisms')}>All mechanisms</button>
+              <button type="button" onClick={() => openFloat('interventions')}>
+                Interventions · {Number(frame?.world_intervention_summary?.n || 0)}
+              </button>
+            </>
+          )}
         </div>
       );
     }
-    if (deviceTool === 'intervention') return (
+    if (which === 'intervention') return (
       <div className="device-form">
         <div className="metric"><span>UNDERCOVER</span><strong>{undercoverIn ? 'IN WORLD' : 'OUT'}</strong></div>
         <InteractPanel live={frame.experimenter_interaction} globalPressed={expKb.pressed} onRefresh={() => undefined} />
       </div>
     );
-    if (deviceTool === 'observe') return (
-      <div className="device-form">
-        <div className="toolbar-row" style={{ gap: 6, flexWrap: 'wrap' }}>
-          <button type="button" onClick={() => openFloat('observe_overlays')}>Overlays</button>
-          <button type="button" onClick={() => openFloat('observe_inspector')}>Inspector</button>
-          <button type="button" onClick={() => openFloat('geometry')}>Geometry</button>
-          <button type="button" onClick={() => openFloat('agent_details')}>Agent details</button>
-          <button type="button" onClick={() => { setTab('MIND'); openFloat('agent_details'); }}>Mind</button>
-          <button type="button" onClick={() => { setTab('TIMELINE'); openFloat('signal_forensics'); }}>Timeline</button>
-          <button type="button" onClick={() => { setTab('DATA'); openFloat('run_details'); }}>Data</button>
-        </div>
-        <label>View <select value={worldView} onChange={e => setWorldView(e.target.value)}>
-          <option>PHYSICAL</option><option>TRAVERSABILITY</option><option>DEFLECTION</option>
-          <option>FLOW</option><option>TRAJECTORY</option><option>AGENT_PERCEPTION</option>
-        </select></label>
-        <div className="subtle">Detailed GT overlays open in floating windows — map stays clear.</div>
-        <button type="button" onClick={() => setFullscreen(!fullscreen)}>{fullscreen ? 'Exit fullscreen map' : 'Fullscreen map'}</button>
-        <button type="button" onClick={() => setLegacyPanels(!legacyPanels)}>{legacyPanels ? 'Hide legacy panels' : 'Show legacy panels'}</button>
-        {tab === 'MIND' && <div style={{ marginTop: 8 }}>{mindTab}</div>}
-        {tab === 'TIMELINE' && <div style={{ marginTop: 8 }}>{timelineTab}</div>}
-        {tab === 'DATA' && <div style={{ marginTop: 8 }}>{dataTab}</div>}
-      </div>
-    );
-    if (deviceTool === 'sensors') return (
+    if (which === 'observe') return null;
+    if (which === 'sensors') {
+      const visionMech = (mechanisms || []).find((m: any) => m.id === 'physical_near_field_vision');
+      const vRow = visionRowFromIntegrity(integrity);
+      const runtimeR = Math.max(
+        1,
+        Math.min(
+          3,
+          Number(
+            physical?.near_field_exteroception?.vision_radius
+            ?? physical?.near_field_exteroception?.radius
+            ?? vRow?.runtime_radius
+            ?? vRow?.radius
+            ?? 3,
+          ),
+        ),
+      );
+      const configuredR = vRow?.configured_radius != null
+        ? Number(vRow.configured_radius)
+        : runtimeR;
+      const visionMismatch = Boolean(
+        vRow?.status && vRow.status !== 'READY',
+      ) || (configuredR !== runtimeR);
+      return (
       <div className="device-form section-agent">
-        <div className="section-label">Vision</div>
+        <MechanismPreflightPanel integrity={integrity} />
+        <VisionExperimenterControl
+          visionEnabled={visionAuthorityOn}
+          runtimeRadius={runtimeR}
+          configuredRadius={configuredR}
+          mismatch={visionMismatch}
+          visionMechanismPresent={!!visionMech}
+          onToggleVision={visionMech ? () => toggleMechanism(visionMech) : undefined}
+          onSetRadius={setVisionRadius}
+        />
+        <div className="section-label">Agent-accessible channels</div>
         <VisionBars
           observation={agentObservation}
           visionEnabled={visionAuthorityOn}
           agentLabel={String(selectedAgentId || 'agent_0').toUpperCase()}
         />
         <div className="subtle">AGENT-ACCESSIBLE exo_* · FOV overlay on map while Sensors is open (Observer GT only).</div>
-        <div className="metric"><span>Vision</span><strong>{visionAuthorityOn ? 'ON' : 'OFF'}</strong></div>
         <div className="metric"><span>Illumination cycle</span><strong>{(mechanisms || []).find((m: any) => m.id === 'illumination_cycle')?.enabled ? 'ON' : 'OFF'}</strong></div>
         <div className="metric"><span>Illumination (GT)</span><strong>{physical?.near_field_exteroception?.illumination ?? '—'}</strong></div>
-        <div className="na">ACTIVE_SENSOR_ORIENTATION = NOT_AVAILABLE · no TURN/LOOK</div>
+        {(() => {
+          const aso = String(
+            physical?.orientation?.ACTIVE_SENSOR_ORIENTATION
+            || physical?.near_field_exteroception?.ACTIVE_SENSOR_ORIENTATION
+            || 'NOT_AVAILABLE',
+          );
+          const fovAxis = physical?.near_field_exteroception?.sensor_forward_axis
+            ?? physical?.near_field_exteroception?.head_world_heading
+            ?? physical?.orientation?.theta;
+          return (
+            <>
+              <div className="metric">
+                <span>ACTIVE_SENSOR_ORIENTATION</span>
+                <strong>{aso}</strong>
+              </div>
+              {aso === 'AVAILABLE' ? (
+                <div className="metric">
+                  <span>sensor FOV axis (Observer GT)</span>
+                  <strong>{fovAxis == null ? '—' : Number(fovAxis).toFixed(4)}</strong>
+                </div>
+              ) : (
+                <div className="subtle">
+                  NOT_AVAILABLE = articulated head OFF — no independent sensor DOF.
+                  Map FOV uses body θ={fovAxis == null ? '—' : Number(fovAxis).toFixed(4)}.
+                  No LOOK_AT / TRACK / ATTENTION.
+                </div>
+              )}
+            </>
+          );
+        })()}
         <button type="button" onClick={() => openFloat('sensor_inspector')}>Open Vision Inspector</button>
         <NearFieldSensorPanel
           physical={physical}
@@ -2135,32 +2754,62 @@ export default function App() {
           onToggleMechanism={toggleMechanism}
           onSetVisionRadius={setVisionRadius}
         />
+        <VestibularProprioceptionPanel
+          physical={physical}
+          agentObservation={agentObservation}
+          mechanisms={mechanisms}
+          onToggleMechanism={toggleMechanism}
+          cognitionEnabled={
+            !(
+              String(selectedAgentId || '').toLowerCase().includes('undercover')
+              && !(mechanisms || []).some((m: any) => m.id === 'cognition' && m.enabled)
+            )
+          }
+        />
       </div>
-    );
-    if (deviceTool === 'signals') return (
+      );
+    }
+    if (which === 'signals') return (
       <div className="device-form">
-        <SignalSequence events={events} />
-        <button type="button" onClick={() => openFloat('signal_forensics')}>Signal Forensics</button>
+        <MechanismAwareSignals
+          events={events}
+          physical={physical}
+          mechanisms={mechanisms}
+          agentObservation={agentObservation}
+          attribution={
+            selectedEvent?.evidence?.source_attribution
+            || selectedEvent?.evidence?.attribution
+            || selectedEvent?.attribution
+            || null
+          }
+        />
+        <button type="button" onClick={() => openFloat('signal_forensics')}>Signal Forensics V2</button>
         <div className="subtle">Analyzer candidate relations open in forensics — not shown as meaning.</div>
       </div>
     );
-    if (deviceTool === 'analyze') return (
+    if (which === 'analyze') return (
       <div className="device-form section-analyzer">
         <div className="metric"><span>Current run</span><strong>{currentRunId || '—'}</strong></div>
         <div className="metric"><span>Archived</span><strong>{archivedRuns.length}</strong></div>
+        {liveFrame?.header?.status === 'RUNNING' ? (
+          <div className="pending-banner">
+            LIVE SIMULATION PRIORITY — full Analyzer evidence package is not auto-run while RUNNING.
+            Pause/Stop, then Analyze Current; or use Analyze snapshot explicitly (may compete for I/O).
+          </div>
+        ) : null}
         <button type="button" className="active" onClick={() => { void runAnalyzeCurrent(); openFloat('analysis'); }}>Analyze Current</button>
         <button type="button" onClick={() => { refreshSavedRuns(); openFloat('analysis'); }}>Open Analysis Window</button>
         <button type="button" onClick={() => runExplicitAnalysis()}>Run explicit analysis</button>
       </div>
     );
-    if (deviceTool === 'runs') return (
+    if (which === 'runs') return (
       <div className="device-form">
         <button type="button" onClick={() => { refreshSavedRuns(); openFloat('run_details'); }}>Run catalog</button>
         <div className="subtle">Uses existing session/local archive — not a fake database.</div>
         {overviewPanel}
       </div>
     );
-    if (deviceTool === 'world_status') return (
+    if (which === 'world_status') return (
       <div className="device-form section-gt">
         <div className="metric"><span>Requested</span><strong>{effWorld?.requested_preset || experiment.ecology_preset || '—'}</strong></div>
         <div className="metric"><span>Fingerprint</span><strong>{String(effWorld?.world_fingerprint || '').slice(0, 8) || '—'}</strong></div>
@@ -2188,14 +2837,46 @@ export default function App() {
           onToggleMechanism={toggleMechanism}
           onSetVisionRadius={setVisionRadius}
         />
+        <VestibularProprioceptionPanel
+          physical={physical}
+          agentObservation={agentObservation}
+          mechanisms={mechanisms}
+          onToggleMechanism={toggleMechanism}
+        />
+        <OscillatorySignalingPanel
+          physical={physical}
+          agentObservation={agentObservation}
+          mechanisms={mechanisms}
+          onToggleMechanism={toggleMechanism}
+        />
+        <SensorimotorConsequencePanel />
+        <HistoricalSensorimotorSelectionPanel />
+        <SignalSensorimotorPanel />
+        <ContextualProspectiveControlPanel
+          frame={frame}
+          agentId={desiredAgentId || requestedAgentId(frame)}
+          detail={frame?.observer?.frame_detail}
+        />
+
       </div>
     );
     if (id === 'signal_forensics') return (
-      <div>
-        <div className="section-gt"><SignalSequence events={events} /></div>
-        <div className="section-analyzer" style={{ marginTop: 8 }}>
-          <SignalContextPanel selectedEvent={selectedEvent} />
-        </div>
+      <div className="section-analyzer">
+        <SignalContextPanel
+          live={frame.signal_context_interpretation}
+          selectedEvent={selectedEvent}
+          sourceMeta={{
+            run_id: currentRunId,
+            generation: header.runtime_generation,
+            tick: header.tick,
+            telemetry_schema:
+              frame.scientific_history?.telemetry_schema
+              || frame.header?.telemetry_schema
+              || 'SCIENTIFIC_TELEMETRY_V2',
+            motor_schema: frame.motor_control?.schema || 'COMPOSITE_MOTOR_V1',
+            coverage: Number(header.tick) > 0 ? 'LIVE CURRENT RUN' : 't0 — NO EVIDENCE YET',
+          }}
+        />
       </div>
     );
     if (id === 'effective_world') {
@@ -2225,9 +2906,9 @@ export default function App() {
       );
     }
     if (id === 'mechanisms') return (
-      <div>
+      <div className="float-fill-list">
         <div className="metric"><span>Active</span><strong>{(mechanisms || []).filter((m: any) => m.enabled).length}</strong></div>
-        <div style={{ maxHeight: 360, overflow: 'auto' }}>
+        <div className="float-fill-scroll">
           {(mechanisms || []).map((m: any) => (
             <div key={m.id} className="metric" style={{ alignItems: 'center' }}>
               <span>{m.label || m.id}</span>
@@ -2281,6 +2962,7 @@ export default function App() {
     if (id === 'raw') return <pre style={{ fontSize: 10, whiteSpace: 'pre-wrap' }}>{JSON.stringify(frame, null, 2)}</pre>;
     return <div className="na">Empty</div>;
   }
+  void floatBody;
 
   const applyFromDevice = async () => {
     const payload: any = {
@@ -2290,7 +2972,18 @@ export default function App() {
       world: { width: +width, height: +height, boundary_mode: 'WRAP_PERIODIC' },
       agent_body: { mass: +bodyMass, v_max: +bodyVMax },
     };
-    if (twoAgentExperimental) payload.agent_count = 2;
+    if (preset === 'MM 1.0 — Tiktaalik Public Beta 3') {
+      payload.public_preset = 'BETA3_RECOMMENDED';
+      payload.psc_motor_resolution = 'OBSERVED_COMPOSITE';
+      payload.agent_count = 2;
+    } else {
+      payload.mechanisms = Object.fromEntries(
+        (mechanisms || [])
+          .filter((m: any) => m && m.id && m.ablatable !== false)
+          .map((m: any) => [m.id, !!m.enabled]),
+      );
+      if (twoAgentExperimental) payload.agent_count = 2;
+    }
     if (targetTick.trim() !== '' && Number.isFinite(+targetTick)) payload.target_tick = +targetTick;
     if (Number.isFinite(+uiHz)) payload.ui_hz = +uiHz;
     if (Number.isFinite(+bufferCapacity)) payload.buffer_capacity = Math.max(8, +bufferCapacity);
@@ -2301,6 +2994,10 @@ export default function App() {
     const f = await applyExperiment(payload);
     resetGeoEmpiricalCache();
     setControlMessage(f.control_receipt);
+    if (Array.isArray(f.mechanism_result?.mechanisms)) {
+      setMechanisms(f.mechanism_result.mechanisms);
+    }
+    await refreshAux().catch(() => undefined);
     setAppliedConfig({ ...editConfig });
     const agent = desiredAgentIdRef.current || requestedAgentId(f);
     const projected = applyProjectionToFrame(mergeGeoTransportIntoFrame(f), agent);
@@ -2308,16 +3005,17 @@ export default function App() {
   };
 
   const applyLiveFromDevice = async () => {
+    const screen = tabToExperimentScreen(inspUi.tabs.EXPERIMENT || 'ecology');
     const payload: any = {
       source: 'observer_ui',
-      category: experimentScreen === 'set_model' ? 'model'
-        : experimentScreen === 'set_ecology' ? 'ecology'
-        : experimentScreen === 'set_resources' ? 'resources'
+      category: screen === 'set_model' ? 'model'
+        : screen === 'set_ecology' ? 'ecology'
+        : screen === 'set_resources' ? 'resources'
         : 'experimental',
     };
-    if (experimentScreen === 'set_ecology') {
+    if (screen === 'set_ecology') {
       payload.ecology_preset = ecologyPreset;
-    } else if (experimentScreen === 'set_model') {
+    } else if (screen === 'set_model') {
       payload.cognition_enabled = cognitionEnabled;
       if (targetTick.trim() !== '' && Number.isFinite(+targetTick)) payload.target_tick = +targetTick;
       if (Number.isFinite(+uiHz)) payload.ui_hz = +uiHz;
@@ -2329,11 +3027,11 @@ export default function App() {
       if (f.control_receipt?.accepted) {
         setAppliedConfig((prev: any) => ({
           ...(prev || editConfig),
-          ecologyPreset: experimentScreen === 'set_ecology' ? ecologyPreset : (prev?.ecologyPreset ?? ecologyPreset),
-          cognitionEnabled: experimentScreen === 'set_model' ? cognitionEnabled : (prev?.cognitionEnabled ?? cognitionEnabled),
-          targetTick: experimentScreen === 'set_model' ? targetTick : (prev?.targetTick ?? targetTick),
-          uiHz: experimentScreen === 'set_model' ? uiHz : (prev?.uiHz ?? uiHz),
-          bufferCapacity: experimentScreen === 'set_model' ? bufferCapacity : (prev?.bufferCapacity ?? bufferCapacity),
+          ecologyPreset: screen === 'set_ecology' ? ecologyPreset : (prev?.ecologyPreset ?? ecologyPreset),
+          cognitionEnabled: screen === 'set_model' ? cognitionEnabled : (prev?.cognitionEnabled ?? cognitionEnabled),
+          targetTick: screen === 'set_model' ? targetTick : (prev?.targetTick ?? targetTick),
+          uiHz: screen === 'set_model' ? uiHz : (prev?.uiHz ?? uiHz),
+          bufferCapacity: screen === 'set_model' ? bufferCapacity : (prev?.bufferCapacity ?? bufferCapacity),
         }));
       }
       const agent = desiredAgentIdRef.current || requestedAgentId(f);
@@ -2344,42 +3042,100 @@ export default function App() {
     }
   };
 
-  return <div className="desktop app">
-    <header className="desktop-top">
-      <strong>MM</strong>
-      <span>{header.model_display_name || 'Tiktaalik'}</span>
-      <span className="sep">|</span>
-      <span>t{header.tick}</span>
-      <Status value={displayStatus}/>
-      <Status value={mode}/>
-      <span>{header.simulation_speed === 50 ? 'MAX' : `${header.simulation_speed ?? 1}×`}</span>
-      <span className="sep">|</span>
-      <div className="transport-bar">
-        <button className={mode==='LIVE'?'active':''} onClick={()=>{setMode('LIVE');setViewFrame(liveFrame)}}>LIVE</button>
-        <button onClick={()=>control('play')} disabled={!!finalizing}>Play</button>
-        <button onClick={()=>control('pause')} disabled={!!finalizing}>Pause</button>
-        <button onClick={()=>control('step',{n:1})} disabled={!!finalizing}>Step</button>
-        <button onClick={openStopDialog} disabled={!!finalizing}>Stop</button>
-        <button onClick={()=>control('reset')} disabled={!!finalizing}>Reset</button>
-        <select value={String(header.simulation_speed ?? 1)} onChange={e=>control('speed',{speed:+e.target.value})}>
-          {SPEEDS.map(s => <option key={s} value={s}>{s===50?'MAX':`${s}×`}</option>)}
-        </select>
-      </div>
-      {pending && <span className="flag pending">PENDING CONFIG</span>}
-      {overrideCount > 0 && <span className="flag overrides" onClick={() => openFloat('effective_world')} style={{cursor:'pointer'}}>
-        {String(effWorld?.requested_preset || ecologyPreset || 'WORLD').replace(/_/g,' ').slice(0,22)} · OV {overrideCount}
-      </span>}
-    </header>
+  const observeAttribution =
+    selectedEvent?.evidence?.source_attribution
+    || selectedEvent?.evidence?.attribution
+    || selectedEvent?.attribution
+    || null;
+  const observeSlice = (section: 'agent' | 'body' | 'environment' | 'cognition' | 'predictive') => (
+    <ObserveV2Panel
+      section={section}
+      frame={frame}
+      events={events}
+      timeline={timeline}
+      runId={currentRunId}
+      agentId={selectedAgentId}
+      agentObservation={agentObservation}
+      attribution={observeAttribution}
+      onSelectEvent={(e) => setSelectedEvent(e)}
+      rawEvidenceSlot={section === 'cognition' ? timelineTab : undefined}
+    />
+  );
+  const observeByTab = {
+    agent: (
+      <>
+        {observeSlice('agent')}
+        <InspectorAccordion id="observe-agent-details" title="Diagnostics · agent details" defaultOpen={false}>
+          {agentTab}
+        </InspectorAccordion>
+      </>
+    ),
+    body: observeSlice('body'),
+    environment: (
+      <>
+        {observeSlice('environment')}
+        <InspectorAccordion id="observe-overlays" title="Overlays" defaultOpen={false}>
+          {layerControls}
+        </InspectorAccordion>
+        <InspectorAccordion id="observe-geometry" title="Geometry" defaultOpen={false}>
+          <GeometryPanel geometry={frame.geometry_interpretation} />
+        </InspectorAccordion>
+        <InspectorAccordion id="observe-cell-inspector" title="Diagnostics · cell / body inspector" defaultOpen={false}>
+          {inspector}
+        </InspectorAccordion>
+      </>
+    ),
+    cognition: (
+      <>
+        {observeSlice('cognition')}
+        <InspectorAccordion id="observe-mind" title="Diagnostics · mind" defaultOpen={false}>
+          {mindTab}
+        </InspectorAccordion>
+        <InspectorAccordion id="observe-data" title="Diagnostics · data" defaultOpen={false}>
+          {dataTab}
+        </InspectorAccordion>
+      </>
+    ),
+    predictive: (
+      <>
+        {observeSlice('predictive')}
+        <InspectorAccordion id="observe-signal-forensics" title="Diagnostics · signal forensics" defaultOpen={false}>
+          <SignalContextPanel
+            live={frame.signal_context_interpretation}
+            selectedEvent={selectedEvent}
+            sourceMeta={{
+              run_id: currentRunId,
+              generation: header.runtime_generation,
+              tick: header.tick,
+              telemetry_schema:
+                frame.scientific_history?.telemetry_schema
+                || frame.header?.telemetry_schema
+                || 'SCIENTIFIC_TELEMETRY_V2',
+              motor_schema: frame.motor_control?.schema || 'COMPOSITE_MOTOR_V1',
+              coverage: Number(header.tick) > 0 ? 'LIVE CURRENT RUN' : 't0 — NO EVIDENCE YET',
+            }}
+          />
+        </InspectorAccordion>
+      </>
+    ),
+  };
+
+  return <div className="desktop app" data-observer-shell data-workspace={lab.workspace}>
+    <ClockDriver />
+    <InterestDriver />
+    <AuxPollDriver refreshAux={refreshAuxStable} mode={mode} />
+    <ObserverHeader
+      onControl={control}
+      onStop={openStopDialog}
+      disabled={!!finalizing || connection === 'DISCONNECTED'}
+    />
 
     {expKb.active && (
       <div className="subtle" style={{ padding: '3px 10px', borderBottom: '1px solid var(--line)', fontSize: 11 }}>
-        YOU CONTROL TIKTAALIK · WASD · SPACE wait · Q/E FIELD {expKb.pressed ? `· ${expKb.pressed}` : ''}
+        YOU CONTROL EXPERIMENTER BODY · WASD · SPACE wait · Q/E FIELD {expKb.pressed ? `· ${expKb.pressed}` : ''}
       </div>
     )}
-    {finalizing && <div className="control-receipt warn-banner">{finalizing}</div>}
-    {controlMessage && <div className={`control-receipt ${controlMessage.accepted?'ok':'bad'}`}>
-      {controlMessage.operation}: {controlMessage.accepted?'ACCEPTED':'REJECTED'} · t{controlMessage.verified_final_tick ?? controlMessage.tick}
-    </div>}
+    <LifecycleBanners />
     {analysisCopyMsg && <div className="control-receipt ok">{analysisCopyMsg}</div>}
     {stopDialog && <div className="stop-dialog-backdrop" style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000,
@@ -2410,103 +3166,115 @@ export default function App() {
           collapsed={deviceCollapsed}
           onToggleCollapse={() => setDeviceCollapsed(v => !v)}
           tool={deviceTool}
-          onTool={(t) => { setDeviceTool(t); if (t === 'experiment') setExperimentScreen('menu'); if (t === 'analyze') void runAnalyzeCurrent(); }}
+          activeTool={railSelectedTool(lab, deviceTool, deviceCollapsed)}
+          onTool={(t) => {
+            const { dest, nextWorkspace } = applyRailDestination(t, workspaceStore.get());
+            setDeviceTool(dest.deviceTool);
+            setDeviceCollapsed(dest.deviceCollapsed);
+            workspaceStore.set(nextWorkspace);
+          }}
           experimentScreen={experimentScreen}
           onExperimentScreen={setExperimentScreen}
           pending={pending}
           overrideCount={overrideCount}
           undercoverInWorld={undercoverIn}
           selectedAgentLabel={String(selectedAgentId || 'agent_0').toUpperCase()}
-        >
-          {deviceBody()}
-          {deviceTool === 'experiment' && experimentScreen === 'set_world' && (
-            <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <button type="button" className="active" onClick={applyFromDevice} disabled={!!finalizing}>
-                APPLY &amp; RESET WORLD
-              </button>
-              {pending && appliedConfig && (
-                <button type="button" onClick={() => {
-                  setSeed(String(appliedConfig.seed));
-                  setWidth(String(appliedConfig.width));
-                  setHeight(String(appliedConfig.height));
-                  setEcologyPreset(String(appliedConfig.ecologyPreset));
-                  setCognitionEnabled(Boolean(appliedConfig.cognitionEnabled));
-                  setTwoAgentExperimental(Boolean(appliedConfig.twoAgentExperimental));
-                  setBodyMass(String(appliedConfig.bodyMass));
-                  setBodyVMax(String(appliedConfig.bodyVMax));
-                  setTargetTick(String(appliedConfig.targetTick ?? ''));
-                  setUiHz(String(appliedConfig.uiHz));
-                  setBufferCapacity(String(appliedConfig.bufferCapacity));
-                  setTerrainSeedOverride(String(appliedConfig.terrainSeedOverride ?? ''));
-                }}>Discard pending</button>
-              )}
-            </div>
-          )}
-          {deviceTool === 'experiment' && (experimentScreen === 'set_ecology' || experimentScreen === 'set_model') && (
-            <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <button type="button" className="active" onClick={applyLiveFromDevice} disabled={!!finalizing}>
-                APPLY LIVE
-              </button>
-              <div className="subtle">Does not rebuild agents · records WORLD_INTERVENTION when config changes.</div>
-            </div>
-          )}
-          {deviceTool === 'experiment' && experimentScreen === 'set_world' && (
-            <div className="subtle" style={{ marginTop: 8 }}>
-              For ecology / mechanism interventions without reset, use Set Ecology or Experimental.
-            </div>
-          )}
-        </ControlDevice>
+        />
       </div>
 
       <main className="sim-workspace" ref={simWorkspaceRef}>
-        <div className="sim-map-host">
-          {frame.error ? (
-            <Card title="Recorded frame"><div className="availability">{frame.error}: {frame.reason || 'tick not in bounded buffer'}</div></Card>
-          ) : worldWithInspector}
-          <FloatingWindowHost
-            windows={floatWindows}
-            bounds={simBounds}
-            renderBody={floatBody}
-            infoKind={(id) => {
-              if (id === 'effective_world' || id === 'observe_overlays' || id === 'geometry') return 'WORLD_GT';
-              if (id === 'sensor_inspector') return 'AGENT_ACCESSIBLE';
-              if (id === 'analysis' || id === 'signal_forensics') return 'ANALYZER_INFERENCE';
-              return null;
+        {lab.workspace === 'ANALYZE' ? (
+          <AnalyzeWorkspace
+            analysis={runAnalysis}
+            analyzing={analyzing}
+            analysisProgress={analysisProgress}
+            analysisSource={analysisSource}
+            onAnalysisSourceChange={setAnalysisSource}
+            savedRuns={savedRunCatalog}
+            selectedRunId={selectedSavedRunId}
+            onSelectRunId={setSelectedSavedRunId}
+            onRefreshRuns={refreshSavedRuns}
+            onAnalyze={runExplicitAnalysis}
+            onAnalyzeCurrent={runAnalyzeCurrent}
+            onCopy={async () => {
+              const text = runAnalysis?.analysis_log || '';
+              try {
+                await navigator.clipboard.writeText(text);
+                setAnalysisCopyMsg('Analysis log copied to clipboard');
+              } catch {
+                setAnalysisCopyMsg('Clipboard unavailable — use Download');
+              }
             }}
-            onFocus={(id) => setFloatWindows((w) => focusWindow(w, id))}
-            onClose={(id) => setFloatWindows((w) => closeWindow(w, id))}
-            onMove={(id, x, y) => setFloatWindows((w) => moveWindow(w, id, x, y, simBounds))}
-            onResize={(id, ww, hh) => setFloatWindows((w) => resizeWindow(w, id, ww, hh, simBounds))}
-            onMaximize={(id) => setFloatWindows((w) => toggleMaximize(w, id, simBounds))}
-            onReset={(id) => setFloatWindows((w) => resetWindowPosition(w, id, simBounds))}
+            onDownload={() => {
+              const text = runAnalysis?.analysis_log || '';
+              const a = document.createElement('a');
+              a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+              a.download = `mm_run_analysis_t${runAnalysis?.generated_at_tick ?? 0}.txt`;
+              a.click();
+            }}
+            onInspectTick={(t) => { inspect(t); }}
+            overview={overviewPanel}
           />
-        </div>
-        <footer className="sim-hud">
-          {(agentsObs.length ? agentsObs : [{ observer_id: selectedAgentId, selected_action: body?.selected_action }]).map((a: any, i: number) => {
-            const id = a.observer_id || `agent_${i}`;
-            const active = id === selectedAgentId;
-            return (
-              <button key={id} type="button" className={`agent-sel agent-chip ${active ? 'active' : ''}`}
-                onClick={() => selectObserverAgent(Number(String(id).replace(/\D/g, '') || i))}>
-                <b>{String(id).toUpperCase()}</b>
-                <span>{a.selected_action || '—'}</span>
-              </button>
-            );
-          })}
-          {undercoverIn && <span className="flag undercover in">UNDERCOVER: IN WORLD</span>}
-          <VisionBars
-            observation={agentObservation}
-            visionEnabled={visionAuthorityOn}
-            agentLabel={String(selectedAgentId || 'agent_0').toUpperCase()}
+        ) : lab.workspace === 'INSPECT' ? (
+          <InspectWorkspace
+            prefs={worldPrefs}
+            mechanisms={mechanisms}
+            onToggleMechanism={(id, enabled) => {
+              const m = (mechanisms || []).find((x: any) => x.id === id);
+              if (m) void toggleMechanism(m, enabled);
+            }}
+            onSetVisionRadius={setVisionRadius}
+            onSelectCell={inspectCell}
+            expPressed={expKb.pressed}
+            mapKey={mapKey}
+            extras={{
+              experiment: deviceBody('experiment'),
+              observeByTab,
+              runs: deviceBody('runs'),
+              worldStatus: deviceBody('world_status'),
+              sensors: (
+                <>
+                  <VisionBars
+                    observation={agentObservation}
+                    visionEnabled={visionAuthorityOn}
+                    agentLabel={String(selectedAgentId || 'agent_0').toUpperCase()}
+                  />
+                  <button type="button" onClick={() => openFloat('sensor_inspector')}>Open Vision Inspector</button>
+                </>
+              ),
+              signals: (
+                <>
+                  <MechanismAwareSignals
+                    events={events}
+                    physical={physical}
+                    mechanisms={mechanisms}
+                    agentObservation={agentObservation}
+                    attribution={
+                      selectedEvent?.evidence?.source_attribution
+                      || selectedEvent?.evidence?.attribution
+                      || selectedEvent?.attribution
+                      || null
+                    }
+                  />
+                  <button type="button" onClick={() => openFloat('signal_forensics')}>Signal Forensics V2</button>
+                </>
+              ),
+            }}
+            onSectionTab={(inspector, tabId) => {
+              if (inspector === 'EXPERIMENT' || inspector === 'MECHANISMS' || inspector === 'PREDICTIVE') {
+                setExperimentScreen(tabToExperimentScreen(
+                  inspector === 'PREDICTIVE' ? 'predictive' : inspector === 'MECHANISMS' ? 'ablations' : tabId,
+                ));
+              }
+            }}
           />
-          <span className="subtle">Mechanisms {(mechanisms || []).filter((m: any) => m.enabled).length} active</span>
-          <button type="button" style={{ marginLeft: 'auto' }} onClick={() => openFloat('raw')}>Raw</button>
-        </footer>
-        {legacyPanels && (
-          <div style={{ maxHeight: 220, overflow: 'auto', borderTop: '1px solid var(--line)', padding: 8 }}>
-            <div className="subtle">Legacy migration surface — temporary parity</div>
-            {experimentTab}
-          </div>
+        ) : (
+          <RunWorkspace
+            prefs={worldPrefs}
+            onSelectCell={inspectCell}
+            onSelectAgent={selectObserverAgent}
+            mapKey={mapKey}
+          />
         )}
       </main>
     </div>

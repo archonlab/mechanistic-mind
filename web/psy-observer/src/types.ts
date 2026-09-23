@@ -43,6 +43,10 @@ export type ObserverFrame = {
   agents_views?: Record<string, any>;
   signal_forensics?: Record<string, any>;
   structured_events?: any[];
+  world_interventions?: any[];
+  motor_control?: Record<string, any>;
+  scientific_history?: Record<string, any>;
+  signal_context_interpretation?: Record<string, any>;
   experiment?: Record<string, any>;
   trajectory?: { points: TrajectoryPoint[]; capacity: number; boundary: string };
   telemetry?: { series: any[]; capacity: number };

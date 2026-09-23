@@ -18,6 +18,12 @@ export async function postControl(path: string, body?: unknown): Promise<Frame> 
   return r.json();
 }
 
+export async function getSaveJob() {
+  const r = await fetch(`${API}/api/control/save-job`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
 export async function getStopInfo() {
   const r = await fetch(`${API}/api/control/stop-info`);
   if (!r.ok) throw new Error(await r.text());
@@ -87,13 +93,17 @@ export async function getSnapshotMeta() {
   return r.json();
 }
 
-export function connectLive(onFrame: (f: Frame) => void): WebSocket {
+export function connectLive(
+  onFrame: (f: Frame) => void,
+  onHeartbeat?: (hb: any) => void,
+): WebSocket {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   const ws = new WebSocket(`${proto}://${location.host}/ws/live`);
   ws.onmessage = (ev) => {
     try {
       const msg = JSON.parse(ev.data);
       if (msg.type === 'frame') onFrame(msg.data);
+      else if (msg.type === 'heartbeat' && onHeartbeat) onHeartbeat(msg.data);
     } catch {
       /* ignore */
     }
@@ -119,6 +129,44 @@ export async function setActionTrace(body: { enabled: boolean; mode?: string }) 
 
 export async function listRuns() {
   const r = await fetch(`${API}/api/runs`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function startAnalysisJob(opts: {
+  source: 'current' | 'saved';
+  run_id?: string | null;
+  cutoff_tick?: number | null;
+}) {
+  const r = await fetch(`${API}/api/analysis/jobs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      source: opts.source,
+      run_id: opts.run_id || undefined,
+      cutoff_tick: opts.cutoff_tick ?? undefined,
+    }),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function getAnalysisJob(jobId: string) {
+  const r = await fetch(`${API}/api/analysis/jobs/${encodeURIComponent(jobId)}`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function cancelAnalysisJob(jobId: string) {
+  const r = await fetch(`${API}/api/analysis/jobs/${encodeURIComponent(jobId)}/cancel`, {
+    method: 'POST',
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function getAnalysisJobResult(jobId: string) {
+  const r = await fetch(`${API}/api/analysis/jobs/${encodeURIComponent(jobId)}/result`);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
@@ -206,14 +254,37 @@ export async function getSignalContextEpisode(episode_id: string) {
   return r.json();
 }
 
+export async function analyzeSignalContextCurrent(opts?: {
+  max_timeline_rows?: number;
+  max_events?: number;
+  max_episode_details?: number;
+  cutoff_tick?: number | null;
+}) {
+  const q = new URLSearchParams();
+  if (opts?.max_timeline_rows != null) q.set('max_timeline_rows', String(opts.max_timeline_rows));
+  if (opts?.max_events != null) q.set('max_events', String(opts.max_events));
+  if (opts?.max_episode_details != null) q.set('max_episode_details', String(opts.max_episode_details));
+  if (opts?.cutoff_tick != null) q.set('cutoff_tick', String(opts.cutoff_tick));
+  const qs = q.toString();
+  const r = await fetch(`${API}/api/signal-context/current${qs ? `?${qs}` : ''}`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
 export async function analyzeSignalContextRun(
   run_id: string,
-  opts?: { max_timeline_rows?: number; max_events?: number; max_episode_details?: number },
+  opts?: {
+    max_timeline_rows?: number;
+    max_events?: number;
+    max_episode_details?: number;
+    reference?: boolean;
+  },
 ) {
   const q = new URLSearchParams();
   if (opts?.max_timeline_rows != null) q.set('max_timeline_rows', String(opts.max_timeline_rows));
   if (opts?.max_events != null) q.set('max_events', String(opts.max_events));
   if (opts?.max_episode_details != null) q.set('max_episode_details', String(opts.max_episode_details));
+  if (opts?.reference) q.set('reference', 'true');
   const qs = q.toString();
   const r = await fetch(
     `${API}/api/signal-context/run/${encodeURIComponent(run_id)}${qs ? `?${qs}` : ''}`,

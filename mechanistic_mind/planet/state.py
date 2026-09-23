@@ -34,6 +34,8 @@ class PlanetState:
     R_B: np.ndarray | None = None  # complementary volatile stock
     FIELD_A: np.ndarray | None = None  # experimental physical signal amplitude; default absent
     FIELD_B: np.ndarray | None = None
+    # Oscillatory band energy (n_bands, H, W); Option B alongside FIELD_A/B. Default absent.
+    OSC_BANDS: np.ndarray | None = None
     # Spatial terrain (optional). None when terrain disabled / legacy snapshots.
     terrain_potential: np.ndarray | None = None
     terrain_drag: np.ndarray | None = None  # always >= 0 when present
@@ -75,6 +77,7 @@ class PlanetState:
             R_B=None if getattr(self, "R_B", None) is None else np.asarray(self.R_B).copy(),
             FIELD_A=None if getattr(self, "FIELD_A", None) is None else np.asarray(self.FIELD_A).copy(),
             FIELD_B=None if getattr(self, "FIELD_B", None) is None else np.asarray(self.FIELD_B).copy(),
+            OSC_BANDS=None if getattr(self, "OSC_BANDS", None) is None else np.asarray(self.OSC_BANDS).copy(),
             terrain_potential=(
                 None if getattr(self, "terrain_potential", None) is None
                 else np.asarray(self.terrain_potential).copy()

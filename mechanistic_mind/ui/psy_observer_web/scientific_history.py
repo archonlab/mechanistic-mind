@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-from .run_finalize import RUN_SUBDIR, agent_summaries, default_results_root
+from .run_finalize import RUN_SUBDIR, agent_summaries, default_results_root, json_safe
 
 SCHEMA_TICK = "mm.psy_observer_web.scientific_tick.v1"
 SCHEMA_EVENT = "mm.psy_observer_web.scientific_event.v1"
@@ -28,6 +28,17 @@ ANALYZER_VERSION = "1.1.0"
 
 # Buffered append cadence: flush every N ticks or on close (O(1) amortized).
 DEFAULT_FLUSH_EVERY = 32
+
+# Telemetry mode (V1 reference vs V2 tiered). Env override: SCIENTIFIC_TELEMETRY_MODE.
+def default_telemetry_mode() -> str:
+    import os
+    from .scientific_telemetry_v2 import TELEMETRY_MODE_V1, TELEMETRY_MODE_V2
+
+    raw = str(os.environ.get("SCIENTIFIC_TELEMETRY_MODE") or TELEMETRY_MODE_V2).strip().upper()
+    if raw in {TELEMETRY_MODE_V1, "V1", "REFERENCE", "SCIENTIFIC_V1"}:
+        return TELEMETRY_MODE_V1
+    return TELEMETRY_MODE_V2
+
 
 
 def live_scientific_dir(results_root: Path | str, run_id: str) -> Path:
@@ -40,7 +51,7 @@ def published_run_dir(results_root: Path | str, run_id: str) -> Path:
 
 
 def _jsonl_line(payload: dict[str, Any]) -> str:
-    return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+    return json.dumps(json_safe(payload), ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
 
 
 def _resource_sum(body: Any, attr: str) -> float | None:
@@ -288,6 +299,27 @@ def _row_for_slot(
     )
     from mechanistic_mind.ui.psy_observer_web.undercover_identity import slot_agent_body_ids
     aid, bid = slot_agent_body_ids(index, experimenter_slot=experimenter_slot)
+    vest_0 = vest_1 = prop_neck_0 = prop_neck_1 = None
+    try:
+        from mechanistic_mind.physical_system.vestibular_proprioception import (
+            cognition_vestibular_fragments,
+            cognition_neck_proprioception_fragments,
+        )
+        vcfg = getattr(getattr(slot, "config", None), "vestibular", None)
+        pcfg = getattr(getattr(slot, "config", None), "neck_proprioception", None)
+        ah = getattr(getattr(slot, "config", None), "articulated_head", None)
+        if vcfg is not None and getattr(vcfg, "enabled", False):
+            vf = cognition_vestibular_fragments(
+                body, vcfg,
+                orientation_meta=getattr(slot, "last_orientation_meta", None),
+                prev_omega=float(getattr(slot, "_prev_body_omega", 0.0) or 0.0),
+            )
+            vest_0, vest_1 = vf.get("vest_0"), vf.get("vest_1")
+        if pcfg is not None and getattr(pcfg, "enabled", False):
+            pf = cognition_neck_proprioception_fragments(body, pcfg, articulated_head=ah)
+            prop_neck_0, prop_neck_1 = pf.get("prop_neck_0"), pf.get("prop_neck_1")
+    except Exception:
+        pass
     return {
         "schema": SCHEMA_TICK,
         "tick": tick,
@@ -295,9 +327,35 @@ def _row_for_slot(
         "body_id": bid,
         "action": getattr(slot, "last_selected_action", None),
         "action_source": sel.get("source"),
+        "motor_output": (
+            getattr(slot, "last_motor_output", None)
+            or sel.get("motor_output")
+        ),
+        "motor_schema": sel.get("motor_schema"),
         "x": float(getattr(body, "x", 0.0) or 0.0),
         "y": float(getattr(body, "y", 0.0) or 0.0),
         "theta": float(getattr(body, "theta", 0.0) or 0.0),
+        "omega": float(getattr(body, "omega", 0.0) or 0.0),
+        "body_alpha": (
+            float((getattr(slot, "last_orientation_meta", None) or {}).get("alpha"))
+            if isinstance(getattr(slot, "last_orientation_meta", None), dict)
+            and (getattr(slot, "last_orientation_meta", None) or {}).get("alpha") is not None
+            else None
+        ),
+        "head_relative_angle": float(getattr(body, "head_relative_angle", 0.0) or 0.0),
+        "head_world_heading": float(getattr(body, "theta", 0.0) or 0.0)
+        + float(getattr(body, "head_relative_angle", 0.0) or 0.0),
+        "head_omega": float(getattr(body, "head_omega", 0.0) or 0.0),
+        "vest_0": vest_0,
+        "vest_1": vest_1,
+        "prop_neck_0": prop_neck_0,
+        "prop_neck_1": prop_neck_1,
+        "osc_emit_active": float(getattr(body, "osc_emit_active", 0.0) or 0.0) > 0.0,
+        "osc_frequency": float(getattr(body, "osc_frequency", 0.0) or 0.0) or None,
+        "osc_amplitude": float(getattr(body, "osc_amplitude", 0.0) or 0.0) or None,
+        "osc_emit_remaining": int(getattr(body, "osc_emit_remaining", 0) or 0),
+        "osc_l_energy": sum(float(obs.get(f"osc_l_{i}") or 0.0) for i in range(6)) or None,
+        "osc_r_energy": sum(float(obs.get(f"osc_r_{i}") or 0.0) for i in range(6)) or None,
         "vx": vx,
         "vy": vy,
         "speed": float((vx * vx + vy * vy) ** 0.5),
@@ -458,29 +516,76 @@ def read_jsonl_range(path: Path) -> tuple[int | None, int | None, int]:
 
 
 class ScientificHistoryWriter:
-    """Buffered append-only writer. Safe to flush while runtime continues."""
+    """Buffered append-only writer. Safe to flush while runtime continues.
 
-    def __init__(self, directory: Path, *, flush_every: int = DEFAULT_FLUSH_EVERY) -> None:
+    Modes:
+      SCIENTIFIC_V1_REFERENCE — full tick rows + all events (legacy Public Beta shape)
+      SCIENTIFIC_V2_TIERED — compact timeline + Analyzer-relevant compact events + checkpoints
+    """
+
+    def __init__(
+        self,
+        directory: Path,
+        *,
+        flush_every: int = DEFAULT_FLUSH_EVERY,
+        telemetry_mode: str | None = None,
+        checkpoint_every: int | None = None,
+    ) -> None:
+        from .scientific_telemetry_v2 import (
+            DEFAULT_CHECKPOINT_EVERY,
+            TELEMETRY_MODE_V1,
+            TELEMETRY_MODE_V2,
+        )
+
         self.directory = Path(directory)
         self.timeline_path = self.directory / "scientific_timeline.jsonl"
         self.events_path = self.directory / "scientific_events.jsonl"
         self.meta_path = self.directory / "scientific_meta.json"
+        self.checkpoint_path = self.directory / "scientific_checkpoints.jsonl"
         self.flush_every = max(1, int(flush_every))
+        mode = telemetry_mode or default_telemetry_mode()
+        self.telemetry_mode = (
+            TELEMETRY_MODE_V1 if mode == TELEMETRY_MODE_V1 else TELEMETRY_MODE_V2
+        )
+        self.checkpoint_every = max(
+            0, int(checkpoint_every if checkpoint_every is not None else DEFAULT_CHECKPOINT_EVERY)
+        )
         self._lock = threading.Lock()
         self._tl_buf: list[str] = []
         self._ev_buf: list[str] = []
+        self._cp_buf: list[str] = []
         self._last_tick_written = -1
         self._rows_written = 0
         self._events_written = 0
-        self._seen_event_keys: set[str] = set()
+        self._checkpoints_written = 0
+        # tick -> set(keys); bounded window (V2) / all ticks (V1 resume)
+        self._seen_by_tick: dict[int, set[str]] = {}
         self._identity: dict[str, Any] = {}
         self._opened = False
+        self._omitted_events = 0
 
     def open(self, identity: dict[str, Any] | None = None) -> None:
+        from .scientific_telemetry_v2 import (
+            SCHEMA_META_V2,
+            TELEMETRY_MAJOR,
+            TELEMETRY_MINOR,
+            TELEMETRY_MODE_V2,
+            event_exhaustiveness_policy,
+        )
+
         with self._lock:
             self.directory.mkdir(parents=True, exist_ok=True)
             self._identity = dict(identity or {})
-            self._identity.setdefault("schema", SCHEMA_META)
+            if self.telemetry_mode == TELEMETRY_MODE_V2:
+                self._identity["schema"] = SCHEMA_META_V2
+                self._identity["telemetry_mode"] = TELEMETRY_MODE_V2
+                self._identity["telemetry_schema_major"] = TELEMETRY_MAJOR
+                self._identity["telemetry_schema_minor"] = TELEMETRY_MINOR
+                self._identity["event_exhaustiveness"] = event_exhaustiveness_policy()
+                self._identity["checkpoint_every"] = self.checkpoint_every
+            else:
+                self._identity.setdefault("schema", SCHEMA_META)
+                self._identity["telemetry_mode"] = "SCIENTIFIC_V1_REFERENCE"
             self._identity.setdefault("analyzer_compatible_version", ANALYZER_VERSION)
             self._identity.setdefault("opened_at", datetime.now(timezone.utc).isoformat())
             # Resume counters if files already exist (Observer restart mid-run).
@@ -490,17 +595,50 @@ class ScientificHistoryWriter:
                     self._last_tick_written = mx
                 self._rows_written = n
             if self.events_path.is_file():
-                for row in iter_jsonl(self.events_path):
-                    self._seen_event_keys.add(event_stable_key(row))
-                    self._events_written += 1
+                # Bound memory: only index recent event keys for dedupe.
+                from .scientific_telemetry_v2 import SEEN_KEY_TICK_WINDOW
+
+                rows = iter_jsonl(self.events_path)
+                self._events_written = len(rows)
+                for row in rows[-SEEN_KEY_TICK_WINDOW * 64 :]:
+                    try:
+                        t = int(row.get("tick") or -1)
+                    except (TypeError, ValueError):
+                        t = -1
+                    self._remember_key_unlocked(t, event_stable_key(row))
+            if self.checkpoint_path.is_file():
+                self._checkpoints_written = read_jsonl_range(self.checkpoint_path)[2]
             self._write_meta_unlocked(flush_bufs=False)
             self._opened = True
+
+    def _remember_key_unlocked(self, tick: int, key: str) -> bool:
+        """Return True if newly seen. Bound by recent tick window."""
+        from .scientific_telemetry_v2 import SEEN_KEY_TICK_WINDOW
+
+        bucket = self._seen_by_tick.setdefault(int(tick), set())
+        if key in bucket:
+            return False
+        # Also check nearby ticks (ring re-drain)
+        for t, keys in self._seen_by_tick.items():
+            if key in keys:
+                return False
+        bucket.add(key)
+        if len(self._seen_by_tick) > SEEN_KEY_TICK_WINDOW:
+            for old in sorted(self._seen_by_tick.keys())[:-SEEN_KEY_TICK_WINDOW]:
+                self._seen_by_tick.pop(old, None)
+        return True
 
     def append_tick(self, runtime: Any) -> int:
         """Append scientific rows for current runtime.tick if not already written.
 
         Returns number of new rows appended (0 if duplicate tick).
         """
+        from .scientific_telemetry_v2 import (
+            TELEMETRY_MODE_V2,
+            build_checkpoint_v2,
+            compact_tick_row_v2,
+        )
+
         rows = collect_scientific_tick_rows(runtime)
         if not rows:
             return 0
@@ -510,8 +648,16 @@ class ScientificHistoryWriter:
                 self.open()
             if tick <= self._last_tick_written:
                 return 0
-            for row in rows:
-                self._tl_buf.append(_jsonl_line(row))
+            if self.telemetry_mode == TELEMETRY_MODE_V2:
+                for row in rows:
+                    self._tl_buf.append(_jsonl_line(compact_tick_row_v2(row)))
+                if self.checkpoint_every > 0 and tick % self.checkpoint_every == 0:
+                    cp = build_checkpoint_v2(tick=tick, full_rows=rows)
+                    self._cp_buf.append(_jsonl_line(cp))
+                    self._checkpoints_written += 1
+            else:
+                for row in rows:
+                    self._tl_buf.append(_jsonl_line(row))
             self._last_tick_written = tick
             self._rows_written += len(rows)
             if len(self._tl_buf) >= self.flush_every:
@@ -519,6 +665,8 @@ class ScientificHistoryWriter:
             return len(rows)
 
     def append_events(self, events: Iterable[dict[str, Any]]) -> int:
+        from .scientific_telemetry_v2 import TELEMETRY_MODE_V2, compact_event_v2
+
         added = 0
         with self._lock:
             if not self._opened:
@@ -526,18 +674,36 @@ class ScientificHistoryWriter:
             for ev in events:
                 if not isinstance(ev, dict):
                     continue
-                key = event_stable_key(ev)
-                if key in self._seen_event_keys:
+                if self.telemetry_mode == TELEMETRY_MODE_V2:
+                    compact = compact_event_v2(ev)
+                    if compact is None:
+                        self._omitted_events += 1
+                        continue
+                    payload = compact
+                else:
+                    payload = dict(ev)
+                    payload.setdefault("schema", SCHEMA_EVENT)
+                try:
+                    tick = int(payload.get("tick") or -1)
+                except (TypeError, ValueError):
+                    tick = -1
+                key = event_stable_key(payload if self.telemetry_mode != TELEMETRY_MODE_V2 else {
+                    **ev,
+                    "type": payload.get("type"),
+                    "evidence": payload.get("evidence") or {},
+                })
+                if not self._remember_key_unlocked(tick, key):
                     continue
-                self._seen_event_keys.add(key)
-                payload = dict(ev)
-                payload.setdefault("schema", SCHEMA_EVENT)
                 self._ev_buf.append(_jsonl_line(payload))
                 self._events_written += 1
                 added += 1
             if len(self._ev_buf) >= self.flush_every:
                 self._flush_unlocked()
         return added
+
+    def append_event(self, ev: dict[str, Any]) -> int:
+        """Singular alias used by session experimenter markers."""
+        return self.append_events([ev])
 
     def flush(self) -> None:
         with self._lock:
@@ -547,6 +713,7 @@ class ScientificHistoryWriter:
         with self._lock:
             self._flush_unlocked()
             self._identity["closed_at"] = datetime.now(timezone.utc).isoformat()
+            self._identity["omitted_events_v2"] = self._omitted_events
             self._write_meta_unlocked(flush_bufs=False)
             self._opened = False
 
@@ -561,6 +728,11 @@ class ScientificHistoryWriter:
                 fh.write("\n".join(self._ev_buf))
                 fh.write("\n")
             self._ev_buf.clear()
+        if self._cp_buf:
+            with self.checkpoint_path.open("a", encoding="utf-8") as fh:
+                fh.write("\n".join(self._cp_buf))
+                fh.write("\n")
+            self._cp_buf.clear()
         self._write_meta_unlocked(flush_bufs=False)
 
     def _write_meta_unlocked(self, *, flush_bufs: bool) -> None:
@@ -569,13 +741,23 @@ class ScientificHistoryWriter:
             return
         meta = {
             **self._identity,
-            "schema": SCHEMA_META,
             "timeline_path": self.timeline_path.name,
             "events_path": self.events_path.name,
+            "checkpoint_path": self.checkpoint_path.name,
             "rows_written": self._rows_written,
             "events_written": self._events_written,
+            "checkpoints_written": self._checkpoints_written,
+            "omitted_events_v2": self._omitted_events,
             "last_tick_written": self._last_tick_written if self._last_tick_written >= 0 else None,
             "updated_at": datetime.now(timezone.utc).isoformat(),
+            "durability": {
+                "flush_every_lines": self.flush_every,
+                "fsync_per_record": False,
+                "semantics": (
+                    "Buffered append; completed lines after flush() are readable after "
+                    "process crash. Unexpected kill may lose ≤ flush_every buffered lines."
+                ),
+            },
         }
         tmp = self.meta_path.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(meta, ensure_ascii=False, sort_keys=True, indent=2, default=str), encoding="utf-8")
@@ -590,7 +772,21 @@ def copy_scientific_into(run_dir: Path, live_dir: Path | None) -> dict[str, Any]
     if live_dir is None or not Path(live_dir).is_dir():
         return info
     live = Path(live_dir)
-    for name in ("scientific_timeline.jsonl", "scientific_events.jsonl", "scientific_meta.json"):
+    for name in (
+        "scientific_timeline.jsonl",
+        "scientific_events.jsonl",
+        "scientific_meta.json",
+        "scientific_checkpoints.jsonl",
+        # SCIENTIFIC_V3 CORE (additive; do not silently drop at finalize)
+        "scientific_v3_meta.json",
+        "identity_map.json",
+        "scientific_spine.jsonl",
+        "scientific_observations.jsonl",
+        "scientific_decisions.jsonl",
+        "scientific_motors.jsonl",
+        "scientific_consequences.jsonl",
+        "scientific_revisions.jsonl",
+    ):
         src = live / name
         if src.is_file():
             dst = Path(run_dir) / name
@@ -654,6 +850,7 @@ def classify_evidence_coverage(
     ui_timeline_min: int | None = None,
     ui_timeline_max: int | None = None,
     has_cumulative: bool = False,
+    ticks_consumed: int | None = None,
 ) -> dict[str, Any]:
     """FULL iff scientific timeline covers [expected_start .. cutoff] without gaps in tick set size."""
     cutoff = final_or_cutoff_tick
@@ -690,10 +887,32 @@ def classify_evidence_coverage(
         density_ok = scientific_row_count >= int(expected_ticks * agents * 0.98)
 
     if starts_ok and ends_ok and density_ok:
+        archive_full = True
+    else:
+        archive_full = False
+
+    # FULL reconstruction coverage requires the Analyzer to have consumed ticks.
+    if ticks_consumed is not None and int(ticks_consumed) <= 0:
+        return {
+            "coverage": "PARTIAL",
+            "tick_level_reconstruction": "NOT_CONSUMED",
+            "complete_tick_level_reanalysis": False,
+            "archive_coverage": "FULL" if archive_full else "PARTIAL",
+            "scientific_timeline_available": f"{scientific_tick_min}–{scientific_tick_max}",
+            "full_runtime_cumulative_counters_available": bool(has_cumulative),
+            "reason": (
+                "Scientific archive row counts are present, but this package did not consume "
+                "tick-level history (no TickStories / unique simulation ticks ingested)."
+            ),
+            "evidence_source": "scientific_timeline_meta",
+        }
+
+    if archive_full:
         return {
             "coverage": "FULL",
             "tick_level_reconstruction": "FULL",
             "complete_tick_level_reanalysis": True,
+            "archive_coverage": "FULL",
             "scientific_timeline_available": f"{scientific_tick_min}–{scientific_tick_max}",
             "full_runtime_cumulative_counters_available": bool(has_cumulative),
             "reason": "Complete scientific_timeline.jsonl from run start through analysis cutoff.",
@@ -725,38 +944,103 @@ def load_evidence_package(
     run_id: str | None = None,
     identity: dict[str, Any] | None = None,
     snapshot: dict[str, Any] | None = None,
+    include_bulk_rows: bool = True,
+    include_behavioral: bool = True,
+    include_v3_core: bool = True,
+    write_behavioral_artifacts: bool = True,
+    artifact_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Load scientific evidence for Analyzer (read-only).
 
     Prefer scientific_timeline.jsonl; fall back to bounded UI timeline as PARTIAL.
+    Set include_bulk_rows=False to avoid materializing full JSONL into RAM/HTTP.
     """
     identity = dict(identity or {})
     sci_rows: list[dict[str, Any]] = []
     sci_events: list[dict[str, Any]] = []
     evidence_files: list[str] = []
     sci_dir = Path(evidence_dir) if evidence_dir else None
+    meta: dict[str, Any] = {}
+    sci_min = sci_max = None
+    sci_row_count = 0
+    sci_event_count = 0
+    first_row: dict[str, Any] | None = None
 
     if sci_dir and sci_dir.is_dir():
         tl_path = sci_dir / "scientific_timeline.jsonl"
         ev_path = sci_dir / "scientific_events.jsonl"
-        if tl_path.is_file():
-            sci_rows = iter_jsonl(tl_path, max_tick=cutoff_tick)
-            evidence_files.append("scientific_timeline.jsonl")
-        if ev_path.is_file():
-            sci_events = iter_jsonl(ev_path, max_tick=cutoff_tick)
-            evidence_files.append("scientific_events.jsonl")
-        if (sci_dir / "scientific_meta.json").is_file():
+        meta_path = sci_dir / "scientific_meta.json"
+        if meta_path.is_file():
             evidence_files.append("scientific_meta.json")
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            except Exception:
+                meta = {}
+        if tl_path.is_file():
+            evidence_files.append("scientific_timeline.jsonl")
+            if include_bulk_rows:
+                sci_rows = iter_jsonl(tl_path, max_tick=cutoff_tick)
+                sci_row_count = len(sci_rows)
+                if sci_rows:
+                    first_row = sci_rows[0]
+                    sci_ticks = [int(r["tick"]) for r in sci_rows if "tick" in r]
+                    sci_min = min(sci_ticks) if sci_ticks else None
+                    sci_max = max(sci_ticks) if sci_ticks else None
+            else:
+                sci_row_count = int(meta.get("rows_written") or 0)
+                last_t = meta.get("last_tick_written")
+                sci_max = int(last_t) if last_t is not None else None
+                if cutoff_tick is not None and sci_max is not None:
+                    sci_max = min(sci_max, int(cutoff_tick))
+                sci_min = 1 if sci_max else None
+                try:
+                    with tl_path.open("r", encoding="utf-8") as fh:
+                        for line in fh:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            first_row = json.loads(line)
+                            break
+                except Exception:
+                    first_row = None
+        if ev_path.is_file():
+            evidence_files.append("scientific_events.jsonl")
+            if include_bulk_rows:
+                sci_events = iter_jsonl(ev_path, max_tick=cutoff_tick)
+                sci_event_count = len(sci_events)
+            else:
+                sci_event_count = int(meta.get("events_written") or 0)
+        if (sci_dir / "scientific_checkpoints.jsonl").is_file():
+            evidence_files.append("scientific_checkpoints.jsonl")
+        for v3_name in (
+            "scientific_v3_meta.json",
+            "identity_map.json",
+            "scientific_spine.jsonl",
+            "scientific_observations.jsonl",
+            "scientific_decisions.jsonl",
+            "scientific_motors.jsonl",
+            "scientific_consequences.jsonl",
+        ):
+            if (sci_dir / v3_name).is_file() and v3_name not in evidence_files:
+                evidence_files.append(v3_name)
+
+    from .scientific_telemetry_v2 import detect_telemetry_schema
+
+    telemetry_schema = detect_telemetry_schema(meta, first_row if first_row else (sci_rows[0] if sci_rows else None))
 
     agent_count = int(identity.get("agent_count") or 1)
     if sci_rows:
         agent_ids = {str(r.get("agent_id")) for r in sci_rows if r.get("agent_id")}
         if agent_ids:
             agent_count = max(agent_count, len(agent_ids))
+    elif first_row and first_row.get("agent_id"):
+        agent_count = max(agent_count, 1)
 
-    sci_ticks = [int(r["tick"]) for r in sci_rows if "tick" in r]
-    sci_min = min(sci_ticks) if sci_ticks else None
-    sci_max = max(sci_ticks) if sci_ticks else None
+    if sci_rows:
+        sci_ticks = [int(r["tick"]) for r in sci_rows if "tick" in r]
+        sci_min = min(sci_ticks) if sci_ticks else sci_min
+        sci_max = max(sci_ticks) if sci_ticks else sci_max
+        sci_row_count = len(sci_rows)
 
     ui_min = ui_max = None
     if ui_timeline:
@@ -792,18 +1076,27 @@ def load_evidence_package(
     coverage = classify_evidence_coverage(
         scientific_tick_min=sci_min,
         scientific_tick_max=sci_max,
-        scientific_row_count=len(sci_rows),
+        scientific_row_count=sci_row_count if sci_row_count else len(sci_rows),
         agent_count=agent_count,
         expected_start=1,
         final_or_cutoff_tick=effective_cutoff,
         ui_timeline_min=ui_min,
         ui_timeline_max=ui_max,
         has_cumulative=bool(cumulative),
+        ticks_consumed=(
+            None
+            if include_bulk_rows and include_behavioral
+            else 0
+        ),
     )
 
     if sci_rows:
         timeline_events = scientific_rows_to_timeline_events(sci_rows)
         events = sci_events
+        analyzed_start, analyzed_end = sci_min, sci_max
+    elif not include_bulk_rows and sci_row_count:
+        timeline_events = []
+        events = []
         analyzed_start, analyzed_end = sci_min, sci_max
     else:
         # Legacy PARTIAL path — UI buffer only
@@ -824,9 +1117,61 @@ def load_evidence_package(
         analyzed_start, analyzed_end = ui_min, ui_max
         coverage["evidence_source"] = "legacy_ui_buffers"
 
+    # SCIENTIFIC_V3 CORE reconstruction (NOT_RECORDED if files absent — never invent from V2)
+    scientific_v3_core = None
+    behavioral_reconstruction = None
+    if sci_dir and sci_dir.is_dir():
+        if include_v3_core:
+            scientific_v3_core = scientific_v3_core_reconstruction(sci_dir)
+            if isinstance(scientific_v3_core, dict):
+                if scientific_v3_core.get("evidence_version") == "SCIENTIFIC_V3":
+                    scientific_v3_core["status"] = "AVAILABLE"
+                elif scientific_v3_core.get("status") is None:
+                    scientific_v3_core["status"] = "NOT_RECORDED"
+        if include_behavioral:
+            try:
+                from mechanistic_mind.scientific_v3.analyzer_next import build_behavioral_reconstruction as _bbr
+                art_dir = Path(artifact_dir) if artifact_dir else (sci_dir / "analyzer_next")
+                behavioral_reconstruction = _bbr(
+                    sci_dir,
+                    max_tick=effective_cutoff,
+                    write_artifacts=bool(write_behavioral_artifacts),
+                    artifact_dir=art_dir,
+                )
+                if isinstance(behavioral_reconstruction, dict):
+                    behavioral_reconstruction["artifacts_dir"] = str(art_dir)
+            except Exception as _br_exc:
+                behavioral_reconstruction = behavioral_reconstruction_for_evidence(
+                    sci_dir, cutoff_tick=effective_cutoff
+                )
+                if isinstance(behavioral_reconstruction, dict):
+                    behavioral_reconstruction["artifacts_error"] = str(_br_exc)
+
+        consumed = 0
+        if isinstance(behavioral_reconstruction, dict):
+            consumed = int(behavioral_reconstruction.get("unique_simulation_ticks") or 0)
+            if consumed <= 0:
+                rng = behavioral_reconstruction.get("scientific_tick_range") or [None, None]
+                if rng[0] is not None and rng[1] is not None:
+                    consumed = int(rng[1]) - int(rng[0]) + 1 if behavioral_reconstruction.get("tick_stories_count") else 0
+            if consumed <= 0:
+                consumed = int(behavioral_reconstruction.get("tick_stories_count") or 0)
+        if include_behavioral and consumed <= 0 and isinstance(coverage, dict) and coverage.get("coverage") == "FULL":
+            coverage["coverage"] = "PARTIAL"
+            coverage["complete_tick_level_reanalysis"] = False
+            coverage["tick_level_reconstruction"] = "NOT_CONSUMED"
+            coverage["reason"] = (
+                "Archive looked complete but reconstruction consumed zero ticks."
+            )
+
     return {
         "schema": "mm.psy_observer_web.evidence_package.v1",
         "analyzer_version": ANALYZER_VERSION,
+        "telemetry_schema": telemetry_schema,
+        "telemetry_mode": meta.get("telemetry_mode") if isinstance(meta, dict) else None,
+        "event_exhaustiveness": (
+            meta.get("event_exhaustiveness") if isinstance(meta, dict) else None
+        ),
         "run_id": run_id,
         "runtime_status": runtime_status,
         "analysis_cutoff_tick": effective_cutoff,
@@ -835,23 +1180,36 @@ def load_evidence_package(
         "coverage_detail": coverage,
         "complete_tick_level_reanalysis": coverage.get("complete_tick_level_reanalysis"),
         "evidence_files": evidence_files,
+        "scientific_v3_core": scientific_v3_core,
+        "behavioral_reconstruction": behavioral_reconstruction,
         "evidence_counts": {
-            "scientific_rows": len(sci_rows),
+            "scientific_rows": sci_row_count if not include_bulk_rows else len(sci_rows),
             "timeline_events": len(timeline_events),
-            "events": len(events),
+            "events": sci_event_count if not include_bulk_rows else len(events),
             "cumulative_agent_summaries": len(cumulative),
         },
         "identity": identity,
+        "scientific_meta": meta,
         "timeline": timeline_events,
         "scientific_rows": sci_rows,
         "events": events,
         "cumulative_runtime_summaries": cumulative,
         "used_cumulative_runtime_summaries": bool(cumulative),
+        "runtime_mechanism_integrity": _evidence_mechanism_integrity(meta, events),
         "note": (
             "Cumulative runtime summaries are NOT tick-level history. "
-            "They must not be presented as reconstructed transition timing or streak structure."
+            "They must not be presented as reconstructed transition timing or streak structure. "
+            f"telemetry_schema={telemetry_schema}."
         ),
     }
+
+
+def _evidence_mechanism_integrity(meta: Any, events: list[dict[str, Any]]) -> dict[str, Any]:
+    from mechanistic_mind.physical_system.mechanism_configuration import summarize_mechanism_integrity
+    manifest = None
+    if isinstance(meta, dict):
+        manifest = meta.get("runtime_mechanism_manifest")
+    return summarize_mechanism_integrity(manifest=manifest, interventions=events)
 
 
 def list_psyweb_runs(results_root: Path | str | None = None) -> list[dict[str, Any]]:
@@ -911,3 +1269,34 @@ def save_analysis_output(
         encoding="utf-8",
     )
     return out_dir
+
+
+def scientific_v3_core_reconstruction(sci_dir: Path) -> dict[str, Any]:
+    """Minimal Analyzer adapter entry — SCIENTIFIC_V3 CORE RECONSTRUCTION."""
+    try:
+        from mechanistic_mind.scientific_v3.analyzer_adapter import build_v3_core_reconstruction
+        return build_v3_core_reconstruction(sci_dir)
+    except Exception as exc:
+        return {
+            "section": "SCIENTIFIC_V3 CORE RECONSTRUCTION",
+            "status": "NOT_AVAILABLE",
+            "error": str(exc),
+        }
+
+
+def behavioral_reconstruction_for_evidence(sci_dir: Path, *, cutoff_tick: int | None = None) -> dict:
+    """Analyzer Next Phase-1 Behavioral Reconstruction (read-only over V3/V2 evidence)."""
+    try:
+        from mechanistic_mind.scientific_v3.analyzer_next import build_behavioral_reconstruction
+        return build_behavioral_reconstruction(sci_dir, max_tick=cutoff_tick, write_artifacts=False)
+    except Exception as exc:
+        return {
+            "section": "BEHAVIORAL RECONSTRUCTION",
+            "status": "NOT_AVAILABLE",
+            "error": str(exc),
+            "report_text": (
+                "BEHAVIORAL RECONSTRUCTION\n"
+                "=========================\n\n"
+                f"status: NOT_AVAILABLE\nerror: {exc}\n"
+            ),
+        }

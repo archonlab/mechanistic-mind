@@ -1,5 +1,5 @@
 @echo off
-REM Psy Observer Web — Public Beta 1 launcher (Windows Explorer double-clickable).
+REM Psy Observer Web — Beta 1 launcher (Windows Explorer double-clickable).
 REM Resolves %%~dp0 as project root. First launch may create .venv_psy_web.
 setlocal EnableExtensions EnableDelayedExpansion
 
@@ -77,7 +77,7 @@ set "PY=%VENV_PY%"
 
 :launch
 cd /d "%ROOT%"
-echo Starting Psy Observer Web ^(Public Beta 1^)...
+echo Starting Psy Observer Web ^(Beta 1^)...
 "%PY%" -m mechanistic_mind.ui.psy_observer_web.launcher %*
 set "ERR=%ERRORLEVEL%"
 if not "%ERR%"=="0" goto :fail
@@ -112,7 +112,7 @@ exit /b 1
 :no_spa
 echo Psy Observer Web could not start.
 echo.
-echo Missing production web_dist. Re-download the Public Public Beta 1 archive.
+echo Missing production web_dist. Re-download the Beta 1 archive.
 echo.
 echo Log: %LOG_FILE%
 echo %DATE% %TIME% ERROR missing web_dist>> "%LOG_FILE%"

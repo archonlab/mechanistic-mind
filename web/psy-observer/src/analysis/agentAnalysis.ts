@@ -47,7 +47,13 @@ export function buildAgentAnalyses(state: AnalysisState): AgentAnalysis[] {
       }
       // Observed unique cells from canonical trajectory only — never inflate with
       // runtime cumulative unique_cells_visited (different evidence class).
-      const unique = agg.unique_cells.size;
+      const unique = Number.isFinite(Number((agg as any)._canonical_unique_cells))
+        ? Number((agg as any)._canonical_unique_cells)
+        : agg.unique_cells.size;
+      const pathUnavailable = Boolean((agg as any)._canonical_path_unavailable)
+        && unique <= 0
+        && agg.distance === 0
+        && agg.unique_position_ticks > 0;
       const w = state.map_w;
       const h = state.map_h;
       // net = WRAP min-image displacement of OBSERVED trajectory endpoints only.
@@ -153,11 +159,15 @@ export function buildAgentAnalyses(state: AnalysisState): AgentAnalysis[] {
         cumulative_runtime_action_counts:
           cumulative && Object.keys(cumulative).length ? { ...cumulative } : 'NOT AVAILABLE',
         movement: {
-          distance_travelled: agg.distance > 0 || unique > 0 ? agg.distance : naNum(agg.distance === 0 ? 0 : null),
+          distance_travelled: pathUnavailable || (agg.unique_position_ticks > 0 && unique <= 0 && agg.distance === 0)
+            ? naNum(null)
+            : (agg.distance > 0 || unique > 0 ? agg.distance : naNum(agg.distance === 0 ? 0 : null)),
           distance_metric: w != null && h != null ? 'manhattan_wrap_unique_tick' : 'manhattan_legacy_raw_unique_tick',
-          path_length_euclidean: pathEuclid > 0 || unique > 0
-            ? pathEuclid
-            : naNum(pathEuclid === 0 ? 0 : null),
+          path_length_euclidean: pathUnavailable || (agg.unique_position_ticks > 0 && unique <= 0 && pathEuclid === 0)
+            ? naNum(null)
+            : (pathEuclid > 0 || unique > 0
+              ? pathEuclid
+              : naNum(pathEuclid === 0 ? 0 : null)),
           path_length_manhattan_legacy: agg.path_length_manhattan_wrap > 0 || unique > 0
             ? agg.path_length_manhattan_wrap
             : naNum(agg.path_length_manhattan_wrap === 0 ? 0 : null),
@@ -195,7 +205,7 @@ export function buildAgentAnalyses(state: AnalysisState): AgentAnalysis[] {
           mean_realized_speed: meanSpeed != null ? meanSpeed : 'NOT AVAILABLE',
           max_realized_speed: agg.max_speed > 0 ? agg.max_speed : 'NOT AVAILABLE',
           rotation_accumulated: agg.rotation_accum > 0 ? agg.rotation_accum : 'NOT AVAILABLE',
-          unique_cells: unique > 0 ? unique : (agg.unique_position_ticks > 0 ? 0 : 'NOT AVAILABLE'),
+          unique_cells: unique > 0 ? unique : 'NOT AVAILABLE',
           unique_cells_source: 'observed_canonical_trajectory_floor_cells',
           unique_position_ticks: agg.unique_position_ticks,
           duplicate_observer_samples_ignored: agg.duplicate_observer_samples_ignored,

@@ -33,9 +33,11 @@ class ExperimenterCommand:
     """Simulation-tick scheduled command (not wall-clock)."""
 
     sim_tick: int  # apply when runtime.tick == sim_tick (before step), or relative
-    kind: str  # ACTION | FIELD_A | FIELD_B | SPECIMEN_REPLAY | WAIT_RELATIVE
+    kind: str  # ACTION | FIELD_A | FIELD_B | OSC_EMIT | SPECIMEN_REPLAY | WAIT_RELATIVE
     action: str | None = None
     amplitude: float | None = None
+    frequency: float | None = None
+    duration: int | None = None
     specimen_id: str | None = None
     relative: bool = True  # if True, sim_tick is offset from enqueue time
 
@@ -222,6 +224,46 @@ class ExperimenterController:
         return cap
 
 
+def promote_physical_to_two_agent_host(rt: PhysicalSystemRuntime) -> TwoAgentRuntime:
+    """Wrap a single-agent PhysicalSystemRuntime so experimenter spawn can append a slot.
+
+    Preserves the existing autonomous agent object (body/internal/cognition/world)
+    as slot 0. Does not alter that agent's scientific state. Observer-only host
+    upgrade — required because spawn_experimenter_body appends onto TwoAgentRuntime.slots.
+    """
+    if isinstance(rt, TwoAgentRuntime):
+        return rt
+    from mechanistic_mind.physical_system.two_agent import _empty_agent_stats
+
+    x = int(rt.body.x) % max(1, int(rt.world.T.shape[1]))
+    y = int(rt.body.y) % max(1, int(rt.world.T.shape[0]))
+    signal_on = bool(getattr(getattr(rt.config, "physical_signal", None), "enabled", False))
+    host = TwoAgentRuntime(
+        seed=int(rt.seed),
+        config=rt.config.copy(),
+        starts=((x, y), (x, y)),
+        signal_enabled=signal_on,
+        independent_agent_seeds=False,  # keep existing slot seed as-is
+    )
+    # Replace freshly constructed slots with the live autonomous agent.
+    host.slots = [rt]
+    host.world = rt.world
+    host.config = rt.config
+    host.seed = int(rt.seed)
+    host._agent_stats = [_empty_agent_stats()]
+    host._prev_xy = [(float(rt.body.x), float(rt.body.y))]
+    host.process_order = (0,)
+    # Keep a 2-tuple starts shape for snapshot() compatibility; only slot 0 is live.
+    host.starts = ((x, y), (x + 4, y))
+    host.experimenter_slot = None
+    host.selected_index = 0
+    if signal_on:
+        from mechanistic_mind.physical_system.physical_signal import ensure_fields
+
+        ensure_fields(host.world)
+    return host
+
+
 def spawn_experimenter_body(
     rt: TwoAgentRuntime,
     *,
@@ -231,8 +273,16 @@ def spawn_experimenter_body(
     controller: ExperimenterController,
 ) -> dict[str, Any]:
     """Attach ordinary PSR slot with cognition OFF as experimenter body."""
+    if not isinstance(rt, TwoAgentRuntime):
+        return {
+            "accepted": False,
+            "error": "SPAWN_REJECTED:RUNTIME_UNAVAILABLE",
+            "detail": "TwoAgentRuntime host required",
+        }
     if getattr(rt, "experimenter_slot", None) is not None:
-        return {"accepted": False, "error": "experimenter already spawned"}
+        return {"accepted": False, "error": "SPAWN_REJECTED:ALREADY_SPAWNED", "detail": "experimenter already spawned"}
+    if not rt.slots:
+        return {"accepted": False, "error": "SPAWN_REJECTED:NO_VALID_TARGET", "detail": "no autonomous slots"}
     # Build config like existing slots, cognition disabled
     base = rt.slots[0].config.copy()
     base.cognition.cognition_enabled = False
@@ -474,6 +524,36 @@ def apply_experimenter_pre_step(
                 trigger="experimenter_control",
             )
             applied.append({"kind": cmd.kind, "amplitude": amp})
+        elif cmd.kind == "OSC_EMIT":
+            # Undercover uses identical oscillatory physics as Tiktaalik bodies.
+            from mechanistic_mind.physical_system.oscillatory_signaling import (
+                set_undercover_osc_params,
+            )
+            body = rt.slots[slot].body
+            osc_cfg = getattr(rt.slots[slot].config, "oscillatory_signaling", None)
+            if osc_cfg is None or not osc_cfg.enabled:
+                applied.append({"kind": "OSC_EMIT", "applied": False, "reason": "osc_off"})
+            else:
+                freq = cmd.frequency if getattr(cmd, "frequency", None) is not None else None
+                amp = cmd.amplitude if cmd.amplitude is not None else None
+                dur = cmd.duration if getattr(cmd, "duration", None) is not None else None
+                info = set_undercover_osc_params(
+                    body,
+                    frequency=freq,
+                    amplitude=amp,
+                    duration=dur,
+                    cfg=osc_cfg,
+                    emit_now=True,
+                )
+                controller.log(
+                    "EXPERIMENTER_OSC_EMITTED",
+                    int(rt.tick),
+                    frequency=info.get("frequency") or body.osc_frequency,
+                    amplitude=info.get("amplitude") or body.osc_amplitude,
+                    remaining=int(body.osc_emit_remaining),
+                    trigger="experimenter_control",
+                )
+                applied.append({"kind": "OSC_EMIT", **info})
         elif cmd.kind == "SPECIMEN_REPLAY":
             remaining.append(cmd)  # handled by session with library
         else:

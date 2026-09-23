@@ -1,12 +1,9 @@
-"""MM 2.0 Tiktaalik: Undercover identity constants (no runtime imports)."""
+"""MM 1.0 Tiktaalik identity constants (no runtime imports)."""
 
 MODEL_FAMILY = "Mechanistic Mind"
-MODEL_VERSION = "2.0"
+MODEL_VERSION = "1.0"
 MODEL_CODENAME = "Tiktaalik"
-# Public edition / packaging label — does not rename internal mechanisms.
-RELEASE_EDITION = "Undercover"
-PUBLIC_RELEASE = "Public Beta 1"
-RUNTIME_VERSION = "MM_2_0_TIKTAALIK_UNDERCOVER"
+RUNTIME_VERSION = "MM_1_0_TIKTAALIK"
 LEGACY_RUNTIME_VERSION = "CURRENT_INTEGRATED_MM"
 SNAPSHOT_SCHEMA = "mm.physical_system.snapshot.v2"
 OBSERVER_API_VERSION = "0.2.0"
@@ -31,6 +28,9 @@ PROMOTION: dict[str, str] = {
     "prediction_error_revision": "EXPERIMENTAL",
     "temporal_prediction_error": "EXPERIMENTAL",
     "predicted_context_prospection": "EXPERIMENTAL",
+    "contextual_predictive_organization": "EXPERIMENTAL",
+    "context_grounded_prospection": "EXPERIMENTAL",
+    "persistent_prospective_control": "EXPERIMENTAL",
     "multistep_action_prospection": "EXPERIMENTAL",
     "discrete_action_bridge": "CANONICAL",
     "shared_work_allocation": "CANONICAL",
@@ -57,16 +57,7 @@ PROMOTION: dict[str, str] = {
 
 
 def display_name() -> str:
-    """Scientific model display (stable identity)."""
     return f"MM {MODEL_VERSION} — {MODEL_CODENAME}"
-
-
-def release_display_name() -> str:
-    """Public packaging banner for Observer / launchers."""
-    return (
-        f"MM {MODEL_VERSION} TIKTAALIK | TIKTAALIK: UNDERCOVER | "
-        f"{PUBLIC_RELEASE.upper()}"
-    )
 
 
 def promotion_class(mechanism_id: str) -> str:

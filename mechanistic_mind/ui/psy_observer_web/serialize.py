@@ -645,6 +645,10 @@ def world_frame(
                         "x": float(slot.body.x),
                         "y": float(slot.body.y),
                         "theta": float(getattr(slot.body, "theta", 0.0) or 0.0),
+                        "head_relative_angle": float(getattr(slot.body, "head_relative_angle", 0.0) or 0.0),
+                        "head_world_heading": float(
+                            getattr(slot.body, "theta", 0.0) or 0.0
+                        ) + float(getattr(slot.body, "head_relative_angle", 0.0) or 0.0),
                         "vx": float(slot.body.vx),
                         "vy": float(slot.body.vy),
                         "work": float(getattr(slot.body, "mechanical_work_reservoir", 0.0) or 0.0),
@@ -789,6 +793,32 @@ def mind_compact_frame(
         }
     metrics = (runtime.cognition.get("metrics") or {}) if isinstance(runtime.cognition, dict) else {}
     sel = (runtime.cognition.get("last_selection") or {}) if isinstance(runtime.cognition, dict) else {}
+    cog = runtime.cognition if isinstance(runtime.cognition, dict) else {}
+    # Compact 4.26–4.28 summaries — no cognition_public_view / cognitive_view.
+    from mechanistic_mind.research import contextual_predictive_organization as _cpo
+    from mechanistic_mind.research import context_grounded_prospection as _cgp
+    from mechanistic_mind.research import persistent_prospective_control as _ppc
+    cpo_st = cog.get("contextual_organization") if isinstance(cog.get("contextual_organization"), dict) else {}
+    cgp_st = cog.get("context_grounded_prospection") if isinstance(cog.get("context_grounded_prospection"), dict) else {}
+    ppc_st = cog.get("persistent_prospective_control") if isinstance(cog.get("persistent_prospective_control"), dict) else {}
+    cfg = runtime.config.cognition
+    contextual_stack = {
+        "detail": "compact",
+        "context": _cpo.observer_compact(cpo_st),
+        "prospection": _cgp.observer_compact(cgp_st),
+        "persistent_control": _ppc.observer_compact(ppc_st),
+        "flags": {
+            "contextual_predictive_organization": bool(getattr(cfg, "contextual_predictive_organization", False)),
+            "context_grounded_prospection": bool(getattr(cfg, "context_grounded_prospection", False)),
+            "persistent_prospective_control": bool(getattr(cfg, "persistent_prospective_control", False)),
+        },
+        "psc_mode": str(getattr(cfg, "prospective_selection", "")),
+        "last_event": (ppc_st.get("last_event") if isinstance(ppc_st, dict) else None),
+        "last_reactivation": (cpo_st.get("last_reactivation") if isinstance(cpo_st, dict) else None),
+        "last_active_context": (cpo_st.get("last_active") if isinstance(cpo_st, dict) else None),
+        "selection_source": sel.get("source"),
+        "note": "Observer compact chain — not a map/goal/intention variable",
+    }
     return {
         "status": "ACTIVE",
         "detail": "compact",
@@ -809,6 +839,7 @@ def mind_compact_frame(
             "novel_compositions": metrics.get("novel_compositions"),
             "action_counts": dict(metrics.get("action_counts") or {}),
         },
+        "contextual_stack": contextual_stack,
         "note": "COMPACT live summary. Open MIND / inspect for full cognition structures.",
     }
 
@@ -818,6 +849,7 @@ def mind_frame(
     *,
     agent_id: str | None = None,
     body_id: str | None = None,
+    cog: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     agent_id = agent_id or observer_agent_id(runtime)
     body_id = body_id or observer_body_id(runtime)
@@ -831,7 +863,7 @@ def mind_frame(
             "agent_seed": int(getattr(runtime, "seed", 0)),
             "tick": int(runtime.tick),
         }
-    cog = runtime.cognitive_view()
+    cog = cog if cog is not None else runtime.cognitive_view()
     cfg = cog.get("mechanisms") or {}
     bridges = cog.get("bridges") or {}
 
@@ -961,6 +993,35 @@ def mind_frame(
         "multistep_action_prospection": cog.get("multistep_action_prospection") or {
             "enabled": False,
             "note": "MULTI-STEP ACTION PROSPECTION — not planning, not a policy",
+        },
+        "contextual_predictive_organization": cog.get("contextual_predictive_organization") or {
+            "enabled": False,
+            "note": "CONTEXTUAL_PREDICTIVE_ORGANIZATION — not place / map / familiar",
+        },
+        "context_grounded_prospection": cog.get("context_grounded_prospection") or {
+            "enabled": False,
+            "note": "CONTEXT_GROUNDED_PROSPECTION — not route / destination",
+        },
+        "persistent_prospective_control": cog.get("persistent_prospective_control") or {
+            "enabled": False,
+            "note": "PERSISTENT_PROSPECTIVE_CONTROL — support-gated, not intention variable",
+        },
+        "contextual_stack": {
+            "detail": "full",
+            "context": (cog.get("contextual_predictive_organization") or {}).get("observer_compact") or {},
+            "prospection": (cog.get("context_grounded_prospection") or {}).get("observer_compact") or {},
+            "persistent_control": (cog.get("persistent_prospective_control") or {}).get("observer_compact") or {},
+            "flags": {
+                "contextual_predictive_organization": bool((cog.get("mechanisms") or {}).get("contextual_predictive_organization")),
+                "context_grounded_prospection": bool((cog.get("mechanisms") or {}).get("context_grounded_prospection")),
+                "persistent_prospective_control": bool((cog.get("mechanisms") or {}).get("persistent_prospective_control")),
+            },
+            "psc_mode": (cog.get("action") or {}).get("prospective_selection_mode"),
+            "last_event": ((cog.get("persistent_prospective_control") or {}).get("last_event")),
+            "last_reactivation": ((cog.get("contextual_predictive_organization") or {}).get("last_reactivation")),
+            "last_active_context": ((cog.get("contextual_predictive_organization") or {}).get("last_active")),
+            "selection_source": (cog.get("action") or {}).get("source"),
+            "note": "Observer chain from public view — not map/goal/intention",
         },
         "metrics": cog.get("metrics") or {},
         "causal_trace": cog.get("causal_trace") or {},
@@ -1114,10 +1175,16 @@ def cognition_pipeline_compact_frame(runtime: PhysicalSystemRuntime) -> dict[str
     }
 
 
-def causal_chain_frame(runtime: PhysicalSystemRuntime, *, previous_body: dict[str, Any] | None = None) -> dict[str, Any]:
+def causal_chain_frame(
+    runtime: PhysicalSystemRuntime,
+    *,
+    previous_body: dict[str, Any] | None = None,
+    cog: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """WORLD → PERCEPTION → BODY → INTERNAL → PREDICTION → ACTION → CONSEQUENCE."""
     views = runtime.observation_views()
-    cog = runtime.cognitive_view() if runtime.config.cognition.cognition_enabled else {}
+    if cog is None:
+        cog = runtime.cognitive_view() if runtime.config.cognition.cognition_enabled else {}
     action = (cog.get("action") if cog else None) or {}
     sel = action
     prosp = (cog.get("prospection") if cog else None) or {}
@@ -1242,34 +1309,68 @@ def _why_this_action(runtime: PhysicalSystemRuntime, cog: dict[str, Any]) -> dic
     }
 
 
-def experiment_config_frame(runtime: PhysicalSystemRuntime) -> dict[str, Any]:
+def experiment_config_frame(runtime: PhysicalSystemRuntime, *, detail: str = "full") -> dict[str, Any]:
     cfg = runtime.config
-    planet = cfg.planet.to_dict() if hasattr(cfg.planet, "to_dict") else {}
     from mechanistic_mind.physical_system.ecology_presets import ecology_metadata
 
     eco = ecology_metadata(cfg)
+    compact = str(detail).lower() == "compact"
+    runtime_block = {
+        "type": "TwoAgentRuntime" if getattr(runtime, "slots", None) else "PhysicalSystemRuntime",
+        "cognition_enabled": cfg.cognition.cognition_enabled,
+        "agent_count": len(getattr(runtime, "slots", None) or [runtime]),
+        "selected_agent": observer_agent_id(runtime),
+        "selected_agent_id": observer_agent_id(runtime),
+        "selected_body_id": observer_body_id(runtime),
+        "agent_body_mapping": agent_body_mapping(runtime),
+        "observer_agent_ids": (
+            [f"agent_{i}" for i in range(len(runtime.slots))]
+            if getattr(runtime, "slots", None)
+            else ["agent_0"]
+        ),
+        "ecology_preset": eco.get("ecology_preset"),
+        "note": "Technical observer IDs. Not present in agent observation.",
+    }
+    gt = _climate_observer_ground_truth(runtime)
+    if compact:
+        ew = (gt or {}).get("effective_world") or {}
+        slim_ew = {
+            "requested_preset": ew.get("requested_preset"),
+            "world_fingerprint": ew.get("world_fingerprint"),
+            "overrides": ew.get("overrides"),
+            "climate_ablated": ew.get("climate_ablated"),
+            "climate_package_implies_climate": ew.get("climate_package_implies_climate"),
+            "resources_now": ew.get("resources_now"),
+            "subsystems": ew.get("subsystems"),
+            "climate_ecology": ew.get("climate_ecology"),
+            "near_field_exteroception": ew.get("near_field_exteroception"),
+        }
+        return {
+            "detail": "compact",
+            "seed": int(runtime.seed),
+            "ecology_preset": eco.get("ecology_preset"),
+            "ecology_ui_label": eco.get("ui_label"),
+            "runtime": runtime_block,
+            "world": {
+                "width": int(cfg.planet.width),
+                "height": int(cfg.planet.height),
+                "boundary": boundary_metadata(runtime),
+                "ecology_preset": eco.get("ecology_preset"),
+            },
+            "observer_ground_truth": {
+                "ecology_preset": (gt or {}).get("ecology_preset") or eco.get("ecology_preset"),
+                "effective_world": slim_ew,
+            },
+            "note": "Compact experiment omits static planet/body/internal dicts; full on PAUSE/INSPECT.",
+        }
+    planet = cfg.planet.to_dict() if hasattr(cfg.planet, "to_dict") else {}
     return {
         "seed": int(runtime.seed),
         "ecology_preset": eco.get("ecology_preset"),
         "ecology_ui_label": eco.get("ui_label"),
         "body_orientation_force_scale": eco.get("body_orientation_force_scale"),
         "passive_reservoir_trickle": eco.get("passive_reservoir_trickle"),
-        "runtime": {
-            "type": "TwoAgentRuntime" if getattr(runtime, "slots", None) else "PhysicalSystemRuntime",
-            "cognition_enabled": cfg.cognition.cognition_enabled,
-            "agent_count": len(getattr(runtime, "slots", None) or [runtime]),
-            "selected_agent": observer_agent_id(runtime),
-            "selected_agent_id": observer_agent_id(runtime),
-            "selected_body_id": observer_body_id(runtime),
-            "agent_body_mapping": agent_body_mapping(runtime),
-            "observer_agent_ids": (
-                [f"agent_{i}" for i in range(len(runtime.slots))]
-                if getattr(runtime, "slots", None)
-                else ["agent_0"]
-            ),
-            "ecology_preset": eco.get("ecology_preset"),
-            "note": "Technical observer IDs. Not present in agent observation.",
-        },
+        "runtime": runtime_block,
         "world": {
             **planet,
             "width": int(cfg.planet.width),
@@ -1285,16 +1386,21 @@ def experiment_config_frame(runtime: PhysicalSystemRuntime) -> dict[str, Any]:
         "actions_available": list(available_actions()),
         "actions_bridge_missing": ["TAKE", "RELEASE", "CONTACT", "EMIT"],
         "note": "Only parameters supported by PhysicalSystemConfig / CognitionConfig are listed.",
-        "observer_ground_truth": _climate_observer_ground_truth(runtime),
+        "observer_ground_truth": gt,
     }
 
 
-def cognition_pipeline_frame(runtime: PhysicalSystemRuntime) -> dict[str, Any]:
+def cognition_pipeline_frame(
+    runtime: PhysicalSystemRuntime,
+    *,
+    cog: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Readable live pipeline from actual configured runtime stages."""
     from mechanistic_mind.model.tiktaalik import promotion_class
 
     cfg = runtime.config.cognition
-    cog = runtime.cognitive_view() if cfg.cognition_enabled else {}
+    if cog is None:
+        cog = runtime.cognitive_view() if cfg.cognition_enabled else {}
     stages: list[dict[str, Any]] = []
 
     def add(stage: str, *, enabled: bool, mechanism_id: str, detail: str | None = None) -> None:
@@ -1332,11 +1438,15 @@ def cognition_pipeline_frame(runtime: PhysicalSystemRuntime) -> dict[str, Any]:
     }
 
 
-def prospection_frame(runtime: PhysicalSystemRuntime) -> dict[str, Any]:
+def prospection_frame(
+    runtime: PhysicalSystemRuntime,
+    *,
+    cog: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Bounded prospective branches with explicit future vs selected distinction."""
     if not runtime.config.cognition.cognition_enabled:
         return {"status": "INACTIVE", "branches": []}
-    cog = runtime.cognitive_view()
+    cog = cog if cog is not None else runtime.cognitive_view()
     prosp = cog.get("prospection") or {}
     branches = prosp.get("branches") or prosp.get("continuations") or []
     out = []
@@ -1383,7 +1493,6 @@ def _physical_bundle(
     nfe = getattr(runtime.config, "near_field_exteroception", None)
     if nfe is not None and getattr(nfe, "enabled", False):
         from mechanistic_mind.physical_system.near_field_exteroception import (
-            ACTIVE_SENSOR_ORIENTATION,
             sample_near_field,
         )
         near_field_gt = sample_near_field(
@@ -1394,12 +1503,44 @@ def _physical_bundle(
         )
         near_field_gt = {
             **near_field_gt,
-            "ACTIVE_SENSOR_ORIENTATION": ACTIVE_SENSOR_ORIENTATION,
             "perception_enabled": bool(nfe.perception_enabled),
             "body_optical_enabled": bool(getattr(nfe, "body_optical_enabled", True)),
             "illumination_intensity_world": getattr(runtime.world, "illumination_intensity", None),
             "surface_checksum": (getattr(runtime.world, "surface_meta", None) or {}).get("checksum"),
         }
+    head_meta = getattr(runtime, "last_head_meta", None) or {}
+    from mechanistic_mind.physical_system.vestibular_proprioception import (
+        neck_proprioception_world_gt,
+        vestibular_world_gt,
+        VestibularConfig,
+        NeckProprioceptionConfig,
+    )
+    vest_cfg = getattr(runtime.config, "vestibular", None) or VestibularConfig(mode="OFF")
+    prop_cfg = getattr(runtime.config, "neck_proprioception", None) or NeckProprioceptionConfig(mode="OFF")
+    vest_gt = vestibular_world_gt(
+        runtime.body,
+        vest_cfg,
+        orientation_meta=getattr(runtime, "last_orientation_meta", None),
+        prev_omega=float(getattr(runtime, "_prev_body_omega", 0.0) or 0.0),
+    )
+    prop_gt = neck_proprioception_world_gt(
+        runtime.body,
+        prop_cfg,
+        articulated_head=getattr(runtime.config, "articulated_head", None),
+        head_meta=head_meta,
+    )
+    from mechanistic_mind.physical_system.oscillatory_signaling import (
+        OscillatorySignalingConfig,
+        oscillatory_world_gt,
+    )
+    osc_cfg = getattr(runtime.config, "oscillatory_signaling", None) or OscillatorySignalingConfig(mode="OFF")
+    osc_gt = oscillatory_world_gt(
+        runtime.body,
+        runtime.world,
+        osc_cfg,
+        articulated_head=bool(getattr(getattr(runtime.config, "articulated_head", None), "enabled", False)),
+        last_step=getattr(runtime, "last_osc_meta", None),
+    )
     return {
         "selected_action": runtime.last_selected_action,
         "action": action_work,
@@ -1413,8 +1554,22 @@ def _physical_bundle(
             "action_torque": 0.0,
             "motor_torque": 0.0,
             "receipt": getattr(runtime, "last_orientation_meta", None),
+            "head_relative_angle": float(getattr(runtime.body, "head_relative_angle", 0.0) or 0.0),
+            "head_world_heading": float(head_meta.get("head_world_heading") or getattr(runtime.body, "theta", 0.0)),
+            "head_omega": float(getattr(runtime.body, "head_omega", 0.0) or 0.0),
+            "neck_motor": float(getattr(runtime.body, "neck_motor", 0.0) or 0.0),
+            "articulated_head_enabled": bool(getattr(runtime.config.articulated_head, "enabled", False)),
+            "ACTIVE_SENSOR_ORIENTATION": (
+                "AVAILABLE"
+                if bool(getattr(runtime.config.articulated_head, "enabled", False))
+                else "NOT_AVAILABLE"
+            ),
         },
         "near_field_exteroception": near_field_gt,
+        "push": getattr(runtime, "last_push_meta", None),
+        "vestibular": vest_gt,
+        "neck_proprioception": prop_gt,
+        "oscillatory_signaling": osc_gt,
         "resources": {
             "generic": getattr(runtime, "last_resource_ledger", None),
             "complementary": resources,
@@ -1435,38 +1590,46 @@ def agents_views_frame(
     previous_body: dict[str, Any] | None,
     previous_bodies: dict[str, dict[str, Any]] | None = None,
     detail: str = "full",
+    include_cognition: bool = True,
 ) -> dict[str, Any]:
     """Per-agent observer slices at the current tick. Selection does not omit peers."""
     compact = str(detail).lower() == "compact"
+    _stub_cog = {"status": "DEFERRED", "reason": "unsubscribed", "observer_only": True}
     slots = getattr(runtime, "slots", None)
     prev_map = previous_bodies or {}
     if not slots:
+        cog0 = None
+        if include_cognition and not compact and runtime.config.cognition.cognition_enabled:
+            # Canonical same-tick public view — one build for all FULL panels.
+            cog0 = runtime.cognitive_view()
         return {
             "agent_0": {
                 "agent_id": "agent_0",
                 "body_id": "body-0",
                 "agent_seed": int(runtime.seed),
                 "tick": int(runtime.tick),
-                "mind": mind_compact_frame(runtime) if compact else mind_frame(runtime),
+                "mind": (mind_compact_frame(runtime) if compact else mind_frame(runtime, cog=cog0)) if include_cognition else dict(_stub_cog),
                 "body": body_frame(runtime),
                 "physical": _physical_bundle(runtime),
                 "agent_observation": runtime.agent_observation(),
                 "causal_chain": (
-                    causal_chain_compact_frame(runtime, previous_body=previous_body)
+                    (causal_chain_compact_frame(runtime, previous_body=previous_body)
                     if compact
-                    else causal_chain_frame(runtime, previous_body=previous_body)
+                    else causal_chain_frame(runtime, previous_body=previous_body, cog=cog0))
+                    if include_cognition else dict(_stub_cog)
                 ),
                 "cognition_pipeline": (
-                    cognition_pipeline_compact_frame(runtime)
+                    (cognition_pipeline_compact_frame(runtime)
                     if compact
-                    else cognition_pipeline_frame(runtime)
+                    else cognition_pipeline_frame(runtime, cog=cog0))
+                    if include_cognition else dict(_stub_cog)
                 ),
                 "prospection_view": (
                     {"status": "DEFERRED", "detail": "compact"}
-                    if compact
-                    else prospection_frame(runtime)
+                    if (compact or not include_cognition)
+                    else prospection_frame(runtime, cog=cog0)
                 ),
-                "perception": perception_frame(runtime),
+                "perception": perception_frame(runtime) if include_cognition else dict(_stub_cog),
             }
         }
     # Access each PhysicalSystemRuntime slot directly — never fall back across agents.
@@ -1481,7 +1644,15 @@ def agents_views_frame(
         for i, slot in enumerate(slots):
             runtime.selected_index = i  # observer projection only; restored below
             aid, bid = slot_agent_body_ids(i, experimenter_slot=exp_slot)
-            mind = mind_compact_frame(slot, agent_id=aid, body_id=bid) if compact else mind_frame(slot, agent_id=aid, body_id=bid)
+            cog_slot = None
+            if include_cognition and not compact and slot.config.cognition.cognition_enabled:
+                # Canonical same-tick public view — one build per agent for all FULL panels.
+                cog_slot = slot.cognitive_view()
+            mind = (
+                mind_compact_frame(slot, agent_id=aid, body_id=bid)
+                if compact
+                else mind_frame(slot, agent_id=aid, body_id=bid, cog=cog_slot)
+            ) if include_cognition else dict(_stub_cog)
             # Prefer per-agent previous body; fall back to selected-only buffer for compat.
             slot_prev = prev_map.get(aid) or prev_map.get(f"agent_{i}")
             if slot_prev is None and i == prev_selected:
@@ -1509,6 +1680,9 @@ def agents_views_frame(
                         "n_body_optical_cells": nf.get("n_body_optical_cells"),
                         "n_detectable": nf.get("n_detectable"),
                         "body_theta": nf.get("body_theta"),
+                        "head_relative_angle": nf.get("head_relative_angle"),
+                        "head_world_heading": nf.get("head_world_heading"),
+                        "sensor_forward_axis": nf.get("sensor_forward_axis"),
                         "fov_deg": nf.get("fov_deg"),
                         "vision_radius": nf.get("vision_radius") or nf.get("radius"),
                         "radius": nf.get("radius") or nf.get("vision_radius"),
@@ -1544,17 +1718,17 @@ def agents_views_frame(
                 "causal_chain": (
                     causal_chain_compact_frame(slot, previous_body=slot_prev)
                     if compact
-                    else causal_chain_frame(slot, previous_body=slot_prev)
+                    else causal_chain_frame(slot, previous_body=slot_prev, cog=cog_slot)
                 ),
                 "cognition_pipeline": (
                     cognition_pipeline_compact_frame(slot)
                     if compact
-                    else cognition_pipeline_frame(slot)
+                    else cognition_pipeline_frame(slot, cog=cog_slot)
                 ),
                 "prospection_view": (
                     {"status": "DEFERRED", "detail": "compact", "source_agent_id": aid}
                     if compact
-                    else prospection_frame(slot)
+                    else prospection_frame(slot, cog=cog_slot)
                 ),
                 "perception": perception_frame(slot, foreign_bodies=foreign),
             }
@@ -1572,14 +1746,74 @@ def agents_views_frame(
     return out
 
 
+def motor_control_status_frame(runtime: PhysicalSystemRuntime) -> dict[str, Any]:
+    """Observer: CURRENT MOTOR OUTPUT vs ACTIVE EFFECTORS vs PASSIVE INPUT."""
+    mo = getattr(runtime, "last_motor_output", None) or {}
+    body = runtime.body
+    osc_cfg = getattr(runtime.config, "oscillatory_signaling", None)
+    head_on = bool(getattr(runtime.config.articulated_head, "enabled", False))
+    vest_on = bool(getattr(getattr(runtime.config, "vestibular", None), "enabled", False))
+    prop_on = bool(getattr(getattr(runtime.config, "neck_proprioception", None), "enabled", False))
+    nfe_on = bool(getattr(runtime.config.near_field_exteroception, "enabled", False))
+    sig_on = bool(getattr(runtime.config.physical_signal, "enabled", False))
+    osc_on = bool(getattr(osc_cfg, "enabled", False)) if osc_cfg else False
+    osc = mo.get("oscillator") if isinstance(mo.get("oscillator"), dict) else {}
+    rem = int(getattr(body, "osc_emit_remaining", 0) or 0)
+    return {
+        "schema": mo.get("schema") or (
+            "COMPOSITE_MOTOR_V1"
+            if bool(getattr(runtime.config.cognition, "composite_motor", True))
+            else "LEGACY_SINGLE_SLOT"
+        ),
+        "current_motor_output": {
+            "locomotion": mo.get("locomotion") or runtime.last_selected_action or "WAIT",
+            "neck": mo.get("neck") or "NONE",
+            "oscillator": {
+                "freq_delta": int(osc.get("frequency_delta") or 0),
+                "amp_delta": int(osc.get("amplitude_delta") or 0),
+                "emit_trigger": bool(osc.get("emit_trigger")),
+            },
+            "push": bool(mo.get("push")),
+            "display": mo.get("display") or runtime.last_selected_action,
+            "note": "Structured motor output — not a Cartesian compound action token.",
+        },
+        "active_effectors": {
+            "body_locomotor_force": "ACTIVE"
+            if str(mo.get("locomotion") or "").startswith("MOVE:")
+            else "IDLE",
+            "neck_torque": mo.get("neck") if (mo.get("neck") and mo.get("neck") != "NONE") else "NONE",
+            "head_angle": float(getattr(body, "head_relative_angle", 0.0) or 0.0),
+            "head_omega": float(getattr(body, "head_omega", 0.0) or 0.0),
+            "oscillator": "EMITTING" if rem > 0 else "IDLE",
+            "osc_freq": float(getattr(body, "osc_freq_u", 0.5) or 0.5),
+            "osc_amp": float(getattr(body, "osc_amp_u", 0.5) or 0.5),
+            "osc_remaining": rem,
+            "push_exertion": float(getattr(body, "push_exertion", 0.0) or 0.0),
+        },
+        "passive_input": {
+            "vision": "ACTIVE" if nfe_on else "OFF",
+            "osc_reception": "ACTIVE" if osc_on else "OFF",
+            "vestibular": "ACTIVE" if vest_on else "OFF",
+            "neck_proprioception": "ACTIVE" if prop_on else "OFF",
+            "legacy_fields": "ACTIVE" if sig_on else "OFF",
+            "note": "Passive sensory pathways — not actions; no LISTEN/SEE slot.",
+        },
+        "articulated_head_enabled": head_on,
+    }
+
+
 def signal_forensics_frame(runtime: PhysicalSystemRuntime, events: list[dict[str, Any]]) -> dict[str, Any]:
     """Read-only emission/reception table for the selected agent. Not communication."""
     selected = observer_agent_id(runtime)
     emitted = []
     received = []
+    osc_episodes: list[dict[str, Any]] = []
+    emit_starts = []
     for ev in events:
         et = str(ev.get("type") or ev.get("kind") or "")
         evidence = ev.get("evidence") if isinstance(ev.get("evidence"), dict) else {}
+        if et == "OSC_EMISSION_STARTED":
+            emit_starts.append({"tick": ev.get("tick"), "evidence": evidence})
         emitter = (
             ev.get("emitter_agent_id")
             or evidence.get("emitter_agent_id")
@@ -1630,10 +1864,30 @@ def signal_forensics_frame(runtime: PhysicalSystemRuntime, events: list[dict[str
                 row["counterparty"] = "UNKNOWN"
                 row["source"] = evidence.get("source") or "NOT_RECORDED"
             received.append(row)
+    # Episode view: trigger ≠ active ticks
+    body = runtime.body
+    rem = int(getattr(body, "osc_emit_remaining", 0) or 0)
+    for st in emit_starts[-10:]:
+        osc_episodes.append({
+            "start_tick": st.get("tick"),
+            "representation": "EMISSION_START → ACTIVE_INTERVAL → EMISSION_END",
+            "note": "Do not count each active tick as a separate OSC_EMIT control.",
+        })
+    duplex = {
+        "emitting": rem > 0 or float(getattr(body, "osc_emit_active", 0.0) or 0.0) > 0.0,
+        "receiving": True,  # continuous transduction when osc ON
+        "full_duplex": True,
+        "half_duplex_rule": False,
+        "turn_taking_rule": False,
+        "speaker_listener_roles": False,
+        "note": "Emit and receive may coexist; cognition sees anonymous osc_l_*/osc_r_* only.",
+    }
     return {
         "selected_agent_id": selected,
         "signals_emitted": emitted[-20:],
         "signals_received": received[-20:],
+        "osc_emission_episodes": osc_episodes,
+        "full_duplex": duplex,
         "note": "Observer forensics only. Physical signal exchange is not communication.",
     }
 
@@ -1744,6 +1998,61 @@ def collect_observer_events(runtime: PhysicalSystemRuntime, *, limit: int = 200)
     ]
 
 
+def collect_observer_events_for_tick(
+    runtime: PhysicalSystemRuntime,
+    *,
+    tick: int,
+    limit: int = 200,
+) -> list[dict[str, Any]]:
+    """Current-tick structured events only — same enrich/sort contract as collect_observer_events.
+
+    Used by Session drain to avoid reprocessing older buffer entries every tick.
+    Ordering among same-tick events remains (tick, type) — identical to filtering the
+    full collect_observer_events result to this tick.
+    """
+    tick = int(tick)
+    slots = getattr(runtime, "slots", None)
+    out: list[dict[str, Any]] = []
+    if slots:
+        for i, slot in enumerate(slots):
+            buf = getattr(slot, "structured_events", None)
+            if buf is None:
+                continue
+            aid, bid = f"agent_{i}", f"body-{i}"
+            # Scan from the end; buffer is append-ordered by emission time ≈ tick order.
+            items = list(getattr(buf, "_buf", ()) or buf.list(limit=max(24, limit)))
+            for ev in reversed(items):
+                if int(ev.get("tick") or -1) < tick:
+                    break
+                if int(ev.get("tick") or -1) != tick:
+                    continue
+                out.append(enrich_structured_event(dict(ev), agent_id=aid, body_id=bid))
+        contact = getattr(runtime, "last_contact", None) or {}
+        if contact.get("contact") and int(runtime.tick) == tick:
+            out.append({
+                "type": "CONTACT",
+                "tick": tick,
+                "agent_id": "observer",
+                "actor_agent_id": "observer",
+                "evidence": {
+                    "com_distance": contact.get("com_distance"),
+                    "overlap_n": len(contact.get("overlap_cells") or []),
+                },
+            })
+    else:
+        buf = getattr(runtime, "structured_events", None)
+        if buf is not None:
+            items = list(getattr(buf, "_buf", ()) or buf.list(limit=limit))
+            for ev in reversed(items):
+                if int(ev.get("tick") or -1) < tick:
+                    break
+                if int(ev.get("tick") or -1) != tick:
+                    continue
+                out.append(enrich_structured_event(dict(ev), agent_id="agent_0", body_id="body-0"))
+    out.sort(key=lambda e: (int(e.get("tick") or 0), str(e.get("type") or "")))
+    return out[-limit:]
+
+
 def _physical_body_inventory_frame(runtime: PhysicalSystemRuntime) -> dict[str, Any]:
     """Observer/developer diagnostic — never cognition input."""
     from mechanistic_mind.ui.psy_observer_web.undercover_identity import (
@@ -1769,6 +2078,7 @@ def live_frame(
     structured_events: list[dict[str, Any]] | None = None,
     previous_bodies: dict[str, dict[str, Any]] | None = None,
     geometry_traversability: dict[str, Any] | None = None,
+    include_cognition: bool = True,
 ) -> dict[str, Any]:
     mechanisms = __import__(
         "mechanistic_mind.physical_system.mechanism_registry",
@@ -1787,6 +2097,7 @@ def live_frame(
         previous_body=previous_body,
         previous_bodies=previous_bodies,
         detail=detail,
+        include_cognition=include_cognition,
     )
     from mechanistic_mind.ui.psy_observer_web.geometry.live_summary import (
         geometry_live_compact_summary,
@@ -1903,15 +2214,12 @@ def live_frame(
         "geometry_interpretation": geometry_interp,
         "structured_events": events_out,
         "signal_forensics": signal_forensics_frame(runtime, events_out if compact else events),
-        "agents_observer": (
-            runtime.observer_agent_summaries()
-            if hasattr(runtime, "observer_agent_summaries")
-            else None
-        ),
+        "motor_control": motor_control_status_frame(runtime),
+        "agents_observer": _agents_observer_frame(runtime),
         "physical_body_inventory": _physical_body_inventory_frame(runtime),
         "contact": getattr(runtime, "last_contact", None),
         "physical_signal": getattr(runtime, "last_signal_receipt", None),
-        "experiment": experiment_config_frame(runtime),
+        "experiment": experiment_config_frame(runtime, detail=detail),
         "honesty": {
             "unsupported_boundary_modes": ["CLOSED", "OPEN"],
             "unavailable_perception": perception_frame(runtime)["unavailable"],
@@ -1922,6 +2230,20 @@ def live_frame(
             "signal_is_not_communication": True,
             "simulation_acceleration_only": True,
             "frame_detail": "compact" if compact else "full",
+        },
+        "observer_perf": {
+            "captured_tick": int(runtime.tick),
+            "frame_detail": "compact" if compact else "full",
+            "include_cognition": bool(include_cognition),
+            "cognitive_view_cache": (
+                runtime.cognitive_view_cache_stats()
+                if hasattr(runtime, "cognitive_view_cache_stats")
+                else {}
+            ),
+            "note": (
+                "LIVE compact avoids FULL cognition_public_view. "
+                "FULL builds one canonical public view per agent/tick."
+            ),
         },
         "overview_facts": {
             "tick": int(runtime.tick),
@@ -1943,6 +2265,36 @@ def live_frame(
 
 def _structured_events_with_agent_id(runtime: PhysicalSystemRuntime) -> list[dict[str, Any]]:
     return collect_observer_events(runtime, limit=40)
+
+def _agents_observer_frame(runtime: PhysicalSystemRuntime) -> list[dict[str, Any]]:
+    """HUD / strip agent rows for N>=1. Always a list (never null).
+
+    TwoAgentRuntime already exposes observer_agent_summaries. Single-agent
+    PhysicalSystemRuntime must still surface agent_0 + selected_action so the
+    bottom strip does not fall back to body.selected_action (which body_frame
+    does not carry).
+    """
+    if hasattr(runtime, "observer_agent_summaries"):
+        rows = runtime.observer_agent_summaries()
+        return list(rows or [])
+    # Prefer shared helper (same shape used at finalize)
+    try:
+        from mechanistic_mind.ui.psy_observer_web.run_finalize import agent_summaries
+
+        return list(agent_summaries(runtime) or [])
+    except Exception:
+        pass
+    return [{
+        "observer_id": "agent_0",
+        "agent_id": "agent_0",
+        "body_id": "body-0",
+        "x": float(runtime.body.x),
+        "y": float(runtime.body.y),
+        "selected_action": runtime.last_selected_action,
+        "tick": int(runtime.tick),
+        "agent_seed": int(runtime.seed),
+    }]
+
 
 def compact_timeline_event(frame: dict[str, Any]) -> dict[str, Any]:
     """Bounded timeline marker — not a full frame. One shared-world tick."""

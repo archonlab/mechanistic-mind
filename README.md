@@ -1,267 +1,231 @@
-# Mechanistic Mind
+# Mechanistic Mind 1.0 — Tiktaalik (Public Beta 3)
 
-**Tiktaalik: Undercover — Public Beta 1**
+**Mechanistic Mind** is an experimental artificial-life / mechanistic simulation
+environment. Observed behavioral structure should be treated as experimental
+evidence requiring controlled comparison and ablation, not as evidence of
+human-like cognition or subjective experience.
 
-Mechanistic Mind is an experimental simulation and research environment for studying how organized behavior can arise from coupling between a physical world, a body, local sensing, internal physical state, bounded memory, prediction, prospective composition, and action selection.
+Do **not** treat observed behavior as proof of consciousness, intention,
+recognition, communication, learning, or goal-directed seeking.
 
-The project deliberately avoids hard-coding semantic psychological labels such as goals, beliefs, curiosity, fear, friendship, or communication into the agents. Agents are exposed to physical state. Higher-level patterns — if any — are tested through observation, intervention, and ablation rather than assumed by construction.
+| Identity | Value |
+|----------|-------|
+| Model | Mechanistic Mind 1.0 — Tiktaalik |
+| Release | Public Beta 3 |
+| Public Observer | Psy Observer Web |
+| Runtime | TwoAgentRuntime (recommended first run) |
 
-This release does **not** claim that semantic concepts, language, social cognition, or consciousness have emerged.
+Beta 3 includes: two-agent runtime, articulated body/head, physical near-field
+vision, physical signaling, heterogeneous terrain / site mechanics, predictive
+mechanisms (compression / equivalence / relevance), temporal prediction /
+prospection, prospective composition, PSC, Scientific V3, Analyzer Next
+(bounded-memory), Psy Observer, Save & Stop / restore, and multi-agent
+behavioral reconstruction.
 
----
-
-## Tiktaalik
-
-**Tiktaalik** is the nickname for the simulated embodied agent lineage used in this release.
-
-A Tiktaalik has:
-
-- a physical body in a shared world
-- internal physical state
-- local sensory access
-- movement and contact dynamics
-- bounded predictive memory
-- prospective / scenario-composition mechanisms
-- interaction with environmental objects and resources
-- physical near-field vision
-- exposure to physical signal fields where enabled
-
-**Observer knowledge is not agent knowledge.** The Observer UI can display ground-truth information that cognition cannot access. That separation is fundamental: what you see in the interface is not automatically what the agent “knows.”
+See `RELEASE_NOTES_BETA3.md` and `KNOWN_LIMITATIONS.md`.
 
 ---
 
-## What is “Undercover”?
+## RECOMMENDED FIRST RUN
 
-**Undercover** lets the experimenter enter the same physical world as another body, instead of writing into an agent’s cognition.
+This is the recommended Beta 3 **baseline workflow**. Tick 1000 is a practical
+experimental checkpoint, **not** a biologically privileged boundary.
 
-The Undercover participant follows ordinary world/body interaction rules. It can physically:
+1. **Apply** the Observer preset **MM 1.0 — Tiktaalik Public Beta 3**
+   (**Apply & Reset World**) **before Play**. The public preset must be Applied
+   to obtain the recommended **TwoAgentRuntime**. Starting Play on the default
+   session without Apply still uses a single-agent runtime.
+2. All normal Beta 3 mechanisms should initially be **ENABLED** except:
+   - **Prospective Scenario Competition (PSC)** — **OFF**
+   - **Climate Control** — **OFF**
+3. **BEFORE pressing Play**, go to:
 
-- move
-- become optically visible to other bodies
-- make contact
-- perturb fields / environment where the runtime supports it
+   **Experiment → Predictive → OBSERVED_COMPOSITE**
 
-It must **not** inject semantic information into another agent’s cognition.
+   `OBSERVED_COMPOSITE` must be selected **before Play even though PSC itself
+   begins disabled**. Do not silently substitute `LEGACY_FIRST`, locomotion-only,
+   `SHADOW`, or another mode.
+4. Start the simulation with PSC **OFF**.
+5. Allow the Tiktaaliks approximately **1000 simulation ticks** of initial
+   history with PSC disabled.
+6. At approximately tick 1000, **enable PSC** without resetting history,
+   cognition, or body. Continue the same biography.
+7. Climate Control remains **OFF** for this baseline unless you intentionally
+   want a climate intervention experiment.
 
-This is useful for physical interaction experiments while preserving the boundary between experimenter knowledge and agent-accessible information.
+**Why PSC begins OFF:** the recommended run first allows a history of physical /
+sensorimotor consequences to accumulate before prospective scenario competition
+is enabled.
 
-Undercover is **not** automatically teaching, imitation, or social learning unless a specific experiment establishes those claims.
+**Why OBSERVED_COMPOSITE is selected before Play:** so that when PSC is later
+enabled, the intended Beta 3 motor-resolution regime is already configured and
+the biography is not interrupted merely to change that setting.
 
----
+**Do not reset** history / cognition / body when enabling PSC in this workflow.
 
-## Physical Vision
+Exact UI path:
 
-Public Beta 1 includes physical near-field vision with LIVE candidate radii:
-
-| Radius | Max Moore candidates |
-|--------|----------------------|
-| **R=1** (default) | 8 |
-| **R=2** | 24 |
-| **R=3** | 48 |
-
-Vision uses body orientation, field of view (FOV), distance, illumination, environmental optical structure, and foreign-body optical response. Changing R=1 / R=2 / R=3 is LIVE: it does not reset the world, body, cognition, or history. There is no R=4 in this Beta.
-
-Agent cognition receives only anonymous channels:
-
-- `exo_0`
-- `exo_1`
-- `exo_2`
-
-These are not object identities. Example:
-
-> The Observer may know that another body produced an optical contribution.  
-> The agent receives only the resulting local sensory values.
-
-Optical exposure is **not** recognition.
-
----
-
-## Physical Signals
-
-`FIELD_A` / `FIELD_B` are physical fields.
-
-- Emission does **not** imply intentional communication.
-- Reception does **not** imply interpretation.
-- Shared field dynamics do **not** prove a language.
-
-**Signal Forensics** investigates physical emission/reception structure and possible context-dependent relationships without assuming meaning.
+```
+Experiment → Predictive → OBSERVED_COMPOSITE
+```
 
 ---
 
-## Analyzer and Scientific Evidence
+## Quick start
 
-The Analyzer inspects scientific evidence for a run, including:
+Unpack the archive, then launch Psy Observer. You do not need a port number or
+the Python module name for normal use.
 
-- trajectories and action occupancy
-- resources / body state
-- structured cognition events
-- physical interactions and contacts
-- signals
-- visual / optical exposure
-- configuration interventions
-- causal provenance where available
+| Platform | Launcher | This packaging environment |
+|----------|----------|----------------------------|
+| **Linux** | `./launch_psy_observer.sh` or `./PsyObserver` | **TESTED** (bootstrap + Observer) |
+| **macOS** | double-click `launch_psy_observer.command` | **STATICALLY AUDITED** (not executed here) |
+| **Windows** | double-click `launch_psy_observer.bat` or `.cmd` | **STATICALLY AUDITED** (not executed here) |
 
-Evidence statements are tagged, for example:
+Requirements:
 
-- `OBSERVED`
-- `DERIVED`
-- `CAUSALLY_LINKED`
-- `TEMPORALLY_ASSOCIATED`
-- `NOT_AVAILABLE`
+- System Python **≥ 3.11** on PATH (used to create `.venv_psy_web` on first launch)
+- Network on **first** launch (`pip install -r requirements-observer.txt`)
+- Production UI is already in `mechanistic_mind/ui/psy_observer_web/web_dist/`
+  (Node/npm is **not** required for normal use)
 
-Important distinctions:
+First launch may take a few minutes while `.venv_psy_web` is created.
 
-- temporal association ≠ causation  
-- visual exposure ≠ recognition  
-- physical signal ≠ message  
+Later launches reuse that environment.
 
-**Analyze Current** takes a snapshot using the current run’s scientific history when available. If historical evidence is unavailable, historical Visual Forensics metrics are reported as `NOT_AVAILABLE` rather than false zeros.
+The launcher binds **127.0.0.1** and prefers port **8768**, falling back to a
+free port if 8768 is occupied. It opens a local browser when ready. Closing the
+browser does **not** stop a running experiment.
 
----
+Stop with **Quit** in the small ownership window, Ctrl+C in the launcher
+terminal, or `./launch_psy_observer.sh --quit`.
 
-## Observer
+On macOS, first open may need **right-click → Open** if Gatekeeper quarantines
+the `.command` file. Homebrew is not required.
 
-**Psychology Observer** (Psy Observer) is the local research UI. It separates:
+On Windows, WSL is not required. If Python is missing, the window stays open
+with an error.
 
-1. **World / ground truth** — what actually happened in the simulation  
-2. **Physical sensor / transduction** — what the sensing pipeline produced  
-3. **Agent-accessible state** — what cognition can receive  
-4. **Analyzer inference** — post-hoc research interpretation  
+Manual equivalent after the environment exists:
 
-Typical tools (not an exhaustive catalog):
+```bash
+PYTHONPATH=. .venv_psy_web/bin/python -m mechanistic_mind.ui.psy_observer_web
+```
 
-- world map and body state
-- cognition / mind views
-- Sensors → Vision (including Vision Inspector and R1/R2/R3)
-- signals and Signal Forensics
-- Analyzer / Analyze Results / Visual Forensics
-- interventions and world status
+Rebuild the UI only if you change frontend sources:
 
-Closing the browser does not always stop the backend — use the launcher window or Stop controls.
+```bash
+cd web/psy-observer && npm install && npm test && npm run build
+```
 
----
+### New-user path
 
-## Getting Started
+unpack → launch → bootstrap if required → Psy Observer opens → create/start
+experiment (Public Beta 3 preset) → verify Experiment → Predictive →
+OBSERVED_COMPOSITE → Play → Pause → Analyze Current → Save & Stop →
+reopen/restore a saved run.
 
-### Requirements
-
-- **Python 3.11+** on `PATH`
-- Network on **first launch** (dependencies install into a local `.venv_psy_web`)
-- No Node.js required to run (the UI ships as a prebuilt `web_dist`)
-
-Entry points at the package root:
-
-| File | Platform |
-|------|----------|
-| `./launch_psy_observer.sh` or `./PsyObserver` | Linux |
-| `launch_psy_observer.command` | macOS |
-| `launch_psy_observer.bat` / `launch_psy_observer.cmd` | Windows |
-
-First launch may run `scripts/bootstrap_psy_observer_env.py` and install `requirements-observer.txt`. Prefer the URL printed by the launcher (typically `http://127.0.0.1:8768`).
-
-### Linux
-
-1. Extract the release archive  
-2. Run `./launch_psy_observer.sh` (or `./PsyObserver`)  
-3. Complete first-run bootstrap if prompted  
-4. Open the local Observer URL  
-
-### macOS
-
-1. Extract the archive  
-2. If needed: `chmod +x launch_psy_observer.command`  
-3. Double-click `launch_psy_observer.command`  
-4. Allow Terminal / Python prompts if Gatekeeper asks  
-
-Native macOS execution is supported by the launcher; full Gatekeeper edge-cases may still appear on some systems.
-
-### Windows
-
-1. Extract the archive  
-2. Double-click `launch_psy_observer.bat`  
-3. First run creates `.venv_psy_web` and installs dependencies  
-4. Open the local Observer URL  
-
-Ensure Python 3.11+ is installed with “Add to PATH” enabled.
+Results are written under **project-relative**
+`results/psychology_observer/psy_observer_web/` (the package root, not the
+caller's working directory). Saved runs are `psyweb-*` directories. Live
+staging uses `.live-*` until a successful Save & Stop.
 
 ---
 
-## Quick Start
+## Observer workflow
 
-1. Launch Psychology Observer.  
-2. In Experiment controls, enable **Two-agent runtime** if it is not already on, then **Start**.  
-3. Open **Sensors → Vision**.  
-4. Enable physical near-field vision if the selected preset does not already enable it.  
-5. Try **R=1 / R=2 / R=3**.  
-6. Let the simulation run.  
-7. Click **Open Vision Inspector** for optical candidates.  
-8. Open the **Analyze** tool / Analyze Results panel.  
-9. Click **Analyze Current**.  
-10. Compare physical exposure, actions, contacts, and signals — without assuming recognition or communication.
+**Transport:** Play / Pause / Step / Stop / Reset.
 
-11. > [!IMPORTANT]
-> ### Recommended setup order
->
-> When creating a new experiment, configure it in this order:
->
-> **1. Select/configure the agents → 2. Select/configure the world → 3. Adjust the remaining settings**
->
-> Applying the world configuration also applies the currently selected agent configuration.  
-> Therefore, choose your agents **before** pressing **Apply** in the world settings.
->
-> Changing the order may result in a different agent configuration being applied than intended.
+**Execution (wall-clock only; scientific `dt` unchanged):** REALTIME (LIVE) /
+FAST / MAX / HEADLESS.
 
----
+**Observer detail:** MINIMAL / NORMAL / FULL — how much the human UI captures,
+not agent memory.
 
-## Scientific Boundaries
+**Evidence:** FULL SCI writes Scientific V3 JSONL. Compact evidence modes reduce
+what is stored; they do not change physics.
 
-This Public Beta does **not** by itself establish:
+**Experiment:** seed, map size, ecology preset, two-agent, mechanisms, Apply &
+Reset World vs Apply Live.
 
-- consciousness or sentience  
-- human-like cognition  
-- language or communication  
-- recognition or intention  
-- social learning  
+**Predictive / PSC:** Experiment → Predictive. PSC enable/disable is a live
+mechanism toggle. Motor resolution is `LOCO_FACTORIZED` or `OBSERVED_COMPOSITE`.
 
-Mechanistic Mind studies mechanisms and measurable relationships. Claims should stay within what the evidence supports. See also `SCIENTIFIC_BOUNDARIES.md`.
+**FOV / vision overlays:** Observer visualization of optical exposure. Not
+equivalent to agent-accessible observation.
 
----
+**Analyze Current:** paused reconstruction of recorded Scientific V3 into
+TickStories / Behavioral Reconstruction. HTTP stays compact.
 
-## Current Status
+**Save & Stop:** asynchronous snapshot publish. Failure should leave live state
+retryable.
 
-**Mechanistic Mind 2.0 — Tiktaalik: Undercover — Public Beta 1**
+**Restore:** reopen a saved `psyweb-*` run and continue ticks from the published
+snapshot.
 
-Experimental research software. Rough edges are expected.
+### Four layers (do not collapse them)
 
-When reporting bugs, include:
+| Layer | What it is |
+|-------|------------|
+| Simulation state | Bodies, world, cognition stores at a tick |
+| Scientific evidence | Recorded receipts (O→D→M→C, pose, signals, contacts) |
+| Observer visualization | Human overlays, FOV, terrain paint |
+| Analyzer-derived reconstruction | TickStories, episodes, derived metrics |
 
-- OS  
-- Python version  
-- seed  
-- preset / configuration  
-- tick  
-- relevant Analyzer output or log (`.psy_observer/launcher.log` when useful)
+Observer overlays are not agent-accessible merely because humans can see them.
 
 ---
 
-## Repository / Data Notes
+## Scientific evidence / Analyzer
 
-Long runs can generate substantial scientific telemetry under `results/` (and related Observer paths). That growth is intentional history retention.
+Scientific V3 core chain:
 
-Do **not** commit large generated run datasets, virtualenvs, or local Observer state. Local-only directories typically include:
+**Observation → Decision → Motor → Consequence**
 
-- `.venv_psy_web/` — first-run Python environment  
-- `.psy_observer/` — launcher state / logs  
-- `results/` — saved runs and scientific timelines  
+Analyzer Next reconstructs TickStories and behavioral episodes from recorded
+evidence. FULL coverage requires successful consumption of that history, not
+metadata that rows exist.
+
+**Observed / recorded:** physical observations, DecisionReceipts, MotorReceipts,
+ConsequenceReceipts, pose/geometry where recorded, signals, visual exposure,
+contacts.
+
+**Derived (explicitly labeled):** approach / withdrawal candidates, geometric
+relationships, motor reversals, sensorimotor trend-reversal candidates, other
+derived metrics.
+
+**Not established merely by observation:** recognition, communication,
+intention, wanting, deliberate navigation, learning.
+
+Physical signaling is not automatically communication.
+Distance reduction is not automatically seeking.
+Terrain-assisted displacement is not automatically intentional terrain use.
 
 ---
 
-## License
+## Configuration note
 
-This project is licensed under the **GNU Affero General Public License v3.0** (AGPL-3.0). See [`LICENSE`](LICENSE).
+Low-level `CognitionConfig` still defaults `psc_motor_resolution` to
+`LOCO_FACTORIZED` (legacy scripts). Fresh Observer experiments using the
+**Public Beta 3 recommended preset** set two-agent mode and
+`OBSERVED_COMPOSITE`, with PSC and Climate Control off. README and that preset
+must agree; applying a custom experiment without the preset does **not**
+silently migrate motor resolution.
 
-Commercial licensing terms, if applicable, are described in `COMMERCIAL_LICENSING.md`.
+Default session Play without Apply still constructs a single-agent runtime.
+Use Apply & Reset World with the Public Beta 3 preset for the recommended
+two-agent first run.
 
 ---
 
-**Mechanistic Mind** · Tiktaalik: Undercover · Public Beta 1
+## Tests (developers)
+
+```bash
+PYTHONPATH=. python3 -m pytest tests/test_analyze_current_paused_v3.py \
+  tests/test_save_stop_enospc_retry.py \
+  tests/test_beta3_recommended_public_preset.py \
+  tests/test_p0_cognition_indexes.py \
+  tests/test_psy_observer_save_stop.py -q
+```
+
+GIT_PUSH is not part of this release process.

@@ -4,8 +4,22 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Psy Observer — Mechanistic Mind</title>
-    <script type="module" crossorigin src="/assets/index-AT9AOQ5R.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DYHGhhw9.css">
+    <script>
+      (function () {
+        try {
+          var p = localStorage.getItem('mm.observer.theme') || 'system';
+          var light = window.matchMedia('(prefers-color-scheme: light)').matches;
+          var r = p === 'light' ? 'light' : p === 'dark' ? 'dark' : (light ? 'light' : 'dark');
+          document.documentElement.setAttribute('data-theme', r);
+          document.documentElement.setAttribute('data-theme-pref', p);
+          document.documentElement.style.colorScheme = r;
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-Dp-0DmBo.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-atP9P5pz.css">
   </head>
   <body>
     <div id="root"></div>

@@ -4,20 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mechanistic-mind"
-version = "2.0.0"
-description = "Mechanistic Mind 2.0 — Tiktaalik: Undercover — Public Beta 1"
+version = "0.5.4"
+description = "Mechanistic Mind Organism x World research foundation"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []
 
+[project.gui-scripts]
+mechanistic-mind-observer = "mechanistic_mind.ui.psychology_observer.cli:main"
+
 [project.optional-dependencies]
-observer = [
-  "fastapi>=0.110",
-  "uvicorn[standard]>=0.27",
-  "numpy>=1.26",
-  "pydantic>=2.0",
-  "httpx>=0.27",
-]
 dev = ["pytest>=8.0"]
 
 [tool.pytest.ini_options]
