@@ -1,4 +1,4 @@
-# Mechanistic Mind 1.0 — Tiktaalik (Public Beta 3.1)
+# Mechanistic Mind 1.0 — Tiktaalik (Public Beta 3.1.1)
 
 ![MM 1.0 Tiktaalik Public Beta 3.1](docs/assets/tiktaalik-beta31-release.png)
 
@@ -14,7 +14,7 @@ goal-directed seeking.
 | Identity | Value |
 |----------|-------|
 | Model | Mechanistic Mind 1.0 — Tiktaalik |
-| Release | Public Beta 3.1 |
+| Release | Public Beta 3.1.1 (launcher patch of frozen 3.1) |
 | Public Observer | Psy Observer Web 0.2.0 |
 | Runtime | TwoAgentRuntime (recommended first run) |
 | Public preset | TIKTAALIK_BETA31 |
@@ -24,7 +24,8 @@ composite motors (NECK / OSC / PUSH), canonical TIKTAALIK_BETA31 configuration,
 Observer composite action display, and a RECENT side-channel HUD. Frozen Public
 Beta 3 remains a separate package (`RELEASE_NOTES_BETA3.md`).
 
-See `RELEASE_NOTES_BETA31.md` and `KNOWN_LIMITATIONS.md`.
+See `RELEASE_NOTES_BETA31_1.md` (this patch), `RELEASE_NOTES_BETA31.md`, and
+`KNOWN_LIMITATIONS.md`.
 
 ---
 
@@ -147,9 +148,9 @@ Requirements:
 - Production UI is already in `mechanistic_mind/ui/psy_observer_web/web_dist/`
   (Node/npm is **not** required for normal use)
 
-First launch may take a few minutes while `.venv_psy_web` is created.
-
-Later launches reuse that environment.
+First launch may take a few minutes while `.venv_psy_web` is created
+(network required). Subsequent launches reuse that environment. If bootstrap
+fails, see `PSY_OBSERVER_LAUNCHER.md` — do not create the venv by hand.
 
 The launcher binds **127.0.0.1** and prefers port **8768**, falling back to a
 free port if 8768 is occupied. It opens a local browser when ready. Closing the

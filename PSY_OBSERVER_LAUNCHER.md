@@ -16,9 +16,14 @@ What happens:
 
 1. The launcher finds this project even if you started it from somewhere else.
 2. It prefers `.venv_psy_web` when present (Unix `bin/`, Windows `Scripts/`).
-3. It checks that the production Observer interface is already built (`web_dist`). Public archives bootstrap `.venv_psy_web` via `scripts/bootstrap_psy_observer_env.py` on first launch.
-4. If Psy Observer Web is already running for this checkout, it opens that same local window again.
-5. Otherwise it starts one local server on `127.0.0.1`, picks a free port if needed (preferred **8768**), waits until healthy, and opens your browser.
+3. If `.venv_psy_web` is missing or incomplete, first launch runs
+   `scripts/bootstrap_psy_observer_env.py`: it creates the environment and
+   installs `requirements-observer.txt`. **Internet access is required** for
+   that install. First launch can take several minutes. Later launches reuse
+   `.venv_psy_web` and do not reinstall unless the environment is broken.
+4. It checks that the production Observer interface is already built (`web_dist`).
+5. If Psy Observer Web is already running for this checkout, it opens that same local window again.
+6. Otherwise it starts one local server on `127.0.0.1`, picks a free port if needed (preferred **8768**), waits until healthy, and opens your browser.
 
 All platforms call the same Python entry:
 
@@ -51,6 +56,14 @@ To stop Psy Observer Web:
 ## Logs
 
 `.psy_observer/launcher.log`
+
+## If first-run setup fails
+
+You do **not** need to create `.venv_psy_web` by hand. Typical causes: no
+network, blocked `pip`, or Python older than 3.11. Install a current Python,
+restore network access, then run the same launcher again. Details are in
+`.psy_observer/launcher.log`. To force a clean retry, delete `.venv_psy_web`
+and relaunch.
 
 ## Development
 

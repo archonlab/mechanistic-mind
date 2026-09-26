@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Build Release/MM-1.0-Tiktaalik-Public-Beta-3.1 from the development tree.
+"""Build Release/MM-1.0-Tiktaalik-Public-Beta-3.1.1 from the development tree.
 
-Destination-only. Does not mutate frozen Beta 3. GIT_PUSH is never performed.
+Destination-only. Does not mutate frozen Beta 3 or the published Beta 3.1
+GitHub tag/assets. GIT_PUSH is never performed.
 """
 from __future__ import annotations
 
@@ -18,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 SRC = Path(__file__).resolve().parents[1]
-SLUG = "MM-1.0-Tiktaalik-Public-Beta-3.1"
+SLUG = "MM-1.0-Tiktaalik-Public-Beta-3.1.1"
 DEST = SRC / "Release" / SLUG
 BETA3 = SRC / "Release" / "MM-1.0-Tiktaalik-Public-Beta-3"
 BETA1 = SRC / "Release" / "MM-1.0-Tiktaalik-Beta1"
@@ -248,6 +249,7 @@ def main() -> int:
     for name in (
         "README.md", "CHANGELOG.md", "KNOWN_LIMITATIONS.md",
         "RELEASE_NOTES_BETA3.md", "RELEASE_NOTES_BETA31.md",
+        "RELEASE_NOTES_BETA31_1.md",
         "PSY_OBSERVER_LAUNCHER.md", "ONTOLOGY_AUDIT.md",
         "LICENSE", "COPYRIGHT", "COMMERCIAL_LICENSING.md",
     ):
@@ -255,9 +257,9 @@ def main() -> int:
         if src_p.is_file():
             copy_file(src_p, DEST / name)
 
-    launcher_src = BETA3 if (BETA3 / "launch_psy_observer.sh").is_file() else (
-        BETA1 if (BETA1 / "launch_psy_observer.sh").is_file() else SRC
-    )
+    # Source-tree launchers are canonical (first-run bootstrap). Do not copy
+    # frozen Beta 3 wrappers, which previously diverged from GitHub main.
+    launcher_src = SRC
     for name in (
         "launch_psy_observer.sh", "launch_psy_observer.command",
         "launch_psy_observer.bat", "launch_psy_observer.cmd", "PsyObserver",
@@ -276,15 +278,19 @@ def main() -> int:
         if not sh.is_file():
             continue
         text = sh.read_text(encoding="utf-8", errors="ignore")
-        text = text.replace("Beta 3 archive", "Beta 3.1 archive")
-        text = text.replace("Beta 3 launcher", "Beta 3.1 launcher")
-        text = text.replace("Psy Observer Web (Beta 3)", "Psy Observer Web (Beta 3.1)")
-        text = text.replace("Starting Psy Observer Web (Beta 3)", "Starting Psy Observer Web (Beta 3.1)")
+        text = text.replace("Beta 3 archive", "Beta 3.1.1 archive")
+        text = text.replace("Beta 3 launcher", "Beta 3.1.1 launcher")
+        text = text.replace("Psy Observer Web (Beta 3)", "Psy Observer Web (Beta 3.1.1)")
+        text = text.replace("Starting Psy Observer Web (Beta 3)", "Starting Psy Observer Web (Beta 3.1.1)")
+        if "Beta 3.1.1" not in text:
+            text = text.replace("Beta 3.1", "Beta 3.1.1")
         sh.write_text(text, encoding="utf-8")
 
     boot = (DEST / "scripts" / "bootstrap_psy_observer_env.py").read_text(encoding="utf-8")
     (DEST / "scripts" / "bootstrap_psy_observer_env.py").write_text(
-        boot.replace("publication / Beta 3", "publication / Beta 3.1"),
+        boot.replace("publication / Beta 3.1", "publication / Beta 3.1.1").replace(
+            "publication / Beta 3", "publication / Beta 3.1.1"
+        ),
         encoding="utf-8",
     )
 

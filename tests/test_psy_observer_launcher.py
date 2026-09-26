@@ -193,3 +193,60 @@ def test_health_endpoint_identifies_app():
     assert out["instance_id"] == "test-instance"
     ident = TestClient(app).get("/api/instance").json()
     assert ident["identity"] == "Psy Observer · local"
+
+
+def test_platform_launchers_call_canonical_bootstrap():
+    root = Path(__file__).resolve().parents[1]
+    sh = (root / "launch_psy_observer.sh").read_text(encoding="utf-8")
+    command = (root / "launch_psy_observer.command").read_text(encoding="utf-8")
+    bat = (root / "launch_psy_observer.bat").read_text(encoding="utf-8")
+    for text in (sh, command, bat):
+        assert "bootstrap_psy_observer_env.py" in text
+        assert ".venv_psy_web" in text
+    assert "ensure_environment" in sh
+    assert "ensure_environment" in command
+
+
+def test_ensure_environment_skips_ready_venv(tmp_path, monkeypatch):
+    calls: list[list[str]] = []
+
+    def fake_import(executable, root):
+        return True, "ok"
+
+    def fake_run(*_a, **_k):
+        calls.append(["ran"])
+        raise AssertionError("bootstrap should not run")
+
+    monkeypatch.setattr(L, "_can_import_observer", fake_import)
+    monkeypatch.setattr(L.subprocess, "run", fake_run)
+    L.ensure_environment(tmp_path)
+    assert calls == []
+
+
+def test_ensure_environment_runs_bootstrap_when_venv_missing(tmp_path, monkeypatch):
+    script = tmp_path / "scripts" / "bootstrap_psy_observer_env.py"
+    script.parent.mkdir()
+    script.write_text("# bootstrap\n", encoding="utf-8")
+    monkeypatch.setattr(L, "_can_import_observer", lambda *_a, **_k: (False, "missing"))
+
+    class Result:
+        returncode = 0
+
+    seen: dict[str, object] = {}
+
+    def fake_run(cmd, cwd=None, check=False):
+        seen["cmd"] = list(cmd)
+        seen["cwd"] = cwd
+        return Result()
+
+    monkeypatch.setattr(L.subprocess, "run", fake_run)
+    L.ensure_environment(tmp_path)
+    assert seen["cmd"][1].endswith("bootstrap_psy_observer_env.py")
+    assert "--root" in seen["cmd"]
+    assert seen["cwd"] == str(tmp_path)
+
+
+def test_ensure_environment_errors_if_bootstrap_missing(tmp_path, monkeypatch):
+    monkeypatch.setattr(L, "_can_import_observer", lambda *_a, **_k: (False, "missing"))
+    with pytest.raises(L.LaunchError, match="bootstrap"):
+        L.ensure_environment(tmp_path)

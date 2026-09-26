@@ -152,6 +152,56 @@ def verify_python(executable: Path) -> tuple[bool, str]:
     return True, "ok"
 
 
+def venv_python_path(root: Path) -> Path:
+    if os.name == "nt":
+        return root / ".venv_psy_web" / "Scripts" / "python.exe"
+    return root / ".venv_psy_web" / "bin" / "python"
+
+
+def ensure_environment(root: Path) -> None:
+    """Create `.venv_psy_web` via the canonical bootstrap script when needed.
+
+    Platform wrappers also call the same script. This path covers
+    `python -m mechanistic_mind.ui.psy_observer_web.launcher` on a fresh copy.
+    """
+    if os.environ.get("PSY_OBSERVER_SKIP_BOOTSTRAP"):
+        return
+    override = os.environ.get("PSY_OBSERVER_PYTHON")
+    if override:
+        p = Path(override)
+        if p.exists() and _python_looks_runnable(p):
+            return
+    venv_py = venv_python_path(root)
+    ok, _reason = _can_import_observer(venv_py, root)
+    if ok:
+        return
+    script = root / "scripts" / "bootstrap_psy_observer_env.py"
+    if not script.is_file():
+        raise LaunchError(
+            "Python environment missing. Psy Observer needs .venv_psy_web, "
+            "and scripts/bootstrap_psy_observer_env.py is not present."
+        )
+    print("Preparing Psy Observer environment", flush=True)
+    print("Creating Python environment and installing dependencies if needed.", flush=True)
+    print("This may take a few minutes on first launch (network required).", flush=True)
+    log(root, "bootstrap starting")
+    proc = subprocess.run(
+        [sys.executable, str(script), "--root", str(root)],
+        cwd=str(root),
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise LaunchError(
+            "First-run setup failed while creating .venv_psy_web or installing "
+            "dependencies.\n"
+            f"See {log_path(root)}\n"
+            "Typical causes: no network, blocked pip, or Python older than 3.11.\n"
+            "Fix the cause and run Psy Observer again. You do not need to create "
+            "the virtual environment by hand."
+        )
+    log(root, "bootstrap finished")
+
+
 def locate_python(root: Path) -> Path:
     tried: list[str] = []
     for cand in python_candidates(root):
@@ -161,8 +211,8 @@ def locate_python(root: Path) -> Path:
         tried.append(f"{cand}: {reason}")
     if not any(p.exists() for p in python_candidates(root)[:4]):
         raise LaunchError(
-            "Python environment missing. Psy Observer needs the project "
-            "Python environment (.venv_psy_web)."
+            "Python environment missing after bootstrap. Psy Observer needs "
+            ".venv_psy_web. See README.md and .psy_observer/launcher.log."
         )
     detail = tried[0] if tried else "unknown"
     if "ModuleNotFoundError" in detail or "import" in detail.lower():
@@ -557,6 +607,7 @@ def launch(
         return existing
 
     verify_spa(root)
+    ensure_environment(root)
     python = locate_python(root)
     port = choose_port(preferred_port)
     instance_id = uuid.uuid4().hex

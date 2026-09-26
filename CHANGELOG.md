@@ -1,5 +1,13 @@
 # Changelog
 
+## MM 1.0 Tiktaalik Public Beta 3.1.1
+
+- Launcher/bootstrap patch of frozen Public Beta 3.1 (`v1.0.0-tiktaalik-public-beta-3.1.1`).
+- Fresh GitHub/source first launch creates `.venv_psy_web` via
+  `scripts/bootstrap_psy_observer_env.py`; later launches reuse it.
+- No scientific/model change. `TIKTAALIK_BETA31` unchanged. Beta 3.1 tag/assets
+  not replaced.
+
 ## MM 1.0 Tiktaalik Public Beta 3.1
 
 - Public cut `MM-1.0-Tiktaalik-Public-Beta-3.1` (`v1.0.0-tiktaalik-public-beta-3.1`).
