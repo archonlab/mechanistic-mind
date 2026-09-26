@@ -9,6 +9,8 @@
 - Observer composite motor HUD and RECENT side-channel HUD; vision controls in this cut.
 - Performance / memory / persistence work already in this tree; mechanism-integrity validation.
 - Frozen Public Beta 3 package is unchanged. Known limitations are documented, not repaired.
+- README pre-run checklist: verify Vision after Apply/Reset, and verify
+  PSC motor resolution `OBSERVED_COMPOSITE` before a PSC research run.
 
 ### MM 1.0 Tiktaalik Public Beta 3 packaging
 

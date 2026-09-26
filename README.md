@@ -1,5 +1,7 @@
 # Mechanistic Mind 1.0 — Tiktaalik (Public Beta 3.1)
 
+![MM 1.0 Tiktaalik Public Beta 3.1](docs/assets/tiktaalik-beta31-release.png)
+
 **Mechanistic Mind** is an experimental artificial-life / mechanistic simulation
 environment. Observed behavioral structure should be treated as experimental
 evidence requiring controlled comparison and ablation, not as evidence of
@@ -53,6 +55,77 @@ is enabled.
 
 **Do not reset** history / cognition / body if you later enable PSC in the same
 biography.
+
+---
+
+## Before starting a research run (pre-run checklist)
+
+Verify the **effective** experiment state before a long run. UI labels and the
+last form you filled in are not a substitute for checking runtime/status after
+Apply / Reset. This is a **recommended research workflow**, not the only valid
+way to use Mechanistic Mind. It does **not** change the canonical public preset
+`TIKTAALIK_BETA31`.
+
+### 1. Vision configuration
+
+In the current Beta 3.1 Observer, vision settings **may reset or return to a
+different / default configuration** during some configuration and reset
+workflows. This is a known limitation; it is planned to be improved in a future
+version. See `KNOWN_LIMITATIONS.md`.
+
+After **Apply** or **Reset**, and **before** beginning a long run, open the
+**Vision** tab and confirm that the live state matches the experiment you
+intend. Check, as applicable:
+
+- Vision enabled
+- Range
+- Surface discrimination mode
+- Optical mapping
+- Spatial Vision mode
+- FOV / effective vision status
+
+No single vision configuration is universally correct. For a research run,
+choose the configuration the experiment requires and verify that the **runtime**
+reflects it.
+
+### 2. PSC motor resolution
+
+PSC motor resolution is **not** cosmetic UI. It selects the effective motor-
+resolution mode used when PSC runs.
+
+Before starting a **PSC** experiment, verify:
+
+**PSC MOTOR RESOLUTION = OBSERVED COMPOSITE**
+
+(`OBSERVED_COMPOSITE` — the observed-composite resolution.) Confirm this on the
+effective / status side after configuration, not only on a control that may
+have been overwritten.
+
+PSC does **not** need to be enabled from tick 0. The usual research sequence is
+to accumulate physical / sensorimotor history first, then enable PSC **without**
+resetting that history, and to confirm observed-composite resolution at enable
+time.
+
+The public Beta 3.1 baseline preset remains `TIKTAALIK_BETA31` with
+`LOCO_FACTORIZED` and PSC off. Use observed-composite when **that** is the
+experiment, and verify it before a long PSC run.
+
+### Recommended research workflow
+
+1. Configure the experiment (preset, seed, map, agents, mechanisms).
+2. Apply / Reset as intended, then **re-check the Vision tab** (enabled, range,
+   surface discrimination, optical mapping, Spatial Vision, FOV / effective
+   status).
+3. Verify intended mechanisms and ablations.
+4. Keep **Climate Control OFF** unless you are specifically studying climate.
+5. Keep legacy **Experimental Signal OFF** unless you are specifically studying
+   that path. **OSC** (physical oscillatory signaling) is separate from legacy
+   Experimental Signal; do not treat them as the same control.
+6. Allow the organism to accumulate experience / history before enabling PSC
+   (PSC need not start at tick 0).
+7. When enabling PSC, verify **PSC MOTOR RESOLUTION = OBSERVED COMPOSITE** if
+   that is the intended resolution for the run.
+8. Check runtime / status indicators once more before committing to a long run.
 
 ---
 

@@ -20,6 +20,12 @@ These are limitations of the current tree. They are not claims about organisms.
   `PhysicalSystemRuntime` lacks `mechanism_snapshot`. This is pre-existing.
   SPA, health, experiment, TIKTAALIK_BETA31 Apply, two-agent runtime, and
   release smoke paths work. It is not repaired in this release.
+- Observer **Vision** settings may reset or return to a different / default
+  configuration during some configuration and reset workflows. This is a known
+  UI/workflow limitation, planned for a future version. It is not repaired in
+  this cut. After Apply / Reset, re-check the Vision tab (enabled, range,
+  surface discrimination, optical mapping, Spatial Vision, FOV / effective
+  status) before a long run. See the README pre-run checklist.
 
 Frozen Public Beta 3 limitations below still apply unless listed as resolved.
 
