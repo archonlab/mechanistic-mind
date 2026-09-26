@@ -1,0 +1,246 @@
+{
+  "schema": "mm.scientific_v3.design_draft.v0",
+  "status": "DESIGN_ONLY",
+  "created": "2026-09-21T05:32:50.068120+00:00",
+  "evidence_mode": "SCIENTIFIC_V3",
+  "tiers": [
+    "CORE",
+    "RESEARCH",
+    "FORENSIC"
+  ],
+  "identity": {
+    "run_id": "string",
+    "generation": "int",
+    "cognitive_agent_id": "string",
+    "physical_body_id": "string",
+    "controller_type": [
+      "AUTONOMOUS_COGNITIVE",
+      "EXPERIMENTER",
+      "PASSIVE",
+      "SYSTEM"
+    ],
+    "world_object_id": "string?",
+    "environmental_site_id": "string?",
+    "signal_emission_id": "string",
+    "signal_reception_id": "string",
+    "observation_id": "string",
+    "decision_id": "string",
+    "motor_id": "string",
+    "consequence_id": "string",
+    "intervention_id": "string?"
+  },
+  "provenance_enum": [
+    "PHYSICAL_GROUND_TRUTH",
+    "AGENT_ACCESSIBLE",
+    "COGNITIVE_INTERNAL",
+    "DECISION_INTERNAL",
+    "MOTOR_OUTPUT",
+    "EXPERIMENTER_CONTROL",
+    "CONFIGURATION",
+    "DERIVED_POSTHOC",
+    "LEGACY_COMPATIBILITY",
+    "DEBUG_DIAGNOSTIC"
+  ],
+  "coverage_states": [
+    "COMPLETE",
+    "PARTIAL",
+    "AGGREGATE_ONLY",
+    "EVENT_ONLY",
+    "CHECKPOINT_ONLY",
+    "SPARSE",
+    "NOT_RECORDED",
+    "NOT_AVAILABLE",
+    "NOT_APPLICABLE"
+  ],
+  "causal_strength": [
+    "DIRECT_CAUSAL_LINK",
+    "RECONSTRUCTED_CAUSAL_LINK",
+    "TEMPORALLY_ASSOCIATED",
+    "DERIVED",
+    "NOT_ESTABLISHED"
+  ],
+  "receipts": {
+    "TickReceipt": {
+      "fields": [
+        "run_id",
+        "tick",
+        "world_epoch",
+        "schema_version",
+        "evidence_tier"
+      ],
+      "notes": "One per simulation tick after physical commit + evidence capture."
+    },
+    "AgentTickSpine": {
+      "fields": [
+        "run_id",
+        "tick",
+        "cognitive_agent_id",
+        "physical_body_id",
+        "controller_type",
+        "observation_id",
+        "decision_id",
+        "motor_id",
+        "consequence_id",
+        "revision_id?"
+      ],
+      "tier": "CORE",
+      "est_bytes": "120-200"
+    },
+    "ObservationReceipt": {
+      "tier": "CORE",
+      "fields": {
+        "observation_id": "id",
+        "tick": "int",
+        "agent_id": "cognitive_agent_id",
+        "accessible": "dict[str,float] compact agent-accessible channels only",
+        "signature": "hash of accessible dict for later equality tests",
+        "sensor_refs": "optional compact refs to vision/signal/vest/neck packs",
+        "provenance": "AGENT_ACCESSIBLE"
+      },
+      "gt_decomposition": {
+        "tier": "RESEARCH/FORENSIC",
+        "when": "event-driven or threshold / checkpoint",
+        "fields": [
+          "contributor_ids",
+          "channel",
+          "magnitudes"
+        ]
+      },
+      "est_bytes_core": "180-350"
+    },
+    "DecisionReceipt": {
+      "tier0_CORE": {
+        "fields": [
+          "decision_id",
+          "tick",
+          "agent_id",
+          "observation_id",
+          "selection_mode",
+          "selection_source",
+          "selection_rule",
+          "selected_action_legacy",
+          "selected_candidate_id?",
+          "candidate_count",
+          "fallback_reason?",
+          "motor_id",
+          "peer_evaluation?",
+          "prediction_count_delta?",
+          "prospective_delta?"
+        ],
+        "forbidden": "invented utility/motivation scores",
+        "source": "CognitionTickResult + last_selection compact subset every tick",
+        "est_bytes": "220-400"
+      },
+      "tier1_RESEARCH": {
+        "adds": [
+          "top_k_candidate_summaries (k<=3)",
+          "competition_summary compact"
+        ],
+        "est_bytes_extra": "300-800"
+      },
+      "tier2_FORENSIC": {
+        "adds": [
+          "full scenario_groups/competition graph sampled or checkpointed"
+        ],
+        "note": "Do not emit full graph every tick by default"
+      }
+    },
+    "MotorReceipt": {
+      "tier": "CORE",
+      "fields": {
+        "motor_id": "id",
+        "tick": "int",
+        "agent_id": "id",
+        "decision_id": "id",
+        "schema": "COMPOSITE_MOTOR_V1",
+        "components": {
+          "locomotion": "WAIT|MOVE:*|NONE",
+          "neck": "NONE|NECK_*",
+          "oscillator": "control+emit fields",
+          "push": "bool"
+        },
+        "selection_source": "string",
+        "legacy_token": "LEGACY_COMPATIBILITY only",
+        "intent_vs_realized": {
+          "requested": "from composite intent",
+          "realized_refs": "action_work_ledger / motor_apply / push receipts ids"
+        }
+      },
+      "est_bytes": "160-280"
+    },
+    "ConsequenceReceipt": {
+      "tier": "CORE",
+      "fields": {
+        "consequence_id": "id",
+        "tick_from": "T",
+        "tick_to": "T+1",
+        "body_id": "physical_body_id",
+        "motor_id": "id",
+        "pose_delta": {
+          "dx": "float",
+          "dy": "float",
+          "wrap_aware": true
+        },
+        "orientation_delta": {
+          "d_theta": "float",
+          "d_omega": "float"
+        },
+        "resource_delta": {
+          "A": "float",
+          "B": "float",
+          "work": "float"
+        },
+        "deform_delta": {
+          "d_alpha": "float?"
+        },
+        "event_refs": [
+          "contact",
+          "push",
+          "signal_emit",
+          "signal_recv",
+          "transfer",
+          "deform"
+        ],
+        "force_contrib_compact?": "optional RESEARCH: env_site/endo/action norms"
+      },
+      "est_bytes": "140-260"
+    },
+    "RevisionReceipt": {
+      "tier": "RESEARCH when mechanism enabled else NOT_APPLICABLE",
+      "fields": [
+        "revision_id",
+        "tick",
+        "agent_id",
+        "prior_prediction_ref",
+        "realized_observation_id",
+        "error_metric_real",
+        "revision_applied",
+        "mechanism_id"
+      ],
+      "source": "prediction_error_revision / temporal_prediction_error when enabled",
+      "est_bytes": "120-200 when present"
+    }
+  },
+  "files": {
+    "scientific_meta.json": "mode, tier, schema major/minor, identity registry snapshot, coverage template",
+    "scientific_spine.jsonl": "AgentTickSpine per (tick, agent)",
+    "scientific_observations.jsonl": "ObservationReceipt",
+    "scientific_decisions.jsonl": "DecisionReceipt",
+    "scientific_motors.jsonl": "MotorReceipt",
+    "scientific_consequences.jsonl": "ConsequenceReceipt",
+    "scientific_events.jsonl": "typed events (leaner payloads)",
+    "scientific_revisions.jsonl": "RevisionReceipt when applicable",
+    "scientific_checkpoints.jsonl": "heavy nests / stores",
+    "identity_map.json": "controller/body/agent lifecycle"
+  },
+  "storage_estimates_bytes_per_tick_core_1_agent": {
+    "spine": 160,
+    "observation": 260,
+    "decision": 320,
+    "motor": 220,
+    "consequence": 200,
+    "baseline_timeline_replacement_credit": -400,
+    "net_core_scalars": 760,
+    "events_variable": "regime-dependent; signal-heavy can dominate"
+  }
+}

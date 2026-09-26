@@ -35,7 +35,9 @@ export function buildCausalChains(state: AnalysisState): CausalChain[] {
           from: `reception:${p.child}`,
           to: 'later_cognition',
           link: 'NOT_ESTABLISHED',
-          reason: 'No explicit causal_parent link from reception to prediction/action in ingested events.',
+          reason:
+            'No explicit causal_parent link from reception to prediction/action. ' +
+            'Cognition sees anonymous local.FIELD_* floats only (SIGINT-01).',
         },
       ],
     });

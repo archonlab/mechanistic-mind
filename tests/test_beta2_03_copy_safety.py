@@ -1,4 +1,4 @@
-"""Copy/sharing safety for hot cognition deepcopy removals."""
+"""BETA2-03: copy/sharing safety for hot cognition deepcopy removals."""
 from __future__ import annotations
 
 from copy import deepcopy
@@ -8,7 +8,13 @@ from mechanistic_mind.physical_system import PhysicalSystemRuntime, TwoAgentRunt
 from mechanistic_mind.physical_system import cognition as cog
 from mechanistic_mind.research import multistep_action_prospection as mapr
 from mechanistic_mind.research import predictive_equivalence as pe
+from mechanistic_mind.research import predictive_relevance as prl
 from mechanistic_mind.research import temporal_predictive_structure as tps
+from mechanistic_mind.ui.psy_observer_web.scientific_history import (
+    ScientificHistoryWriter,
+    iter_jsonl,
+)
+
 
 def _enable_opts(on: bool) -> None:
     pe.set_float_map_dict_copy(on)

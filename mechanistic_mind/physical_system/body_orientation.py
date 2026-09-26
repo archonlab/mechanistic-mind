@@ -136,11 +136,17 @@ def step_orientation_mechanics(
     apply_translation: bool = True,
     work_cfg: Any | None = None,
     work_budget: float | None = None,
+    terrain_cfg: Any | None = None,
+    ambient_cfg: Any | None = None,
+    locomotor_active: bool = False,
 ) -> dict[str, Any]:
     """Experimental tick: rotated site sampling, local forces, net force + torque, angular update.
 
     When morphology config enabled, uses B_site susceptibility; otherwise uniform susc=1.
     Mutates body (and optionally planet/internal via material exchange when morph local material ON).
+    Terrain (optional): F += -κ∇Φ and CoM drag += coupling·γ_local. External only —
+    never credits mechanical_work_reservoir.
+    Ambient (optional): F += ambient_fx/fy (static horizontal). External only.
     """
     meta: dict[str, Any] = {"enabled": False}
     if not orient_cfg.enabled:
@@ -210,6 +216,8 @@ def step_orientation_mechanics(
     Fx = Fy = 0.0
     tau = 0.0
     exposures = []
+    terrain_meta: dict[str, Any] = {"enabled": False}
+    ambient_meta: dict[str, Any] = {"enabled": False}
 
     if site_mech and body_cfg.mechanical_enabled:
         for si, (iy, ix) in enumerate(cells):
@@ -252,15 +260,45 @@ def step_orientation_mechanics(
             site_forces.append({"site": si, "fx": fx, "fy": fy, "tau_i": ti, "susc": susc})
         Fx /= max(1, n_sites)
         Fy /= max(1, n_sites)
+        # Terrain: potential force + extra dissipative drag (external channel only).
+        extra_drag = 0.0
+        if terrain_cfg is not None and bool(getattr(terrain_cfg, "enabled", False)):
+            from mechanistic_mind.planet.terrain import sample_terrain_force
+
+            terrain_meta = sample_terrain_force(
+                planet,
+                cells,
+                terrain_cfg=terrain_cfg,
+                body_vx=float(body.vx),
+                body_vy=float(body.vy),
+                locomotor_active=bool(locomotor_active),
+            )
+            Fx += float(terrain_meta.get("fx") or 0.0)
+            Fy += float(terrain_meta.get("fy") or 0.0)
+            extra_drag = float(terrain_meta.get("extra_drag") or 0.0)
+        if ambient_cfg is not None and bool(getattr(ambient_cfg, "enabled", False)):
+            from mechanistic_mind.planet.ambient import sample_ambient_force
+
+            ambient_meta = sample_ambient_force(
+                planet,
+                cells,
+                ambient_cfg=ambient_cfg,
+                body_vx=float(body.vx),
+                body_vy=float(body.vy),
+                locomotor_active=bool(locomotor_active),
+            )
+            Fx += float(ambient_meta.get("fx") or 0.0)
+            Fy += float(ambient_meta.get("fy") or 0.0)
         # Body-local site loads for next-tick deformation work / passive env deformation.
         if site_forces:
             F_world = np.array([[sf["fx"], sf["fy"]] for sf in site_forces], dtype=np.float64)
             R = rotation_matrix(theta)
             body.deformation_env_force = (R.T @ F_world.T).T
-        # translation from mean site force + drag
+        # translation from mean site force + drag (+ terrain drag)
         if apply_translation and orient_cfg.apply_net_force_to_com:
-            Fx_t = Fx - body_cfg.drag * body.vx
-            Fy_t = Fy - body_cfg.drag * body.vy
+            drag_eff = float(body_cfg.drag) + max(0.0, extra_drag)
+            Fx_t = Fx - drag_eff * body.vx
+            Fy_t = Fy - drag_eff * body.vy
             body.vx = float(np.clip(body.vx + Fx_t / body_cfg.mass, -body_cfg.v_max, body_cfg.v_max))
             body.vy = float(np.clip(body.vy + Fy_t / body_cfg.mass, -body_cfg.v_max, body_cfg.v_max))
             if body_cfg.displacement_enabled:
@@ -291,6 +329,8 @@ def step_orientation_mechanics(
         "angular_drag": orient_cfg.angular_drag,
         "inertia": orient_cfg.inertia,
         "deformation": deformation_meta,
+        "terrain": terrain_meta,
+        "ambient": ambient_meta,
     })
     if use_morph and B_site is not None:
         meta["B_site_spread"] = float(np.std([np.linalg.norm(B_site[i]) for i in range(n_sites)]))

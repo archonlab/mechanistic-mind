@@ -1,530 +1,216 @@
-# Mechanistic Mind 1.0 — Tiktaalik
+# Mechanistic Mind 1.0 — Tiktaalik (Public Beta 3.1)
 
-**Public Beta 1**
+**Mechanistic Mind** is an experimental artificial-life / mechanistic simulation
+environment. Observed behavioral structure should be treated as experimental
+evidence requiring controlled comparison and ablation, not as evidence of
+human-like cognition or subjective experience.
 
-Mechanistic Mind is an experimental research runtime for studying whether **mind-like organization** can emerge from explicit, inspectable, low-level mechanisms — without inserting high-level psychological concepts (fear, belief, goal, curiosity, communication, habit) as privileged semantic variables inside the agent.
+Do **not** treat observed behavior as proof of consciousness, intention,
+recognition, communication, language, attention, learning, intelligence, or
+goal-directed seeking.
 
-It does **not** attempt to simulate a mind by naming its parts. It attempts to discover which **minimal mechanisms** are sufficient for mind-like organization to appear under controlled physical history.
+| Identity | Value |
+|----------|-------|
+| Model | Mechanistic Mind 1.0 — Tiktaalik |
+| Release | Public Beta 3.1 |
+| Public Observer | Psy Observer Web 0.2.0 |
+| Runtime | TwoAgentRuntime (recommended first run) |
+| Public preset | TIKTAALIK_BETA31 |
 
-The primary public interface is **Psy Observer Web**: a local scientific observation UI for the live Tiktaalik runtime.
+Public Beta 3.1 includes the Beta 3 two-agent Observer cut plus factorized
+composite motors (NECK / OSC / PUSH), canonical TIKTAALIK_BETA31 configuration,
+Observer composite action display, and a RECENT side-channel HUD. Frozen Public
+Beta 3 remains a separate package (`RELEASE_NOTES_BETA3.md`).
 
-| Layer | Identifier |
-|-------|------------|
-| Model | **MM 1.0 — Tiktaalik** |
-| Public release | **Beta 1** |
-| Observer | **Psy Observer Web v0.2.0** |
-| Python package (`pyproject.toml`) | **0.5.4** (packaging lineage only) |
-
-> Release posture: **READY_WITH_KNOWN_LIMITATIONS**  
-> See [`results/mm_1_0_tiktaalik/`](results/mm_1_0_tiktaalik/) and [`RELEASE_NOTES_BETA1.md`](RELEASE_NOTES_BETA1.md).
-
-**License:** [AGPL-3.0-or-later](LICENSE) · [Commercial licensing](COMMERCIAL_LICENSING.md)  
-Copyright © 2026 Sergii Derebchynskyi
-
----
-
-## Table of contents
-
-1. [Why this exists](#why-this-exists)
-2. [What “Tiktaalik” means](#what-tiktaalik-means)
-3. [Architecture (causal loop)](#architecture-causal-loop)
-4. [Psy Observer Web](#psy-observer-web)
-5. [What has been demonstrated](#what-has-been-demonstrated)
-6. [Instrumental behavior (claim boundary)](#instrumental-behavior-claim-boundary)
-7. [Multi-agent world and physical signals](#multi-agent-world-and-physical-signals)
-8. [What has not been demonstrated](#what-has-not-been-demonstrated)
-9. [Scientific method](#scientific-method)
-10. [Quick start](#quick-start)
-11. [First experiment (beginner workflow)](#first-experiment-beginner-workflow)
-12. [Repository map](#repository-map)
-13. [Reproducibility](#reproducibility)
-14. [Future research](#future-research)
-15. [Known limitations](#known-limitations)
-16. [Terminology / claim boundary](#terminology--claim-boundary)
-17. [License](#license)
+See `RELEASE_NOTES_BETA31.md` and `KNOWN_LIMITATIONS.md`.
 
 ---
 
-## Why this exists
-
-Most “cognitive” simulations start by wiring high-level labels into the agent:
-
-```text
-FEAR, BELIEF, GOAL, CURIOSITY, COMMUNICATION, HABIT, …
-```
-
-Mechanistic Mind asks a different question:
-
-```text
-If we implement only lower-level mechanisms —
-physical dynamics, body state, limited observation,
-bounded memory, prediction, compression, action selection,
-physical interaction, environmental consequence —
-what higher-level organization can those mechanisms support?
-```
-
-The constitution states this explicitly: agents begin without preset personality, trust, anxiety, preferences, or beliefs about the world; differences should emerge from psyche architecture × body × environment × history ([`docs/MECHANISTIC_MIND_CONSTITUTION.md`](docs/MECHANISTIC_MIND_CONSTITUTION.md)).
-
-Five levels must remain distinct:
-
-```text
-WORLD TRUTH          → objective environment
-BODY TRUTH           → objective physiology
-ACCESSIBLE SIGNALS   → what the organism can actually sense
-AGENT MODEL          → what the psyche has stored or inferred
-BEHAVIOR             → actions produced by current system state
-```
-
-**Observer / experimenter ground truth is not agent knowledge.** Psy Observer may inspect full causal structure; the agent may not.
-
-Mechanistic Mind has **not** solved this research program. Public Beta 1 publishes a reproducible integration stage with explicit claim boundaries.
-
----
-
-## What “Tiktaalik” means
-
-**Tiktaalik** is the codename for the first named **canonical** Mechanistic Mind integration: one reproducible physical + cognitive runtime with explicit experimental boundaries ([model card](results/mm_1_0_tiktaalik/MM_1_0_TIKTAALIK_MODEL_CARD.md)).
-
-It is intentionally a *transitional* stage:
-
-| Tiktaalik is | Tiktaalik is not |
-|--------------|------------------|
-| A continuous embodied causal loop (world ↔ body ↔ bounded cognition ↔ action ↔ world) | A human mind simulator |
-| An integration of previously staged mechanisms under one runtime | A complete cognitive architecture |
-| A research instrument with honest NOT_DEMONSTRATED boundaries | AGI / general intelligence |
-
-The name is a **release codename**, not a biological claim.
-
----
-
-## Architecture (causal loop)
-
-Canonical runtime: **`PhysicalSystemRuntime`** (`mechanistic_mind/physical_system/`).  
-Optional multi-body wrapper: **`TwoAgentRuntime`** (experimental; not the default).
-
-Conceptual loop (terminology follows the runtime, not psychology textbooks):
-
-```text
-WORLD  (planet: topology, temperature, flow, resources, fields)
-   ↓
-PHYSICALLY AVAILABLE INPUT  (body-local sampling; no hidden global oracle for the agent)
-   ↓
-OBSERVATION  (accessible signals only)
-   ↓
-BODY + INTERNAL STATE  (morphology, orientation, deformation, work reservoir, internal medium)
-   ↓
-BOUNDED MEMORY / COMPRESSION  (recent fragments; predictive compression)
-   ↓
-PREDICTION / PROSPECTIVE STRUCTURE  (multiscale prediction; prospective composition)
-   ↓
-ACTION SELECTION  (scenario competition over first_action / root-edge support)
-   ↓
-MOTOR WORK / PHYSICAL CONSEQUENCE  (discrete MOVE / WAIT; work accounting)
-   ↓
-WORLD CHANGES
-   ↺
-```
-
-### Important runtime facts
-
-- **Discrete actions** on the Tiktaalik path include at least **MOVE** and **WAIT** (model card). Other action bridges (e.g. selected EMIT) may still be marked bridge-missing in Observer serialization.
-- **Work / cost** is physical (finite mechanical work reservoir, deformation work, discrete action work accounting where promoted) — not “motivation.”
-- **Cognition**, when enabled, is bounded: predictive compression (4.21), multiscale organization (4.22), prospective trajectory composition (4.23), with scenario competition selecting among supported **first** actions. Distal-consequence-driven present selection is **NOT_DEMONSTRATED**.
-- **Experimental** toggles (e.g. physical signal fields) are labeled honestly in the Observer; default Tiktaalik remains one body.
-
-### Ground truth vs agent information
-
-| Available to Psy Observer | Available to the agent |
-|---------------------------|------------------------|
-| Full planet / body / internal state | Body-local accessible observation |
-| Causal events, provenance, MIXED/UNKNOWN | No sender identity in signal perception |
-| Experimenter configuration & ablations | No semantic season / “goal” labels injected as truth |
-
----
-
-## Psy Observer Web
-
-**Public interface:** `mechanistic_mind.ui.psy_observer_web`  
-Launchers: `PsyObserver`, `launch_psy_observer.sh`, `.command`, `.bat` / `.cmd`  
-Legacy tkinter `psychology_observer` is **not** the Beta 1 product ([`LEGACY.md`](LEGACY.md)).
-
-### Tabs
-
-| Tab | Role |
-|-----|------|
-| **WORLD** | Shared physical scene, fields, spatial structure |
-| **AGENT** | Selected body / agent-facing state and causal “why” chains |
-| **MIND** | Bounded cognitive structures (prediction, compression, prospection) |
-| **TIMELINE** | Event stream with agent attribution |
-| **EXPERIMENT** | Configuration (e.g. agent count, mechanism toggles) |
-| **DATA** | Run / pack oriented scientific data views |
-| **ANALYZE RESULTS** | Local summaries of saved runs (Analyzer product surface still partially deferred) |
-| **OVERVIEW** | Local run catalog |
-
-### Modes and controls
-
-- **Modes:** `LIVE` · `INSPECT` · `REPLAY`
-- **Controls:** Play · Pause · Step · Stop · Reset
-- **Speed:** 0.25× … 10× and **MAX** (wall-clock observer pacing)
-
-**Speed vs science:** Observer rendering / wall-clock sleep is decoupled from scientific ticks. Regression tests show that the same number of ticks yields the same scientific fingerprint across 1× / 10× / MAX (`tests/test_observer_speed_decoupling.py`). Speeding up the UI does not skip scientific ticks.
-
-Closing a browser tab does **not** stop the experiment. Use **Quit Psy Observer**, Ctrl+C, or `./launch_psy_observer.sh --quit`.
-
-Details: [`PSY_OBSERVER_LAUNCHER.md`](PSY_OBSERVER_LAUNCHER.md).
-
----
-
-## What has been demonstrated
-
-Statuses below reuse repository vocabulary. They are **not** confidence scores.
-
-| Capability / mechanism | Evidence (examples) | Status | What this does **not** imply |
-|------------------------|---------------------|--------|------------------------------|
-| Integrated physical world + body loop | Tiktaalik runtime; `results/mm_1_0_tiktaalik/` | **CANONICAL** integration | A living organism; metabolism-as-biology |
-| Bounded predictive compression | Research module; knowledge EXP-4.21; promotion | **CANONICAL** / staged evidence | Belief; unlimited memory; “understanding” |
-| Multiscale predictive organization | EXP-4.22 lineage; promotion | **CANONICAL** | Semantic hierarchy; labeled “levels of thought” |
-| Prospective trajectory composition | EXP-4.23; `mm_prospective_scenario_competition/`, `mm_multistep_action_prospection/` | Composition **ASSERTED** / **DEMONSTRATED** under stated protocols | Planning; goals; distal-driven present choice |
-| Deep-future action competition | Model card / architecture audit | **NOT_DEMONSTRATED** | — |
-| Scenario competition → first_action bridge | Tiktaalik path | Operational under competition rules | Desire; intention; free-form inventing of MOVE alternatives in every ecology |
-| Acquired observability + learned predictive use | EXP-4.25 (C1, C2) | **ASSERTED** (listed seeds) | Curiosity; information-seeking rewards |
-| Self-initiated instrumental observation | EXP-4.25 (C3) | **NOT ASSERTED** | — |
-| Endogenous motor / body coupling | `mm_endogenous_motor_*` | Causal motion / coupling evidenced; claim boundary forbids agency language | Will; motivation; discrete MOVE policy from coupling alone |
-| History-dependent prediction / selection | Prospective / entrenchment packs | Measured under protocols | Habit; personality; helplessness |
-| Early experience entrenchment / hysteresis | `mm_early_experience_entrenchment/` | Path-dependent thresholds **DEMONSTRATED**; some framings unresolved | Infinite lock; dedicated WAIT drive as psychology |
-| Two-agent shared world + independent cognition | `TwoAgentRuntime`; `mm_two_agent_*` | Physics / inspection **DEMONSTRATED**; wrapper **EXPERIMENTAL** | Social mind; theory of mind |
-| Physical signal emit / propagate / perceive | `mm_two_agent_physical_signals/` | Physics **DEMONSTRATED** | Communication; language; intentional messaging |
-| Signal-conditioned prediction → behavior change | Same pack | **NOT_DEMONSTRATED** | — |
-| Learned two-agent communication | Model card / design boundaries | **NOT_DEMONSTRATED** | — |
-| Observer speed invariance (scientific fingerprint) | `tests/test_observer_speed_decoupling.py` | **PASS** in regression | Real-time wall-clock identity of UX |
-| Deterministic seeds / reproducible fingerprints | Runtime + tests | Supported where tests/packs assert | Bit-identity across all OS/hardware without caveats |
-
-**Evidence caveat:** Some early EXP-4.21–4.25 *update* result directories are referenced from knowledge provenance but are **not** shipped as full `results/update42*` trees in this public cut. Integration status is carried by Tiktaalik promotion, research modules, knowledge experiment records, and selected `results/mm_*` packs.
-
----
-
-## Instrumental behavior (claim boundary)
-
-Instrumental behavior is scientifically important because it sits between **passive sensation** and **self-initiated seeking**.
-
-From EXP-4.25 (*Emergent Instrumental Observation*):
-
-| Claim | Status |
-|-------|--------|
-| **C1** acquired physical observability | **ASSERTED** (seeds 17, 23, 41, 59, 83) |
-| **C2** learned predictive use of that observability | **ASSERTED** (same seeds) |
-| **C3** self-initiated instrumental interaction | **NOT ASSERTED** |
-| Novel mediated prospective composition (related) | **ASSERTED** |
-
-Architecture notes from that lineage: physical transduction only; **no** TOOL / INFORMATION / EPISTEMIC reward channels.
-
-### Components vs full instrumental loop
-
-Present as components (conservative reading):
-
-```text
-observation availability  →  predictive use  →  (action bridges vary)
-```
-
-**Missing bridge (explicit):** learned prediction → autonomous seeking / conditional action (**C3**). Related Observer/promotion notes also mark some action bridges (e.g. instrumental EMIT bridge) as **BRIDGE_MISSING**.
-
-### Do not collapse into
-
-- “the agent has goals”
-- “the agent intentionally investigates”
-- “the agent is curious”
-
-Those are **not** established by C1/C2.
-
----
-
-## Multi-agent world and physical signals
-
-**`TwoAgentRuntime`** (experimental):
-
-- One **shared** physical planet
-- Two **independent** `PhysicalSystemRuntime` slots (body / internal / cognition / seeds)
-- Agent-specific bodies; optional soft contact / field coupling
-- Physical signal fields default **OFF** unless enabled
-
-### Signals (`FIELD_A` / `FIELD_B`)
-
-Documented bridge behavior ([`results/mm_two_agent_physical_signals/FINAL_REPORT.md`](results/mm_two_agent_physical_signals/FINAL_REPORT.md)):
-
-- Deposit, decay, neighbor spread, additive superposition
-- Local perception through ordinary observation (`local.FIELD_*`)
-- **No** sender identity / internal-state leakage in the signal itself
-- Provenance may be **UNKNOWN** or **MIXED**; senders are not guessed
-
-**PHYSICAL SIGNALING ≠ DEMONSTRATED COMMUNICATION.**
-
-Physics emit / propagate / perceive: **yes**.  
-Signal-conditioned prediction and selected behavioral change: **not demonstrated**.  
-Learned two-agent communication: **NOT_DEMONSTRATED**.
-
-Enable two-agent mode in the Observer **EXPERIMENT** tab (`agent_count: 2`). Inspect agents independently; selection must not invent peer mind state.
-
----
-
-## What has not been demonstrated
-
-Public Beta 1 does **not** establish:
-
-| Claim | Why current evidence does not justify it |
-|-------|------------------------------------------|
-| Consciousness / subjective experience / sentience | No measurement protocol; mechanisms are operational only |
-| Self-awareness | No self-model claim in Tiktaalik boundaries |
-| Beliefs / desires / emotions | High-level variables are deliberately not ontology |
-| Semantic understanding / language | No language channel; signals are physical fields |
-| Semantic / intentional communication | Explicit **NOT_DEMONSTRATED** |
-| Human-like cognition / AGI / general intelligence | Narrow mechanisms under lab protocols |
-| Full intentionality / curiosity | C3 instrumental seeking **NOT ASSERTED** |
-| Full planning / distal-driven present selection | Composition ≠ planning; deep-future competition **NOT_DEMONSTRATED** |
-| Strong endogenous time as psyche faculty | 4.24 lineage preserves temporal NULL claims |
-| Autonomous scientific reasoning | Observer/ARCHON roles are for experimenters |
-
-This list increases credibility: it marks where interpretation must stop.
-
----
-
-## Scientific method
-
-Mechanistic Mind treats “a behavior occurred” as insufficient. Where packs and tests support it, the project uses:
-
-- **Deterministic seeds** and reproducible run fingerprints
-- **Controlled protocols** and matched histories
-- **Ablations** and broken / shuffled / cached controls (see EXP-4.23 lineage notes)
-- **Counterfactual comparison** where designed
-- **Bounded stores** (capacity limits are part of the claim)
-- **Explicit claim matrices** (ASSERTED / NOT ASSERTED; SUPPORTED / NOT_SUPPORTED; DEMONSTRATED / NOT_DEMONSTRATED)
-- **Provenance** and runtime identity in Observer health (`app=Psy Observer`, `model=MM 1.0 — Tiktaalik`)
-- **Speed-invariance** tests for scientific tick fingerprints
-- Selected **`results/mm_*` evidence packs** for inspection
-
-Causal necessity is only as strong as the specific control/ablation design of each experiment. Do not upgrade a staged ASSERTED component into a system-level psychological faculty.
-
-Principles: [`docs/MECHANISTIC_MIND_CONSTITUTION.md`](docs/MECHANISTIC_MIND_CONSTITUTION.md).
+## RECOMMENDED FIRST RUN (Public Beta 3.1)
+
+This is the recommended Beta 3.1 **baseline workflow**. It is not a claim of
+optimal behavior.
+
+1. **Apply** the Observer preset **MM 1.0 — Tiktaalik Beta 3.1**
+   (`TIKTAALIK_BETA31`) with **Apply & Reset World** **before Play**. That yields
+   the recommended **TwoAgentRuntime**. Play without Apply still uses a
+   single-agent runtime.
+2. Leave **PSC OFF** and **Climate Control OFF** unless you intend that
+   experiment.
+3. Public motor-resolution for this preset is **LOCO_FACTORIZED** (factorized
+   composite). Do not silently substitute another mode.
+4. Footer **primary** badge = current published composite motor. **RECENT** =
+   recently applied NECK / OSC / PUSH components (about 1 s wall-clock), not the
+   current motor.
+5. OSC is physical oscillatory emission/reception, not communication.
+
+The frozen Public Beta 3 first-run (OBSERVED_COMPOSITE, enable PSC ~tick 1000)
+is documented in `RELEASE_NOTES_BETA3.md`.
+
+**Why PSC begins OFF:** the recommended run first allows a history of physical /
+sensorimotor consequences to accumulate before prospective scenario competition
+is enabled.
+
+**Do not reset** history / cognition / body if you later enable PSC in the same
+biography.
 
 ---
 
 ## Quick start
 
-### Requirements
+Unpack the archive, then launch Psy Observer. You do not need a port number or
+the Python module name for normal use.
 
-- System **Python ≥ 3.11** on `PATH` (used to create the project environment)
+| Platform | Launcher | This packaging environment |
+|----------|----------|----------------------------|
+| **Linux** | `./launch_psy_observer.sh` or `./PsyObserver` | **TESTED** (bootstrap + Observer) |
+| **macOS** | double-click `launch_psy_observer.command` | **STATICALLY AUDITED** (not executed here) |
+| **Windows** | double-click `launch_psy_observer.bat` or `.cmd` | **STATICALLY AUDITED** (not executed here) |
+
+Requirements:
+
+- System Python **≥ 3.11** on PATH (used to create `.venv_psy_web` on first launch)
 - Network on **first** launch (`pip install -r requirements-observer.txt`)
-- Production UI already shipped in `mechanistic_mind/ui/psy_observer_web/web_dist/` — **Node/npm not required** for ordinary use
+- Production UI is already in `mechanistic_mind/ui/psy_observer_web/web_dist/`
+  (Node/npm is **not** required for normal use)
 
-### Public flow
+First launch may take a few minutes while `.venv_psy_web` is created.
 
-1. Clone or extract this repository  
-2. Launch the platform launcher  
-3. On first run, the launcher creates `.venv_psy_web`, installs Observer requirements, and writes a readiness marker  
-4. Psy Observer Web opens locally (`127.0.0.1`, preferred port **8768**, free-port fallback)
+Later launches reuse that environment.
 
-Later launches **reuse** `.venv_psy_web` and do not reinstall unnecessarily.
+The launcher binds **127.0.0.1** and prefers port **8768**, falling back to a
+free port if 8768 is occupied. It opens a local browser when ready. Closing the
+browser does **not** stop a running experiment.
 
-### Platform launchers
+Stop with **Quit** in the small ownership window, Ctrl+C in the launcher
+terminal, or `./launch_psy_observer.sh --quit`.
 
-| Platform | How to start | Status |
-|----------|--------------|--------|
-| **Linux** | `./PsyObserver` or `./launch_psy_observer.sh` | **NATIVE TESTED — PASS** |
-| **macOS** | double-click `launch_psy_observer.command` | **NATIVE TESTED — PASS** |
-| **Windows** | double-click `launch_psy_observer.bat` (or `.cmd`) | **STATICALLY VERIFIED — NOT YET NATIVELY TESTED** |
+On macOS, first open may need **right-click → Open** if Gatekeeper quarantines
+the `.command` file. Homebrew is not required.
 
-macOS Gatekeeper: first open may require **right-click → Open** if the `.command` file is quarantined ([launcher notes](PSY_OBSERVER_LAUNCHER.md)).
+On Windows, WSL is not required. If Python is missing, the window stays open
+with an error.
 
-### Developer / manual launch (after env exists)
+Manual equivalent after the environment exists:
 
 ```bash
 PYTHONPATH=. .venv_psy_web/bin/python -m mechanistic_mind.ui.psy_observer_web
 ```
 
-Equivalent entry (delegates to launcher):
-
-```bash
-PYTHONPATH=. .venv_psy_web/bin/python -m mechanistic_mind.ui.psy_observer_web.launcher
-```
-
-Optional frontend rebuild (developers only):
+Rebuild the UI only if you change frontend sources:
 
 ```bash
 cd web/psy-observer && npm install && npm test && npm run build
 ```
 
----
+### New-user path
 
-## First experiment (beginner workflow)
+unpack → launch → bootstrap if required → Psy Observer opens → Apply & Reset
+World with **Tiktaalik Beta 3.1** (`TIKTAALIK_BETA31`) → Play → Pause →
+Analyze Current → Save & Stop → reopen/restore a saved run.
 
-1. Launch Psy Observer (see above).  
-2. Open **EXPERIMENT** and keep the canonical **single-agent** Tiktaalik configuration.  
-3. Press **Play** (or **Step**) and watch **WORLD**.  
-4. Open **AGENT** and **MIND** to inspect body-local state and bounded cognitive structures.  
-5. Use **TIMELINE** for event attribution.  
-6. Try **Pause**, change speed (including **MAX**), and **Step** — scientific ticks remain the unit of advancement.  
-7. **Stop** / save to create a local run artifact (writes under `results/psychology_observer/psy_observer_web/` on your machine).  
-8. Inspect **ANALYZE RESULTS** and **OVERVIEW** for local summaries / catalog.  
-
-Optional: set `agent_count: 2` in **EXPERIMENT** to enter `TwoAgentRuntime`, then switch selected agent (`agent_0` / `agent_1`) without expecting peer-mind fallback.
-
-Do **not** use Legacy Psychology Observer for Beta 1.
+Results are written under **project-relative**
+`results/psychology_observer/psy_observer_web/` (the package root, not the
+caller's working directory). Saved runs are `psyweb-*` directories. Live
+staging uses `.live-*` until a successful Save & Stop.
 
 ---
 
-## Repository map
+## Observer workflow
 
-| Path | Contents |
-|------|----------|
-| `mechanistic_mind/` | Scientific runtime + Psy Observer Web backend |
-| `web/psy-observer/` | Observer frontend source (production build is in `web_dist/`) |
-| `experiments/` | Experiment runners / protocols |
-| `results/mm_*/` | Selected scientific evidence packs (intentionally versioned) |
-| `knowledge/` | Structured research knowledge / claim records |
-| `tests/` | Regression and scientific tests |
-| `worlds/` | Environment definitions |
-| `scripts/` | Bootstrap and tools (incl. first-run env bootstrap) |
-| `docs/` | Constitutions, archaeology notes, design docs |
-| `configs/` | Configuration assets |
+**Transport:** Play / Pause / Step / Stop / Reset.
 
-Local Psy Observer run history is **not** shipped as a public catalog; a fresh user starts with an empty personal Overview unless they generate runs locally.
+**Execution (wall-clock only; scientific `dt` unchanged):** REALTIME (LIVE) /
+FAST / MAX / HEADLESS.
+
+**Observer detail:** MINIMAL / NORMAL / FULL — how much the human UI captures,
+not agent memory.
+
+**Evidence:** FULL SCI writes Scientific V3 JSONL. Compact evidence modes reduce
+what is stored; they do not change physics.
+
+**Experiment:** seed, map size, ecology preset, two-agent, mechanisms, Apply &
+Reset World vs Apply Live.
+
+**Predictive / PSC:** Experiment → Predictive. PSC enable/disable is a live
+mechanism toggle. Beta 3.1 public preset uses `LOCO_FACTORIZED`. `OBSERVED_COMPOSITE`
+remains available. Footer RECENT is Observer-only UX for short-lived side-channel
+motors.
+
+**FOV / vision overlays:** Observer visualization of optical exposure. Not
+equivalent to agent-accessible observation.
+
+**Analyze Current:** paused reconstruction of recorded Scientific V3 into
+TickStories / Behavioral Reconstruction. HTTP stays compact.
+
+**Save & Stop:** asynchronous snapshot publish. Failure should leave live state
+retryable.
+
+**Restore:** reopen a saved `psyweb-*` run and continue ticks from the published
+snapshot.
+
+### Four layers (do not collapse them)
+
+| Layer | What it is |
+|-------|------------|
+| Simulation state | Bodies, world, cognition stores at a tick |
+| Scientific evidence | Recorded receipts (O→D→M→C, pose, signals, contacts) |
+| Observer visualization | Human overlays, FOV, terrain paint |
+| Analyzer-derived reconstruction | TickStories, episodes, derived metrics |
+
+Observer overlays are not agent-accessible merely because humans can see them.
 
 ---
 
-## Reproducibility
+## Scientific evidence / Analyzer
 
-1. Read the Tiktaalik pack: [`results/mm_1_0_tiktaalik/`](results/mm_1_0_tiktaalik/) (model card, readiness, known failure modes).  
-2. Browse related `results/mm_*` packs for mechanism-specific claims.  
-3. Prefer listed **seeds** in experiment records when re-running protocols.  
-4. Run Observer / signal / two-agent regressions from this tree:
+Scientific V3 core chain:
+
+**Observation → Decision → Motor → Consequence**
+
+Analyzer Next reconstructs TickStories and behavioral episodes from recorded
+evidence. FULL coverage requires successful consumption of that history, not
+metadata that rows exist.
+
+**Observed / recorded:** physical observations, DecisionReceipts, MotorReceipts,
+ConsequenceReceipts, pose/geometry where recorded, signals, visual exposure,
+contacts.
+
+**Derived (explicitly labeled):** approach / withdrawal candidates, geometric
+relationships, motor reversals, sensorimotor trend-reversal candidates, other
+derived metrics.
+
+**Not established merely by observation:** recognition, communication,
+intention, wanting, deliberate navigation, learning.
+
+Physical signaling is not automatically communication.
+Distance reduction is not automatically seeking.
+Terrain-assisted displacement is not automatically intentional terrain use.
+
+---
+
+## Configuration note
+
+Low-level `CognitionConfig` still defaults `psc_motor_resolution` to
+`LOCO_FACTORIZED`. Fresh Observer experiments using **TIKTAALIK_BETA31** set
+two-agent mode and `LOCO_FACTORIZED`, with PSC and Climate Control off. Applying
+a custom experiment without the preset does **not** silently migrate motor
+resolution.
+
+Default session Play without Apply still constructs a single-agent runtime.
+Use Apply & Reset World with Tiktaalik Beta 3.1 for the recommended two-agent
+first run.
+
+---
+
+## Tests (developers)
 
 ```bash
-PYTHONPATH=. .venv_psy_web/bin/python -m pytest \
-  tests/test_mm_psy_observer_web_api.py \
-  tests/test_psy_observer_*.py \
-  tests/test_physical_signal_provenance.py \
-  tests/test_observer_signal_mechanism_wiring.py \
-  tests/test_two_agent_*.py \
-  tests/test_observer_speed_decoupling.py \
-  -q
+PYTHONPATH=. python3 -m pytest tests/test_analyze_current_paused_v3.py \
+  tests/test_save_stop_enospc_retry.py \
+  tests/test_beta3_recommended_public_preset.py \
+  tests/test_p0_cognition_indexes.py \
+  tests/test_psy_observer_save_stop.py -q
 ```
 
-Determinism claims apply where tests and packs assert them; treat cross-machine bit-identity as a hypothesis until verified on your platform.
-
----
-
-## Future research
-
-These are **directions**, not shipped capabilities.
-
-### Scientific roadmap
-
-- Stronger instrumental loops (close C3 / missing action bridges)
-- Distal / deep-future competition where currently **NOT_DEMONSTRATED**
-- Historical entrenchment and behavioral transition / hysteresis as open science
-- Decision under unavoidable state transition
-- Compression-regime adaptation; retrospective predictive importance
-- Richer persistent ecologies / seasonal or moving resources
-- Longer developmental histories
-- Multi-agent development and whether **signaling conventions** can emerge (today: physics only)
-- Endogenous temporal organization without injecting clocks into cognition
-- Integration of still-isolated research stages into the canonical loop
-
-### Observer / tooling roadmap
-
-- Deeper **Analyzer** live integration (today: honest CATALOG_ONLY / NOT AVAILABLE where applicable)
-- **COMPARE RUNS**
-- **WORLD INTERPRETER**
-
-Beta 2+ UI items are deferred; shipping Beta 1 does not imply new cognition or physics.
-
----
-
-## Known limitations
-
-- Beta software — APIs and UI may still evolve  
-- Research system: computational / storage cost can be nontrivial for long runs  
-- Incomplete integration between some staged mechanisms  
-- Some experiments remain isolated research stages (knowledge records may point at packs not fully mirrored here)  
-- Analyzer product surface not fully integrated  
-- COMPARE RUNS not implemented  
-- WORLD INTERPRETER deferred  
-- Windows launchers not yet natively verified  
-- Legacy modules retained for import / reproducibility only ([`LEGACY.md`](LEGACY.md))  
-- Interpretation must stay inside claim matrices — do not anthropomorphize operational mechanisms  
-
----
-
-## Terminology / claim boundary
-
-| We say | We do **not** automatically mean |
-|--------|----------------------------------|
-| prediction | belief |
-| intrinsic / body state transition | emotion |
-| acquired preference / selection bias | desire |
-| prospective composition | planning |
-| physical signaling (`FIELD_*`) | communication |
-| history-dependent behavior | habit |
-| acquired observability | curiosity |
-| endogenous motor activity | intention / will |
-| scenario competition | goals |
-| agent | person / mind in the ordinary sense |
-
-Anthropomorphic words appear in this README only to mark what the evidence **does not** establish.
-
----
-
-## License
-
-Mechanistic Mind is available under a dual-licensing model.
-
-### Open-source license
-
-Mechanistic Mind is licensed under the
-[GNU Affero General Public License v3.0 or later](LICENSE)
-(`AGPL-3.0-or-later`).
-
-You may use, study, modify, distribute, and use Mechanistic Mind
-commercially under the terms of the GNU AGPL.
-
-The exact rights and obligations of the open-source licensing path are
-defined by the full license text in [LICENSE](LICENSE).
-
-### Alternative commercial license
-
-Organizations or individuals that require licensing terms different
-from the AGPL may obtain a separate commercial license from the
-copyright holder.
-
-This may be appropriate for proprietary products, services,
-integrations, or deployments whose intended licensing model is
-incompatible with the applicable AGPL requirements.
-
-Commercial licensing is provided only through a separate written
-agreement and may have independently negotiated terms.
-
-See [COMMERCIAL_LICENSING.md](COMMERCIAL_LICENSING.md).
-
-**Copyright © 2026 Sergii Derebchynskyi**
-
-The availability of alternative commercial licensing does not reduce,
-replace, or revoke rights already granted under the AGPL.
-
----
-
-## Screenshots
-
-No publication screenshots are bundled yet. Optional placeholders are listed in [`docs/images/README.md`](docs/images/README.md). Do not commit screenshots that contain private desktop content.
-
----
-
-## Further reading
-
-- [`LICENSE`](LICENSE)  
-- [`COMMERCIAL_LICENSING.md`](COMMERCIAL_LICENSING.md)  
-- [`COPYRIGHT`](COPYRIGHT)  
-- [`RELEASE_NOTES_BETA1.md`](RELEASE_NOTES_BETA1.md)  
-- [`PSY_OBSERVER_LAUNCHER.md`](PSY_OBSERVER_LAUNCHER.md)  
-- [`LEGACY.md`](LEGACY.md)  
-- [`docs/MECHANISTIC_MIND_CONSTITUTION.md`](docs/MECHANISTIC_MIND_CONSTITUTION.md)  
-- [`results/mm_1_0_tiktaalik/MM_1_0_TIKTAALIK_MODEL_CARD.md`](results/mm_1_0_tiktaalik/MM_1_0_TIKTAALIK_MODEL_CARD.md)  
-- [`results/mm_two_agent_physical_signals/FINAL_REPORT.md`](results/mm_two_agent_physical_signals/FINAL_REPORT.md)  
+GIT_PUSH is not part of this release process.

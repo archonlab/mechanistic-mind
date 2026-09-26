@@ -32,6 +32,9 @@ EXPERIMENTAL_COGNITION_KEYS = (
     "temporal_prediction_error",
     "predicted_context_prospection",
     "multistep_action_prospection",
+    "contextual_predictive_organization",
+    "context_grounded_prospection",
+    "persistent_prospective_control",
 )
 
 BOUNDED_LIMITS = {
@@ -58,9 +61,13 @@ def tiktaalik_cognition_config():
 
 
 def tiktaalik_config():
-    from mechanistic_mind.physical_system.runtime import PhysicalSystemConfig
+    """Canonical Tiktaalik PhysicalSystemConfig: promoted BASELINE_CLIMATE_DEFAULT."""
+    from mechanistic_mind.physical_system.ecology_presets import (
+        ECOLOGY_BASELINE,
+        make_ecology_config,
+    )
 
-    cfg = PhysicalSystemConfig()
+    cfg = make_ecology_config(ECOLOGY_BASELINE)
     cfg.runtime_version = RUNTIME_VERSION
     cfg.cognition = tiktaalik_cognition_config()
     return cfg
@@ -78,8 +85,23 @@ def experimental_overrides(config) -> dict[str, bool]:
             out[key] = cur
     planet = getattr(config, "planet", None)
     ce = getattr(planet, "climate_ecology", None) if planet else None
-    if ce is not None and bool(getattr(ce, "enabled", False)):
-        out["spatiotemporal_climate_ecology"] = True
+    # Climate ON is the promoted Tiktaalik baseline — not an experimental override.
+    # Flag only when climate is OFF relative to canonical baseline, or when an
+    # alternate ecology preset is selected.
+    from mechanistic_mind.physical_system.ecology_presets import (
+        ECOLOGY_BASELINE,
+        normalize_ecology_preset,
+    )
+
+    eco = normalize_ecology_preset(getattr(config, "ecology_preset", None) or ECOLOGY_BASELINE)
+    if eco != ECOLOGY_BASELINE:
+        out["ecology_preset_non_baseline"] = True
+    # Climate OFF under any climate-bearing package is an explicit ablation,
+    # not merely a LEGACY/GENTLE default.
+    from mechanistic_mind.research.climate_authority import climate_package_implies_on
+
+    if ce is not None and not bool(getattr(ce, "enabled", False)) and climate_package_implies_on(eco):
+        out["spatiotemporal_climate_ecology_disabled"] = True
     ps = getattr(config, "physical_signal", None)
     if ps is not None and str(getattr(ps, "mode", "OFF")).upper() == "EXPERIMENTAL":
         out["experimental_physical_signal"] = True

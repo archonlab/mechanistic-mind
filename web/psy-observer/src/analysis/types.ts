@@ -130,6 +130,16 @@ export type AgentAnalysis = {
     body_body_contacts: NaMetric;
     cross_agent_signal_contributions: number;
   };
+  /** Analyzer vision forensics (Observer GT — not agent-accessible identity). */
+  vision?: {
+    foreign_body_exposure_ticks: NaMetric;
+    observed_exposure_episodes: NaMetric;
+    vision_only_episodes: NaMetric;
+    peak_body_optical_contribution: NaMetric;
+    exo_body_derived_delta: NaMetric | Record<string, number>;
+    next_action_observations: NaMetric | Record<string, number>;
+    cognition_linkage: string;
+  };
 };
 
 export type ImportantEvent = {
@@ -223,6 +233,13 @@ export type DataCoverage = {
   telemetry_samples: number;
   level: CoverageLevel;
   reason: string;
+  /** Beta 2 measurement integrity */
+  sequence_coverage?: string;
+  runtime_span?: string;
+  gap_count_agents_max?: number;
+  action_occupancy_semantics?: string;
+  continuous_streaks?: string;
+  structured_cognition_events?: string;
 };
 
 export type RunAnalysis = {
@@ -242,6 +259,10 @@ export type RunAnalysis = {
   coverage: DataCoverage;
   analysis_log: string;
   generated_at_tick: number;
+  /** Beta 2: STATIC vs MULTI_REGIME from WORLD_INTERVENTION provenance. */
+  configuration_history?: import('./configurationHistory.ts').RegimeReport;
+  /** Vision forensics (optical series when available). */
+  vision_forensics?: import('./visionForensics.ts').VisionForensicsReport;
   /** Present when analysis was built from a scientific evidence package. */
   evidence_meta?: {
     analyzer_version: string;
@@ -258,6 +279,8 @@ export type RunAnalysis = {
     cumulative_runtime_summaries: any[];
     source: string | null;
     note: string | null;
+    telemetry_schema?: string | null;
+    telemetry_mode?: string | null;
   };
 };
 

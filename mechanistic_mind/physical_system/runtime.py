@@ -31,6 +31,14 @@ from .action_work import (
     realize_discrete_action,
     request_discrete_action,
 )
+from .composite_motor import (
+    CompositeMotorOutput,
+    OscillatorMotorComponent,
+    apply_composite_motor,
+    build_composite_from_factorized,
+    motor_control_events,
+    select_factorized_side_channels,
+)
 from .morphology_mechanics import MorphologyMechanicsConfig, step_morphology_mechanics
 from .body_orientation import BodyOrientationConfig, step_orientation_mechanics
 from .body_deformation import BodyDeformationConfig
@@ -45,7 +53,13 @@ from .deformation_work import DeformationWorkConfig, drag_dissipation, kinetic_e
 from .environmental_resource import EnvironmentalResourceConfig, step_environmental_resource
 from .complementary_resources import ComplementaryResourcesConfig, step_complementary_resources
 from .physical_signal import PhysicalSignalConfig
+from .near_field_exteroception import NearFieldExteroceptionConfig
+from .articulated_head import ArticulatedHeadConfig, step_articulated_head
+from .physical_push import PhysicalPushConfig
+from .vestibular_proprioception import VestibularConfig, NeckProprioceptionConfig
+from .oscillatory_signaling import OscillatorySignalingConfig
 from .mechanism_registry import RUNTIME_VERSION, mechanism_snapshot, set_mechanism
+from .actions import OSC_ACTIONS, PUSH_ACTIONS, available_actions
 from .structured_events import StructuredEventBuffer
 from .endogenous_motor import (
     EndogenousMotorCouplingConfig,
@@ -62,6 +76,7 @@ from .motion_diagnostics import (
 from .cognition import (
     CognitionConfig,
     cognition_public_view,
+    clear_derived_indexes,
     empty_cognitive_state,
     run_cognition_before_action,
 )
@@ -80,6 +95,7 @@ class PhysicalSystemConfig:
     Historical manifests: from_dict missing keys → those mechanisms OFF.
     """
     runtime_version: str = RUNTIME_VERSION
+    ecology_preset: str = "CURRENT"  # CURRENT | GENTLE_FREE_MOVEMENT — Observer/runtime GT only
     planet: PlanetConfig = field(default_factory=default_planet_config)
     body: PhysicalBodyConfig = field(default_factory=default_physical_body2_config)
     internal: InternalMediumConfig = field(default_factory=default_internal_medium_config)
@@ -94,6 +110,16 @@ class PhysicalSystemConfig:
     endogenous_motor_work: EndogenousMotorWorkConfig = field(default_factory=EndogenousMotorWorkConfig)
     discrete_action_work: DiscreteActionWorkConfig = field(default_factory=DiscreteActionWorkConfig)
     physical_signal: PhysicalSignalConfig = field(default_factory=PhysicalSignalConfig)
+    near_field_exteroception: NearFieldExteroceptionConfig = field(
+        default_factory=NearFieldExteroceptionConfig
+    )
+    articulated_head: ArticulatedHeadConfig = field(default_factory=ArticulatedHeadConfig)
+    physical_push: PhysicalPushConfig = field(default_factory=PhysicalPushConfig)
+    vestibular: VestibularConfig = field(default_factory=VestibularConfig)
+    neck_proprioception: NeckProprioceptionConfig = field(default_factory=NeckProprioceptionConfig)
+    oscillatory_signaling: OscillatorySignalingConfig = field(
+        default_factory=OscillatorySignalingConfig
+    )
 
     def copy(self) -> "PhysicalSystemConfig":
         return deepcopy(self)
@@ -139,7 +165,12 @@ class PhysicalSystemRuntime:
         self.last_internal_flux: MediumFluxRecord | None = None
         self.cognition: dict[str, Any] = empty_cognitive_state(self.config.cognition)
         self.last_agent_observation: dict[str, float] | None = None
+        self.last_v3_decision_tick: int | None = None
+        self.last_v3_body_before: dict | None = None
+        self.last_v3_body_after: dict | None = None
         self.last_selected_action: str | None = None
+        self.last_motor_output: dict[str, Any] | None = None
+        self.last_motor_apply: dict[str, Any] | None = None
         self.decision_trace = DecisionTraceBuffer(capacity=256)
         self.motion_trace = MotionTraceBuffer(capacity=256)
         self.motion_trace_enabled: bool = False
@@ -153,10 +184,15 @@ class PhysicalSystemRuntime:
         self.last_work_ledger: dict[str, Any] | None = None
         self.last_resource_ledger: dict[str, Any] | None = None
         self.last_complementary_ledger: dict[str, Any] | None = None
+        self.last_passive_reservoir_trickle: dict[str, Any] | None = None
         self.last_motor_work_ledger: dict[str, Any] | None = None
         self.last_action_work_ledger: dict[str, Any] | None = None
         self.last_work_allocation: dict[str, Any] | None = None
         self.last_force_contributions: dict[str, Any] | None = None
+        self.last_head_meta: dict[str, Any] | None = None
+        self.last_push_meta: dict[str, Any] | None = None
+        self.last_osc_meta: dict[str, Any] | None = None
+        self._prev_body_omega: float = 0.0
         self.structured_events = StructuredEventBuffer()
         self.action_trace_enabled: bool = False
         self.action_trace_mode: str = "every_10"  # every_1|every_10|every_50|on_change|on_long_wait
@@ -168,6 +204,7 @@ class PhysicalSystemRuntime:
         self._comp_conv_on: bool = False
         self._motor_drive_on: bool = False
         self._forced_action_once: str | None = None
+        self._forced_motor_once: dict[str, Any] | None = None
         self._tick_ctx: dict[str, Any] | None = None
         self.reset()
 
@@ -175,6 +212,26 @@ class PhysicalSystemRuntime:
         if seed is not None:
             self.seed = int(seed)
         self.world = initialize_planet(self.config.planet, seed=self.seed)
+        nfe = getattr(self.config, "near_field_exteroception", None)
+        if nfe is not None and nfe.enabled and nfe.surface_enabled:
+            from mechanistic_mind.physical_system.near_field_exteroception import (
+                install_surface_on_planet,
+                illumination_intensity,
+                ILLUMINATION_GENERATOR_VERSION,
+            )
+            install_surface_on_planet(self.world, experiment_seed=self.seed, cfg=nfe)
+            self.world.illumination_intensity = illumination_intensity(0, nfe)
+            self.world.illumination_meta = {
+                "period": int(nfe.illumination_period),
+                "min": float(nfe.illumination_min),
+                "max": float(nfe.illumination_max),
+                "generator_version": ILLUMINATION_GENERATOR_VERSION,
+                "note": "Observational only — does not drive forces/work/resources",
+            }
+        osc = getattr(self.config, "oscillatory_signaling", None)
+        if osc is not None and osc.enabled:
+            from mechanistic_mind.physical_system.oscillatory_signaling import ensure_osc_fields
+            ensure_osc_fields(self.world, osc)
         self.body = initialize_physical_body(
             self.config.body,
             width=self.config.planet.width,
@@ -195,6 +252,7 @@ class PhysicalSystemRuntime:
         self.last_work_ledger = None
         self.last_resource_ledger = None
         self.last_complementary_ledger = None
+        self.last_passive_reservoir_trickle = None
         self.last_motor_work_ledger = None
         self.last_action_work_ledger = None
         self.last_work_allocation = None
@@ -213,9 +271,10 @@ class PhysicalSystemRuntime:
         if self.config.cognition.cognition_enabled:
             self.last_agent_observation = self.agent_observation()
 
-    def agent_observation(self) -> dict[str, float]:
+    def agent_observation(self, foreign_bodies=None) -> dict[str, float]:
         sig = getattr(self.config, "physical_signal", None)
         include = bool(sig is not None and sig.enabled and sig.perception_enabled)
+        nfe = getattr(self.config, "near_field_exteroception", None)
         return accessible_observation(
             world=self.world,
             body=self.body,
@@ -223,12 +282,21 @@ class PhysicalSystemRuntime:
             planet_config=self.config.planet,
             body_config=self.config.body,
             include_signal_fields=include,
+            near_field_cfg=nfe,
+            foreign_bodies=foreign_bodies,
+            vestibular_cfg=getattr(self.config, "vestibular", None),
+            neck_proprioception_cfg=getattr(self.config, "neck_proprioception", None),
+            articulated_head_cfg=getattr(self.config, "articulated_head", None),
+            oscillatory_cfg=getattr(self.config, "oscillatory_signaling", None),
+            orientation_meta=getattr(self, "last_orientation_meta", None),
+            prev_omega=float(getattr(self, "_prev_body_omega", 0.0) or 0.0),
         )
 
-    def observation_views(self) -> dict[str, Any]:
+    def observation_views(self, foreign_bodies=None) -> dict[str, Any]:
         """Observer: WORLD TRUTH + AGENT OBSERVATION (separated)."""
         sig = getattr(self.config, "physical_signal", None)
         include = bool(sig is not None and sig.enabled and sig.perception_enabled)
+        nfe = getattr(self.config, "near_field_exteroception", None)
         return observation_bundle(
             world=self.world,
             body=self.body,
@@ -236,10 +304,42 @@ class PhysicalSystemRuntime:
             planet_config=self.config.planet,
             body_config=self.config.body,
             include_signal_fields=include,
+            near_field_cfg=nfe,
+            foreign_bodies=foreign_bodies,
         )
 
     def cognitive_view(self) -> dict[str, Any]:
-        return cognition_public_view(self.cognition)
+        """Researcher panel snapshot.
+
+        Same-tick cache: a single Observer frame historically called this
+        many times per agent (mind/pipeline/prospection/causal). Cognition
+        does not mutate mid-capture, so reuse is exact.
+
+        Observer/public-representation only — never caches scientific decisions.
+        """
+        tick = int(self.tick)
+        cached = getattr(self, "_cognitive_view_cache", None)
+        if isinstance(cached, tuple) and cached[0] == tick:
+            self._cognitive_view_hits = int(getattr(self, "_cognitive_view_hits", 0) or 0) + 1
+            return cached[1]
+        view = cognition_public_view(self.cognition)
+        self._cognitive_view_cache = (tick, view)
+        self._cognitive_view_builds = int(getattr(self, "_cognitive_view_builds", 0) or 0) + 1
+        return view
+
+    def cognitive_view_cache_stats(self) -> dict[str, int]:
+        """Observer diagnostics: same-tick public-view cache counters."""
+        return {
+            "builds": int(getattr(self, "_cognitive_view_builds", 0) or 0),
+            "hits": int(getattr(self, "_cognitive_view_hits", 0) or 0),
+            "cached_tick": int(self._cognitive_view_cache[0])
+            if isinstance(getattr(self, "_cognitive_view_cache", None), tuple)
+            else -1,
+        }
+
+    def reset_cognitive_view_cache_stats(self) -> None:
+        self._cognitive_view_builds = 0
+        self._cognitive_view_hits = 0
 
     def set_ablations(self, **flags: bool) -> None:
         """Research ablations: remove genuine causal contribution flags."""
@@ -297,6 +397,25 @@ class PhysicalSystemRuntime:
             self.config.deformation_work,
             receipt_tick=int(self.tick),
         )
+        # BODY-01: optional passive trickle after resource conversion (ordinary path).
+        # Does not bypass allocate_shared_work / realize_discrete_action.
+        trickle = float(getattr(self.config.deformation_work, "passive_reservoir_trickle", 0.0) or 0.0)
+        if trickle > 0.0:
+            w_max = float(self.config.deformation_work.reservoir_max)
+            w0 = float(getattr(self.body, "mechanical_work_reservoir", 0.0) or 0.0)
+            credited = min(trickle, max(0.0, w_max - w0))
+            if credited > 0.0:
+                self.body.mechanical_work_reservoir = min(w_max, w0 + credited)
+            self.last_passive_reservoir_trickle = {
+                "enabled": True,
+                "source": "PASSIVE_BODY_TRICKLE",
+                "before": w0,
+                "credited": float(credited),
+                "after": float(self.body.mechanical_work_reservoir),
+                "not_experimenter_research_supply": True,
+            }
+        else:
+            self.last_passive_reservoir_trickle = {"enabled": False, "credited": 0.0}
 
     def _motor_increment_mode(self, site_path: bool) -> str:
         return "acceleration" if site_path else "force"
@@ -375,6 +494,71 @@ class PhysicalSystemRuntime:
         self.last_work_allocation = alloc
         return alloc
 
+    def _sync_embodiment_dofs(self) -> None:
+        """Keep body vision flag + cognition action repertoire aligned with configs."""
+        head_on = bool(getattr(self.config.articulated_head, "enabled", False))
+        push_on = bool(getattr(self.config.physical_push, "enabled", False))
+        osc_on = bool(getattr(getattr(self.config, "oscillatory_signaling", None), "enabled", False))
+        # Marker consumed by sample_near_field (legacy paths leave it unset/false).
+        self.body._articulated_head_enabled = head_on  # noqa: SLF001
+        self.body._osc_cfg = getattr(self.config, "oscillatory_signaling", None)  # noqa: SLF001
+        if not head_on:
+            self.body.head_relative_angle = 0.0
+            self.body.head_omega = 0.0
+            self.body.neck_motor = 0.0
+        if not push_on:
+            self.body.push_exertion = 0.0
+        if not osc_on:
+            self.body.osc_emit_remaining = 0
+            self.body.osc_emit_active = 0.0
+        if isinstance(self.cognition, dict):
+            self.cognition["available_actions"] = list(
+                available_actions(
+                    articulated_head=head_on,
+                    physical_push=push_on,
+                    oscillatory_signaling=osc_on,
+                )
+            )
+
+    def _step_articulated_head(self, *, action_work_on: bool) -> None:
+        """Integrate neck DOF; optional work debit for active motor."""
+        cfg = self.config.articulated_head
+        motor = float(getattr(self.body, "neck_motor", 0.0) or 0.0)
+        # Composite / legacy: only clear torque when this tick's motor had no neck command.
+        mo = self.last_motor_output or {}
+        neck_cmd = str(mo.get("neck") or "")
+        selected = str(self.last_selected_action or "WAIT")
+        has_neck_cmd = (neck_cmd and neck_cmd != "NONE") or selected.startswith("NECK_")
+        if not has_neck_cmd:
+            motor = 0.0
+            self.body.neck_motor = 0.0
+        meta = step_articulated_head(self.body, cfg, neck_motor=motor)
+        # Optional work cost for active neck motor (same reservoir as other motors).
+        if (
+            cfg.enabled
+            and action_work_on
+            and abs(motor) > 1e-9
+            and float(cfg.neck_work_cost_per_motor) > 0.0
+        ):
+            cost = float(cfg.neck_work_cost_per_motor) * abs(motor)
+            w0 = float(getattr(self.body, "mechanical_work_reservoir", 0.0) or 0.0)
+            debit = min(w0, cost)
+            self.body.mechanical_work_reservoir = max(0.0, w0 - debit)
+            meta["neck_work_debit"] = debit
+        self.last_head_meta = meta
+        if cfg.enabled and abs(motor) > 1e-9:
+            self.structured_events.emit(
+                "NECK_MOTOR_APPLIED",
+                tick=int(self.tick),
+                evidence={
+                    "neck_motor": motor,
+                    "head_relative_angle": meta.get("head_relative_angle"),
+                    "head_omega": meta.get("head_omega"),
+                    "head_world_heading": meta.get("head_world_heading"),
+                    "clamped": meta.get("clamped"),
+                },
+            )
+
     def _apply_realized_motor(self, *, site_path: bool, endo_on: bool, alloc: dict[str, Any] | None) -> None:
         if not endo_on:
             self.last_motor_work_ledger = None
@@ -399,6 +583,7 @@ class PhysicalSystemRuntime:
         if self.world.tick not in (self.tick, self.tick + 1):
             raise RuntimeError("physical subsystem tick mismatch before step")
 
+        self._sync_embodiment_dofs()
         morph_on = bool(self.config.morphology_mechanics.enabled)
         orient_on = bool(self.config.body_orientation.enabled)
         endo_on = bool(self.config.endogenous_motor.enabled)
@@ -409,14 +594,19 @@ class PhysicalSystemRuntime:
         body_before = self.body.snapshot()
         cognition_result = None
         decision_tick = int(self.tick)
+        # SCIENTIFIC_V3 CORE instrumentation only (no science change)
+        self.last_v3_decision_tick = decision_tick
+        self.last_v3_body_before = body_before
         if self.config.cognition.cognition_enabled:
             obs = observation if observation is not None else self.agent_observation()
-            cognition_result = run_cognition_before_action(
-                self.cognition,
-                observation=obs,
-                tick=self.tick,
-                rng_value=_rng_unit(self.seed, self.tick),
-            )
+            from mechanistic_mind.research.tick_profiler import span as _prof_span
+            with _prof_span("cognition"):
+                cognition_result = run_cognition_before_action(
+                    self.cognition,
+                    observation=obs,
+                    tick=self.tick,
+                    rng_value=_rng_unit(self.seed, self.tick),
+                )
             selected = cognition_result.selected_action
             self.last_agent_observation = obs
             self.last_selected_action = selected
@@ -425,52 +615,192 @@ class PhysicalSystemRuntime:
             if observation is not None:
                 self.last_agent_observation = observation
 
-        if self._forced_action_once is not None:
+        if self._forced_motor_once is not None:
+            motor = CompositeMotorOutput(
+                locomotion=str(self._forced_motor_once.get("locomotion") or "WAIT"),
+                neck=str(self._forced_motor_once.get("neck") or "NONE"),
+                oscillator=OscillatorMotorComponent.from_dict(
+                    self._forced_motor_once.get("oscillator")
+                ),
+                push=bool(self._forced_motor_once.get("push")),
+                selection_source="FORCED_COMPOSITE",
+            )
+            motor.legacy_token = motor.compute_legacy_token()
+            selected = motor.legacy_token
+            self.last_selected_action = selected
+            self.last_motor_output = motor.to_dict()
+            self._forced_motor_once = None
+            self._forced_action_once = None
+            if self.config.cognition.cognition_enabled:
+                self.cognition["last_action"] = selected
+                self.cognition["last_motor_output"] = motor.to_dict()
+                self.cognition["last_selection"] = {
+                    **(self.cognition.get("last_selection") or {}),
+                    "action": selected,
+                    "source": "FORCED_COMPOSITE",
+                    "motor_output": motor.to_dict(),
+                    "motor_schema": motor.schema,
+                }
+        elif self._forced_action_once is not None:
             selected = str(self._forced_action_once)
             self._forced_action_once = None
             self.last_selected_action = selected
+            motor = CompositeMotorOutput.from_legacy(selected, source="FORCED_GATE")
+            if bool(getattr(self.config.cognition, "composite_motor", True)):
+                motor.schema = "COMPOSITE_MOTOR_V1"
+            self.last_motor_output = motor.to_dict()
             if self.config.cognition.cognition_enabled:
                 self.cognition["last_action"] = selected
+                self.cognition["last_motor_output"] = motor.to_dict()
                 self.cognition["last_selection"] = {
                     **(self.cognition.get("last_selection") or {}),
                     "action": selected,
                     "source": "FORCED_GATE",
+                    "motor_output": motor.to_dict(),
+                    "motor_schema": motor.schema,
                 }
+        else:
+            # Prefer cognition motor_output when present.
+            if cognition_result is not None and getattr(cognition_result, "motor_output", None):
+                self.last_motor_output = dict(cognition_result.motor_output)
+                motor = CompositeMotorOutput(
+                    locomotion=str(self.last_motor_output.get("locomotion") or "WAIT"),
+                    neck=str(self.last_motor_output.get("neck") or "NONE"),
+                    oscillator=OscillatorMotorComponent.from_dict(
+                        self.last_motor_output.get("oscillator")
+                    ),
+                    push=bool(self.last_motor_output.get("push")),
+                    schema=str(self.last_motor_output.get("schema") or "COMPOSITE_MOTOR_V1"),
+                    legacy_token=str(self.last_motor_output.get("legacy_token") or selected),
+                    selection_source=str(
+                        self.last_motor_output.get("selection_source") or "COMPOSITE"
+                    ),
+                    domain_sources=dict(self.last_motor_output.get("domain_sources") or {}),
+                )
+            elif bool(getattr(self.config.cognition, "composite_motor", True)):
+                motor = self._factorized_composite_from_cognition(
+                    selected=selected,
+                    cognition_result=cognition_result,
+                )
+                self.last_motor_output = motor.to_dict()
+                if isinstance(self.cognition, dict):
+                    self.cognition["last_motor_output"] = motor.to_dict()
+                    # Beta 3 last_action = legacy_token: MOVE first, else neck,
+                    # then OSC emit/freq/amp, then PUSH.
+                    token = str(motor.legacy_token or motor.compute_legacy_token())
+                    if token.startswith("NECK_") or token in OSC_ACTIONS or token == "PUSH":
+                        self.cognition["last_action"] = token
+            else:
+                motor = CompositeMotorOutput.from_legacy(selected, source="LEGACY")
+                self.last_motor_output = motor.to_dict()
+                if isinstance(self.cognition, dict):
+                    self.cognition["last_motor_output"] = motor.to_dict()
 
-        action_request = request_discrete_action(
-            action=selected,
-            vx=float(self.body.vx),
-            vy=float(self.body.vy),
-            mass=float(self.config.body.mass),
-            v_max=float(self.config.body.v_max),
-            impulse_scale=float(self.config.discrete_action_work.impulse_scale),
-            tick=int(self.tick),
-        )
-        alloc = self._compute_work_allocation(
-            site_path=site_path,
-            endo_on=endo_on,
-            action_request=action_request,
-        )
-        self.last_action_work_ledger = realize_discrete_action(
-            self.body,
-            action_request,
-            accounting_enabled=action_work_on,
-            allocated_work=(
-                float(alloc.get("allocated_action") or 0.0)
-                if action_work_on else None
-            ),
-            reservoir_max=float(self.config.deformation_work.reservoir_max),
-        )
+        composite_on = bool(getattr(self.config.cognition, "composite_motor", True))
+        if composite_on:
+            # Locomotion via work-accounted bridge; neck/osc/push via composite apply.
+            loco = motor.locomotion if motor.locomotion not in ("NONE", "") else "WAIT"
+            action_request = request_discrete_action(
+                action=loco if not motor.push else (
+                    # PUSH may coexist with locomotion: apply loco impulse first; push armed below.
+                    loco
+                ),
+                vx=float(self.body.vx),
+                vy=float(self.body.vy),
+                mass=float(self.config.body.mass),
+                v_max=float(self.config.body.v_max),
+                impulse_scale=float(self.config.discrete_action_work.impulse_scale),
+                tick=int(self.tick),
+            )
+            alloc = self._compute_work_allocation(
+                site_path=site_path,
+                endo_on=endo_on,
+                action_request=action_request,
+            )
+            self.last_action_work_ledger = realize_discrete_action(
+                self.body,
+                action_request,
+                accounting_enabled=action_work_on,
+                allocated_work=(
+                    float(alloc.get("allocated_action") or 0.0)
+                    if action_work_on else None
+                ),
+                reservoir_max=float(self.config.deformation_work.reservoir_max),
+            )
+            # Apply neck / oscillator / push without erasing locomotion Δv.
+            side = CompositeMotorOutput(
+                locomotion="WAIT",
+                neck=motor.neck,
+                oscillator=motor.oscillator,
+                push=motor.push,
+                schema=motor.schema,
+            )
+            self.last_motor_apply = apply_composite_motor(
+                self.body,
+                side,
+                body_config=self.config.body,
+                impulse_scale=float(self.config.discrete_action_work.impulse_scale),
+                oscillatory_cfg=getattr(self.config, "oscillatory_signaling", None),
+            )
+            self.last_motor_apply["locomotion"] = {
+                "action": loco,
+                "applied": bool(action_request.get("bridge_available")),
+                "detail": deepcopy(self.last_action_work_ledger),
+            }
+            for ev in motor_control_events(motor, tick=int(self.tick)):
+                self.structured_events.emit(
+                    str(ev.get("type") or "MOTOR_COMPONENT_SELECTED"),
+                    tick=int(self.tick),
+                    evidence=ev,
+                )
+        else:
+            action_request = request_discrete_action(
+                action=selected,
+                vx=float(self.body.vx),
+                vy=float(self.body.vy),
+                mass=float(self.config.body.mass),
+                v_max=float(self.config.body.v_max),
+                impulse_scale=float(self.config.discrete_action_work.impulse_scale),
+                tick=int(self.tick),
+            )
+            alloc = self._compute_work_allocation(
+                site_path=site_path,
+                endo_on=endo_on,
+                action_request=action_request,
+            )
+            self.last_action_work_ledger = realize_discrete_action(
+                self.body,
+                action_request,
+                accounting_enabled=action_work_on,
+                allocated_work=(
+                    float(alloc.get("allocated_action") or 0.0)
+                    if action_work_on else None
+                ),
+                reservoir_max=float(self.config.deformation_work.reservoir_max),
+            )
+            # Legacy OSC fix: apply through physical action bridge when selected.
+            if str(selected).startswith("OSC_"):
+                from mechanistic_mind.physical_system.actions import apply_physical_action
+                apply_physical_action(
+                    self.body,
+                    selected,
+                    body_config=self.config.body,
+                    impulse_scale=float(self.config.discrete_action_work.impulse_scale),
+                )
+            self.last_motor_apply = {"schema": "LEGACY_SINGLE_SLOT", "action": selected}
+
         self.cognition["last_apply"] = {
             "action": selected,
-            "applied": bool(action_request.get("bridge_available")),
-            "bridge": action_request.get("bridge"),
+            "motor_output": self.last_motor_output,
+            "motor_apply": self.last_motor_apply,
+            "applied": bool((self.last_action_work_ledger or {}).get("bridge_available", True)),
+            "bridge": (self.last_action_work_ledger or {}).get("bridge"),
             "detail": deepcopy(self.last_action_work_ledger),
         }
 
         # Capture post-action-realization body. WAIT leaves vx/vy unchanged.
         body_after_impulse = self.body.snapshot()
-        imp = self.last_action_work_ledger.get("action_dv_realized") or [0.0, 0.0]
+        imp = (self.last_action_work_ledger or {}).get("action_dv_realized") or [0.0, 0.0]
         impulse = (float(imp[0]), float(imp[1]))
         internal_before = internal_summary(self.internal)
         self._tick_ctx = {
@@ -481,6 +811,7 @@ class PhysicalSystemRuntime:
             "action_work_on": action_work_on,
             "site_path": site_path,
             "selected": selected,
+            "motor_output": self.last_motor_output,
             "body_before": body_before,
             "cognition_result": cognition_result,
             "decision_tick": decision_tick,
@@ -511,6 +842,11 @@ class PhysicalSystemRuntime:
 
         if not skip_planet:
             step_planet(self.world, self.config.planet, seed=self.seed)
+        # Observational illumination cache (no force/work/resource coupling).
+        nfe = getattr(self.config, "near_field_exteroception", None)
+        if nfe is not None and nfe.enabled:
+            from mechanistic_mind.physical_system.near_field_exteroception import illumination_intensity
+            self.world.illumination_intensity = illumination_intensity(int(self.world.tick), nfe)
         local_world = sample_local_world(self.body, self.world, self.config.body)
         mech_decomp = mechanical_stage_decomposition(
             vx_before_mech=float(body_after_impulse["vx"]),
@@ -571,6 +907,12 @@ class PhysicalSystemRuntime:
                         None if not (mw_on or action_work_on)
                         else float(alloc.get("allocated_deformation") or 0.0)
                     ),
+                    terrain_cfg=getattr(self.config.planet, "terrain", None),
+                    ambient_cfg=getattr(self.config.planet, "ambient", None),
+                    locomotor_active=(
+                        str(selected).upper().startswith("MOVE")
+                        or abs(float(impulse[0])) + abs(float(impulse[1])) > 1e-12
+                    ),
                 )
                 self.last_deformation_meta = (self.last_orientation_meta or {}).get("deformation")
                 dm = self.last_deformation_meta or {}
@@ -624,7 +966,20 @@ class PhysicalSystemRuntime:
                 }
                 nf = (self.last_orientation_meta or {}).get("net_force") or [0.0, 0.0]
                 force_contrib["environmental_site"] = [float(nf[0]), float(nf[1])]
-            else:
+                tmeta = (self.last_orientation_meta or {}).get("terrain") or {}
+                if tmeta.get("enabled"):
+                    force_contrib["terrain_potential"] = [
+                        float(tmeta.get("fx") or 0.0),
+                        float(tmeta.get("fy") or 0.0),
+                    ]
+                    force_contrib["terrain_extra_drag"] = float(tmeta.get("extra_drag") or 0.0)
+                    force_contrib["terrain_note"] = (
+                        "External channel only — never credits mechanical_work_reservoir"
+                    )
+            # Articulated head / neck DOF — after body θ update so relative angle is physical.
+            self._step_articulated_head(action_work_on=action_work_on)
+            self._step_oscillatory_signaling()
+            if not orient_on:
                 self.last_morphology_meta = step_morphology_mechanics(
                     self.body,
                     self.world,
@@ -672,7 +1027,12 @@ class PhysicalSystemRuntime:
                 force_contrib["endogenous_motor_drive"] = list(ml.get("motor_drive_requested") or [0.0, 0.0])
             elif endo_on:
                 force_contrib["endogenous_motor"] = [float(self.body.motor_ux), float(self.body.motor_uy)]
+            # Head DOF still integrates when morph|orient site path is OFF.
+            self._step_articulated_head(action_work_on=action_work_on)
+            self._step_oscillatory_signaling()
         self.last_force_contributions = force_contrib
+        # Vestibular finite-difference memory (body-local ω only; not agent observation).
+        self._prev_body_omega = float(getattr(self.body, "omega", 0.0) or 0.0)
         if self.last_work_ledger is None:
             self.last_work_ledger = {}
         self.last_work_ledger["work_allocation"] = self.last_work_allocation
@@ -767,6 +1127,8 @@ class PhysicalSystemRuntime:
         self._emit_structured_events(selected=selected, body_before=body_before)
         self.tick += 1
         body_after = self.body.snapshot()
+        # SCIENTIFIC_V3 CORE: post-commit snapshot for ConsequenceReceipt(T→T+1)
+        self.last_v3_body_after = body_after
         internal_after = internal_summary(self.internal)
         self.decision_trace.add_position(
             tick=self.tick, x=body_after["x"], y=body_after["y"], action=selected
@@ -801,12 +1163,20 @@ class PhysicalSystemRuntime:
         for _ in range(max(1, int(n))):
             self.begin_tick()
             self.finish_tick()
+            self._maybe_auto_enable_psc()
 
     def step_forced_action(self, action: str) -> None:
         """Research helper: downstream selected-action override, normal physics."""
         self._forced_action_once = str(action)
         self.step()
 
+    def step_forced_motor(self, motor: dict[str, Any] | CompositeMotorOutput) -> None:
+        """Research helper: force a composite motor vector for one tick."""
+        if isinstance(motor, CompositeMotorOutput):
+            self._forced_motor_once = motor.to_dict()
+        else:
+            self._forced_motor_once = dict(motor)
+        self.step()
 
 
     def _emit_structured_events(self, *, selected: str, body_before: dict[str, Any]) -> None:
@@ -1216,20 +1586,140 @@ class PhysicalSystemRuntime:
                 evidence=evidence_sc,
             )
 
+    def _step_oscillatory_signaling(self) -> None:
+        """Deposit/propagate oscillatory band energy; sample receptors into last_osc_meta."""
+        from mechanistic_mind.physical_system.oscillatory_signaling import (
+            step_oscillatory_signaling,
+            ensure_osc_fields,
+        )
+        cfg = getattr(self.config, "oscillatory_signaling", None)
+        if cfg is None or not cfg.enabled:
+            self.last_osc_meta = {"enabled": False}
+            return
+        ensure_osc_fields(self.world, cfg)
+        head_on = bool(getattr(self.config.articulated_head, "enabled", False))
+        self.last_osc_meta = step_oscillatory_signaling(
+            self.world,
+            [self.body],
+            cfg,
+            tick=int(self.tick),
+            articulated_head=head_on,
+            body_ids=["agent_0"],
+            slots=[0],
+        )
+
+    def _factorized_composite_from_cognition(
+        self,
+        *,
+        selected: str,
+        cognition_result: Any,
+    ) -> CompositeMotorOutput:
+        """LOCO_FACTORIZED: PSC/cognition choose locomotion; same cycle factorizes side channels.
+
+        OSC / neck / push are not compose candidates. They are resolved here from the
+        runtime mechanism-aligned repertoire written by ``_sync_embodiment_dofs``.
+        """
+        head_on = bool(getattr(self.config.articulated_head, "enabled", False))
+        push_on = bool(getattr(self.config.physical_push, "enabled", False))
+        osc_on = bool(getattr(getattr(self.config, "oscillatory_signaling", None), "enabled", False))
+        avail: list[str] = []
+        if isinstance(self.cognition, dict):
+            avail = [str(a) for a in (self.cognition.get("available_actions") or [])]
+        if not avail:
+            avail = list(
+                available_actions(
+                    articulated_head=head_on,
+                    physical_push=push_on,
+                    oscillatory_signaling=osc_on,
+                )
+            )
+        pred: list[dict[str, Any]] = []
+        if cognition_result is not None:
+            pred = list(getattr(cognition_result, "predictions", None) or [])
+        loco = str(selected or "WAIT")
+        if not (loco == "WAIT" or loco.startswith("MOVE:")):
+            loco = CompositeMotorOutput.from_legacy(loco, source="LEGACY").locomotion
+        neck, neck_src, osc, osc_src, push, push_src = select_factorized_side_channels(
+            available=avail,
+            predictions=pred,
+            rng_value=_rng_unit(self.seed, self.tick),
+            articulated_head=head_on,
+            oscillatory=osc_on,
+            physical_push=push_on,
+        )
+        src = "COGNITION"
+        if cognition_result is not None:
+            src = str(getattr(cognition_result, "selection_source", None) or src)
+        return build_composite_from_factorized(
+            locomotion=loco,
+            loco_source=src,
+            neck=neck,
+            neck_source=neck_src,
+            osc=osc,
+            osc_source=osc_src,
+            push=push,
+            push_source=push_src,
+        )
+
     def mechanisms(self) -> dict[str, Any]:
         return mechanism_snapshot(self.config)
 
     def set_mechanism(self, mechanism_id: str, enabled: bool) -> dict[str, Any]:
+        nfe = getattr(self.config, "near_field_exteroception", None)
+        if mechanism_id == "illumination_cycle" and not bool(enabled) and nfe is not None:
+            # Freeze at current physical intensity before disabling dynamics.
+            from mechanistic_mind.physical_system.near_field_exteroception import illumination_intensity
+            cur = getattr(self.world, "illumination_intensity", None)
+            if cur is None:
+                cur = illumination_intensity(int(self.world.tick), nfe)
+            nfe.illumination_frozen = float(cur)
         snap = set_mechanism(self.config, mechanism_id, enabled)
+        self._sync_embodiment_dofs()
         if mechanism_id == "experimental_physical_signal":
             from mechanistic_mind.physical_system.physical_signal import clear_fields, ensure_fields
             if bool(enabled):
                 ensure_fields(self.world)
             else:
                 clear_fields(self.world)
+        if mechanism_id == "oscillatory_signaling":
+            from mechanistic_mind.physical_system.oscillatory_signaling import (
+                clear_osc_fields,
+                ensure_osc_fields,
+            )
+            osc = getattr(self.config, "oscillatory_signaling", None)
+            if bool(enabled) and osc is not None:
+                ensure_osc_fields(self.world, osc)
+            else:
+                clear_osc_fields(self.world)
+        if mechanism_id in ("physical_near_field_vision", "illumination_cycle"):
+            nfe = getattr(self.config, "near_field_exteroception", None)
+            if nfe is not None and nfe.enabled and nfe.surface_enabled:
+                if getattr(self.world, "surface_response", None) is None:
+                    from mechanistic_mind.physical_system.near_field_exteroception import (
+                        install_surface_on_planet,
+                        illumination_intensity,
+                        ILLUMINATION_GENERATOR_VERSION,
+                    )
+                    install_surface_on_planet(self.world, experiment_seed=self.seed, cfg=nfe)
+                    if getattr(self.world, "illumination_intensity", None) is None:
+                        self.world.illumination_intensity = illumination_intensity(int(self.world.tick), nfe)
+                        self.world.illumination_meta = {
+                            "period": int(nfe.illumination_period),
+                            "min": float(nfe.illumination_min),
+                            "max": float(nfe.illumination_max),
+                            "generator_version": ILLUMINATION_GENERATOR_VERSION,
+                            "note": "Observational only — does not drive forces/work/resources",
+                        }
+            if nfe is not None and nfe.enabled:
+                from mechanistic_mind.physical_system.near_field_exteroception import illumination_intensity
+                self.world.illumination_intensity = illumination_intensity(int(self.world.tick), nfe)
         # Keep the cognition store's config copy aligned with live toggles.
         if isinstance(self.cognition, dict):
             self.cognition["config"] = self.config.cognition.to_dict()
+            # Keep SMC store enable flag aligned with live mechanism toggles (no reset).
+            _smc = self.cognition.get("sensorimotor_consequence")
+            if isinstance(_smc, dict):
+                _smc["enabled"] = bool(getattr(self.config.cognition, "sensorimotor_consequence_model", False))
             eq = self.cognition.get("equivalence")
             if isinstance(eq, dict):
                 eq["enabled"] = bool(getattr(self.config.cognition, "predictive_equivalence", False))
@@ -1260,7 +1750,241 @@ class PhysicalSystemRuntime:
             map_meta = self.cognition.get("multistep_action_prospection")
             if isinstance(map_meta, dict):
                 map_meta["enabled"] = bool(getattr(self.config.cognition, "multistep_action_prospection", False))
+            cpo_st = self.cognition.get("contextual_organization")
+            if isinstance(cpo_st, dict):
+                cpo_st["enabled"] = bool(getattr(self.config.cognition, "contextual_predictive_organization", False))
+                cpo_st["ablate_higher_order"] = bool(getattr(self.config.cognition, "contextual_predictive_organization_ablate", False))
+                cpo_st["ablate_predictive_use"] = bool(getattr(self.config.cognition, "contextual_predictive_organization_ablate", False))
+                cpo_st["shuffle_members"] = bool(getattr(self.config.cognition, "contextual_predictive_organization_shuffle", False))
+            cgp_st = self.cognition.get("context_grounded_prospection")
+            if isinstance(cgp_st, dict):
+                cgp_st["enabled"] = bool(getattr(self.config.cognition, "context_grounded_prospection", False))
+                cgp_st["ablate_composition"] = bool(getattr(self.config.cognition, "context_grounded_prospection_ablate", False))
+                cgp_st["shuffle_relations"] = bool(getattr(self.config.cognition, "context_grounded_prospection_shuffle", False))
+            ppc_st = self.cognition.get("persistent_prospective_control")
+            if isinstance(ppc_st, dict):
+                ppc_st["enabled"] = bool(getattr(self.config.cognition, "persistent_prospective_control", False))
+                ppc_st["ablate_persistence"] = bool(getattr(self.config.cognition, "persistent_prospective_control_ablate", False))
+                ppc_st["ablate_motor_chunks"] = bool(getattr(self.config.cognition, "persistent_prospective_control_ablate_chunks", False))
         return snap
+
+    def set_psc_motor_resolution(self, mode: str) -> dict[str, Any]:
+        """Set experimental PSC motor resolution without resetting history/SMC/body.
+
+        Default / unknown → LOCO_FACTORIZED. OBSERVED_COMPOSITE is experimental.
+        """
+        from mechanistic_mind.physical_system import observed_composite_psc as ocpsc
+        old = ocpsc.normalize_mode(getattr(self.config.cognition, "psc_motor_resolution", ocpsc.MODE_LOCO))
+        new = ocpsc.normalize_mode(mode)
+        self.config.cognition.psc_motor_resolution = new
+        if isinstance(self.cognition, dict):
+            self.cognition["config"] = self.config.cognition.to_dict()
+            hist = self.cognition.setdefault("config_history", [])
+            if isinstance(hist, list):
+                hist.append({
+                    "tick": int(self.tick),
+                    "field": "psc_motor_resolution",
+                    "old": old,
+                    "new": new,
+                    "history_reset": False,
+                    "cognition_reset": False,
+                    "smc_reset": False,
+                    "body_reset": False,
+                    "experimental": new == ocpsc.MODE_OBSERVED,
+                })
+                if len(hist) > 64:
+                    del hist[:-64]
+        return {
+            "accepted": True,
+            "old": old,
+            "new": new,
+            "psc_motor_resolution": new,
+            "experimental": new == ocpsc.MODE_OBSERVED,
+            "history_reset": False,
+            "cognition_reset": False,
+            "smc_reset": False,
+            "body_reset": False,
+            "noop": old == new,
+        }
+
+    def set_vision_radius(self, radius: int) -> dict[str, Any]:
+        """LIVE Moore candidate radius {1,2,3}. Does not reset world/cognition/RNG."""
+        from mechanistic_mind.physical_system.near_field_exteroception import (
+            DEFAULT_VISION_RADIUS,
+            clamp_vision_radius,
+            moore_max_candidates,
+        )
+
+        nfe = getattr(self.config, "near_field_exteroception", None)
+        if nfe is None:
+            return {
+                "accepted": False,
+                "reason": "near_field_exteroception absent",
+                "radius": DEFAULT_VISION_RADIUS,
+            }
+        old = clamp_vision_radius(getattr(nfe, "radius", DEFAULT_VISION_RADIUS))
+        new = clamp_vision_radius(radius)
+        nfe.radius = new
+        return {
+            "accepted": True,
+            "old": old,
+            "new": new,
+            "radius": new,
+            "max_candidates": moore_max_candidates(new),
+            "noop": old == new,
+        }
+
+    def set_visual_surface_discrimination(self, mode: str) -> dict[str, Any]:
+        """LIVE OFF/LOW/RICH. Does not reset world/cognition/history."""
+        from mechanistic_mind.physical_system.near_field_exteroception import (
+            clamp_surface_discrimination,
+            install_surface_optical_on_planet,
+            surface_observation_keys,
+        )
+
+        nfe = getattr(self.config, "near_field_exteroception", None)
+        if nfe is None:
+            return {"accepted": False, "reason": "near_field_exteroception absent"}
+        old = clamp_surface_discrimination(getattr(nfe, "visual_surface_discrimination", "OFF"))
+        new = clamp_surface_discrimination(mode)
+        nfe.visual_surface_discrimination = new
+        if new != "OFF" and nfe.enabled and nfe.surface_enabled:
+            install_surface_optical_on_planet(
+                self.world, experiment_seed=self.seed, cfg=nfe
+            )
+        return {
+            "accepted": True,
+            "old": old,
+            "new": new,
+            "keys": list(surface_observation_keys(new)),
+            "noop": old == new,
+        }
+
+    def set_optical_mapping(self, mode: str, *, reinstall: bool = True) -> dict[str, Any]:
+        """Set WORLD optical mapping. Regenerates optical tensor when mapping changes.
+
+        Does not reset tick, cognition, or history. Agent-accessible surface_c* may change
+        because WORLD appearance changed. Not a fifth semantic mode.
+        """
+        from mechanistic_mind.physical_system.near_field_exteroception import (
+            clamp_optical_mapping,
+            install_surface_optical_on_planet,
+        )
+
+        nfe = getattr(self.config, "near_field_exteroception", None)
+        if nfe is None:
+            return {"accepted": False, "reason": "near_field_exteroception absent"}
+        old = clamp_optical_mapping(getattr(nfe, "optical_mapping", "INDEPENDENT"))
+        new = clamp_optical_mapping(mode)
+        nfe.optical_mapping = new
+        regenerated = False
+        if reinstall and (old != new or getattr(self.world, "surface_optical", None) is None):
+            install_surface_optical_on_planet(
+                self.world, experiment_seed=self.seed, cfg=nfe, force=True
+            )
+            regenerated = True
+        return {
+            "accepted": True,
+            "old": old,
+            "new": new,
+            "noop": old == new and not regenerated,
+            "world_optical_regenerated": regenerated,
+            "requires_world_reset": False,
+            "history_reset": False,
+            "note": (
+                "WORLD optical appearance regenerated from deterministic seed namespaces. "
+                "Cognition code unchanged. Accessible surface_c* follow the new WORLD field."
+            ),
+        }
+
+    def set_spatial_vision(self, mode: str, *, n_sectors: int | None = None) -> dict[str, Any]:
+        """LEGACY | ANGULAR | OCCLUSION | TEMPORAL_SPATIAL. No world/history reset."""
+        from mechanistic_mind.physical_system.near_field_exteroception import (
+            clamp_spatial_sectors,
+            clamp_spatial_vision,
+            spatial_observation_keys,
+            spatial_vision_uses_extra_bins,
+        )
+
+        nfe = getattr(self.config, "near_field_exteroception", None)
+        if nfe is None:
+            return {"accepted": False, "reason": "near_field_exteroception absent"}
+        old = clamp_spatial_vision(getattr(nfe, "spatial_vision", "LEGACY"))
+        new = clamp_spatial_vision(mode)
+        nfe.spatial_vision = new
+        if n_sectors is not None:
+            nfe.spatial_sectors = clamp_spatial_sectors(n_sectors)
+        n_sec = int(getattr(nfe, "n_spatial_sectors", 5))
+        cog = self.config.cognition
+        fam = dict(getattr(cog, "sensorimotor_consequence_families", None) or {})
+        fam["spatial_visual"] = bool(spatial_vision_uses_extra_bins(new))
+        cog.sensorimotor_consequence_families = fam
+        if hasattr(self, "cognition") and isinstance(self.cognition, dict):
+            cfgd = self.cognition.get("config")
+            if isinstance(cfgd, dict):
+                cfgd["sensorimotor_consequence_families"] = dict(fam)
+            smc_store = self.cognition.get("sensorimotor_consequence")
+            if isinstance(smc_store, dict):
+                from mechanistic_mind.physical_system import sensorimotor_consequence as smc
+                smc.set_families(smc_store, spatial_visual=bool(fam["spatial_visual"]))
+        return {
+            "accepted": True,
+            "old": old,
+            "new": new,
+            "spatial_sectors": n_sec,
+            "keys": list(spatial_observation_keys(
+                spatial_mode=new,
+                discrimination=getattr(nfe, "visual_surface_discrimination", "OFF"),
+                n_sectors=n_sec,
+            )),
+            "history_reset": False,
+            "noop": old == new,
+        }
+
+    def set_psc_off_ticks(self, value: int | None) -> dict[str, Any]:
+        """MANUAL (None) or auto-ON at tick >= N without history reset."""
+        cog = self.config.cognition
+        old = getattr(cog, "psc_off_ticks", None)
+        if value is None:
+            cog.psc_off_ticks = None
+        else:
+            cog.psc_off_ticks = max(0, int(value))
+        if hasattr(self, "cognition") and isinstance(self.cognition, dict):
+            cfgd = self.cognition.get("config")
+            if isinstance(cfgd, dict):
+                cfgd["psc_off_ticks"] = cog.psc_off_ticks
+        return {
+            "accepted": True,
+            "old": old,
+            "new": cog.psc_off_ticks,
+            "schedule": "MANUAL" if cog.psc_off_ticks is None else int(cog.psc_off_ticks),
+            "history_reset": False,
+            "psc_auto_activated": bool(getattr(self, "_psc_auto_activated", False)),
+        }
+
+    def _maybe_auto_enable_psc(self) -> dict[str, Any] | None:
+        """Deterministic tick-boundary PSC ON without resetting biography."""
+        n = getattr(self.config.cognition, "psc_off_ticks", None)
+        if n is None:
+            return None
+        try:
+            threshold = int(n)
+        except (TypeError, ValueError):
+            return None
+        if getattr(self, "_psc_auto_activated", False):
+            return None
+        if int(self.tick) < threshold:
+            return None
+        snap = self.set_mechanism("prospective_scenario_competition", True)
+        self._psc_auto_activated = True
+        event = {
+            "kind": "PSC_ACTIVATION",
+            "tick": int(self.tick),
+            "mode": str(getattr(self.config.cognition, "psc_motor_resolution", "") or ""),
+            "history_preserved": True,
+        }
+        self._psc_activation = event
+        return {"mechanism": snap, "event": event}
 
     def set_motion_trace(self, *, enabled: bool, mode: str = "every_10") -> dict[str, Any]:
         self.motion_trace_enabled = bool(enabled)
@@ -1484,13 +2208,24 @@ class PhysicalSystemRuntime:
             selection_rule=result.selection_rule or "",
             last_selection=self.cognition.get("last_selection"),
         )
-        # attach counterfactual probe (observer diagnostic)
-        receipt["counterfactual"] = counterfactual_candidate_probe(
-            store=self.cognition["prospection"],
-            compression=self.cognition["compression"],
-            observation=result.observation,
-            actions=list(result.actions or []),
-        )
+        # Counterfactual soft-match probe is Observer-only and O(actions × store).
+        # Run it only when the receipt is sampled into the decision trace (or when
+        # ACTION TRACE is explicitly enabled every tick). Unsampled ticks keep a
+        # cheap stub so last_decision_receipt remains populated without a second
+        # full prospective scan.
+        if sample or (self.action_trace_enabled and mode == "every_1"):
+            receipt["counterfactual"] = counterfactual_candidate_probe(
+                store=self.cognition["prospection"],
+                compression=self.cognition["compression"],
+                observation=result.observation,
+                actions=list(result.actions or []),
+            )
+        else:
+            receipt["counterfactual"] = {
+                "status": "DEFERRED",
+                "per_action": [],
+                "note": "Diagnostic only; computed on sampled decision-trace ticks",
+            }
         self.cognition["last_decision_receipt"] = receipt
         if sample:
             self.decision_trace.add_receipt(receipt)
@@ -1525,14 +2260,30 @@ class PhysicalSystemRuntime:
 
         return model_metadata(self.config, seed=self.seed, tick=self.tick)
 
-    def snapshot(self) -> dict[str, Any]:
-        """Complete causal state needed to continue this deterministic history."""
+    def snapshot(self, *, persist: bool = False) -> dict[str, Any]:
+        """Complete causal state needed to continue this deterministic history.
+
+        persist=False (default, public API): detach cognition so later ``step()``
+        and JSON prep cannot mutate this dict.
+
+        persist=True (Save & Stop): alias live canonical cognition. The encoder
+        must not mutate it. Caller must not step the runtime while dumping.
+        """
+        if persist:
+            cognition = self.cognition
+            last_obs = self.last_agent_observation
+            last_motor = self.last_motor_output
+        else:
+            cognition = deepcopy(self.cognition)
+            last_obs = deepcopy(self.last_agent_observation)
+            last_motor = deepcopy(self.last_motor_output)
         return {
             "schema": "mm.physical_system.snapshot.v2",
             "tick": self.tick,
             "seed": self.seed,
             "model": self.model_identity(),
             "config": {
+                "ecology_preset": getattr(self.config, "ecology_preset", "CURRENT") or "CURRENT",
                 "planet": self.config.planet.to_dict(),
                 "body": self.config.body.to_dict(),
                 "internal": self.config.internal.to_dict(),
@@ -1547,6 +2298,12 @@ class PhysicalSystemRuntime:
                 "endogenous_motor_work": self.config.endogenous_motor_work.to_dict(),
                 "discrete_action_work": self.config.discrete_action_work.to_dict(),
                 "physical_signal": self.config.physical_signal.to_dict(),
+                "near_field_exteroception": self.config.near_field_exteroception.to_dict(),
+                "articulated_head": self.config.articulated_head.to_dict(),
+                "physical_push": self.config.physical_push.to_dict(),
+                "vestibular": self.config.vestibular.to_dict(),
+                "neck_proprioception": self.config.neck_proprioception.to_dict(),
+                "oscillatory_signaling": self.config.oscillatory_signaling.to_dict(),
                 "cognition": self.config.cognition.to_dict(),
             },
             "world": serialize_planet_state(self.world, self.config.planet),
@@ -1555,10 +2312,13 @@ class PhysicalSystemRuntime:
                 "deformation": None if getattr(self.body, "deformation", None) is None else np.asarray(self.body.deformation, dtype=float).tolist(),
             },
             "internal": self.internal.snapshot(),
-            "cognition": deepcopy(self.cognition),
-            "last_agent_observation": deepcopy(self.last_agent_observation),
+            "cognition": cognition,
+            "last_agent_observation": last_obs,
             "last_selected_action": self.last_selected_action,
+            "last_motor_output": last_motor,
             "internal_c_prev": None if self._internal_c_prev is None else np.asarray(self._internal_c_prev, dtype=float).tolist(),
+            "prev_body_omega": float(getattr(self, "_prev_body_omega", 0.0) or 0.0),
+            "last_orientation_meta": deepcopy(self.last_orientation_meta) if persist is False else self.last_orientation_meta,
         }
 
     @classmethod
@@ -1566,6 +2326,7 @@ class PhysicalSystemRuntime:
         configs = payload["config"]
         cog_cfg = CognitionConfig.from_dict(configs.get("cognition"))
         config = PhysicalSystemConfig(
+            ecology_preset=str(configs.get("ecology_preset") or "CURRENT"),
             planet=PlanetConfig.from_dict(configs["planet"]),
             body=_config_from_dict(PhysicalBodyConfig, configs["body"]),
             internal=_config_from_dict(InternalMediumConfig, configs["internal"]),
@@ -1579,6 +2340,16 @@ class PhysicalSystemRuntime:
             endogenous_motor_work=EndogenousMotorWorkConfig.from_dict(configs.get("endogenous_motor_work")),
             discrete_action_work=DiscreteActionWorkConfig.from_dict(configs.get("discrete_action_work")),
             physical_signal=PhysicalSignalConfig.from_dict(configs.get("physical_signal")),
+            near_field_exteroception=NearFieldExteroceptionConfig.from_dict(
+                configs.get("near_field_exteroception")
+            ),
+            articulated_head=ArticulatedHeadConfig.from_dict(configs.get("articulated_head")),
+            physical_push=PhysicalPushConfig.from_dict(configs.get("physical_push")),
+            vestibular=VestibularConfig.from_dict(configs.get("vestibular")),
+            neck_proprioception=NeckProprioceptionConfig.from_dict(configs.get("neck_proprioception")),
+            oscillatory_signaling=OscillatorySignalingConfig.from_dict(
+                configs.get("oscillatory_signaling")
+            ),
             cognition=cog_cfg,
         )
         runtime = cls(seed=int(payload["seed"]), config=config)
@@ -1592,6 +2363,14 @@ class PhysicalSystemRuntime:
             motor_ux=float(b.get("motor_ux", 0.0)), motor_uy=float(b.get("motor_uy", 0.0)),
             B_site=None if b.get("B_site") is None else np.asarray(b["B_site"], dtype=np.float64),
             theta=float(b.get("theta", 0.0)), omega=float(b.get("omega", 0.0)),
+            head_relative_angle=float(b.get("head_relative_angle", 0.0) or 0.0),
+            head_omega=float(b.get("head_omega", 0.0) or 0.0),
+            neck_motor=float(b.get("neck_motor", 0.0) or 0.0),
+            push_exertion=float(b.get("push_exertion", 0.0) or 0.0),
+            osc_freq_u=float(b.get("osc_freq_u", 0.5) or 0.5),
+            osc_amp_u=float(b.get("osc_amp_u", 0.5) or 0.5),
+            osc_emit_remaining=int(b.get("osc_emit_remaining", 0) or 0),
+            osc_emit_active=float(b.get("osc_emit_active", 0.0) or 0.0),
             matter_in=float(b["matter_in"]), matter_out=float(b["matter_out"]),
             heat_from_world=float(b["heat_from_world"]), heat_to_world=float(b["heat_to_world"]),
             react_consumed=float(b["react_consumed"]), core_exchange_cum=float(b["core_exchange_cum"]),
@@ -1616,18 +2395,34 @@ class PhysicalSystemRuntime:
         runtime.last_internal_flux = None
         if "cognition" in payload:
             runtime.cognition = deepcopy(payload["cognition"])
-            eq = runtime.cognition.get("equivalence")
-            if isinstance(eq, dict):
-                pe.clear_derived_caches(eq)
+            if isinstance(runtime.cognition, dict):
+                clear_derived_indexes(runtime.cognition)
         else:
             runtime.cognition = empty_cognitive_state(runtime.config.cognition)
         runtime.last_agent_observation = deepcopy(payload.get("last_agent_observation"))
         runtime.last_selected_action = payload.get("last_selected_action")
+        runtime.last_motor_output = deepcopy(payload.get("last_motor_output"))
         runtime._internal_c_prev = (
             None
             if payload.get("internal_c_prev") is None
             else np.asarray(payload["internal_c_prev"], dtype=np.float64)
         )
+        runtime._prev_body_omega = float(payload.get("prev_body_omega", 0.0) or 0.0)
+        runtime.last_orientation_meta = deepcopy(payload.get("last_orientation_meta"))
+        runtime._sync_embodiment_dofs()
         if not (runtime.tick == runtime.world.tick == runtime.body.tick == runtime.internal.tick):
             raise ValueError("snapshot contains incoherent physical ticks")
+        nfe = runtime.config.near_field_exteroception
+        if (
+            nfe is not None
+            and nfe.enabled
+            and nfe.surface_discrimination != "OFF"
+            and getattr(runtime.world, "surface_optical", None) is None
+        ):
+            from mechanistic_mind.physical_system.near_field_exteroception import (
+                install_surface_optical_on_planet,
+            )
+            install_surface_optical_on_planet(
+                runtime.world, experiment_seed=runtime.seed, cfg=nfe
+            )
         return runtime

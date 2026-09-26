@@ -41,6 +41,9 @@ class PhysicalBodyConfig:
     # --- MM-BODY-2 extensions (defaults keep BODY-1 behavior) ---
     # footprint: list of (dy, dx) cell offsets from center; BODY-1 = [(0,0)]
     footprint: tuple[tuple[int, int], ...] = ((0, 0),)
+    # Anonymous material optical response for near-field vision composition [0,1].
+    # Not identity, not agent-specific, not experimenter-specific.
+    optical_response: float = 0.65
     # slow core compartment: exchanges only with surface B, not WORLD
     core_enabled: bool = False
     core_exchange: float = 0.02  # surface <-> core rate
@@ -51,7 +54,19 @@ class PhysicalBodyConfig:
         d = asdict(self)
         d["permeability"] = list(self.permeability)
         d["footprint"] = [list(p) for p in self.footprint]
+        d["optical_response"] = float(self.optical_response)
         return d
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any] | None) -> "PhysicalBodyConfig":
+        if not data:
+            return cls()
+        payload = {k: data[k] for k in cls.__dataclass_fields__ if k in data}
+        if "permeability" in payload:
+            payload["permeability"] = tuple(payload["permeability"])
+        if "footprint" in payload:
+            payload["footprint"] = tuple(tuple(p) for p in payload["footprint"])
+        return cls(**payload)
 
 
 def default_physical_body_config() -> PhysicalBodyConfig:

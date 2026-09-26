@@ -5,16 +5,16 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mechanistic-mind"
 version = "0.5.4"
-description = "Mechanistic Mind 1.0 — Tiktaalik (Beta 1). Primary interface: Psy Observer Web."
+description = "Mechanistic Mind Organism x World research foundation"
 readme = "README.md"
 requires-python = ">=3.11"
-license = "AGPL-3.0-or-later"
 dependencies = []
 
-# Beta 1 public entry is Psy Observer Web launchers / python -m mechanistic_mind.ui.psy_observer_web
-# Legacy tkinter Observer is not registered as a gui-script in this release.
+[project.gui-scripts]
+mechanistic-mind-observer = "mechanistic_mind.ui.psychology_observer.cli:main"
 
 [project.optional-dependencies]
+dev = ["pytest>=8.0"]
 observer = [
   "fastapi>=0.110",
   "uvicorn[standard]>=0.27",
@@ -22,7 +22,6 @@ observer = [
   "pydantic>=2.0",
   "httpx>=0.27",
 ]
-dev = ["pytest>=8.0"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

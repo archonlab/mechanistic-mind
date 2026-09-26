@@ -31,6 +31,50 @@ FORBIDDEN_TOKENS = (
     "environmental_cycle_phase",
     "climate_phase",
     "resource_cycle_phase",
+    "terrain_potential",
+    "terrain_drag",
+    "terrain_grad",
+    "terrain_seed",
+    "resource_geo_suit",
+    "resource_suitability",
+    "ambient_fx",
+    "ambient_fy",
+    "ambient_force",
+    "ambient_seed",
+    "temporal_panel",
+    "phase_velocity_per_tick",
+    "body_climate_timescale_ratio",
+    "OBSTACLE",
+    "MOUNTAIN",
+    "TRAP",
+    # PHYSICAL_PERCEPTION_01 — WORLD GT / pipeline intermediates never cognition-visible by name
+    "illumination_phase",
+    "surface_response",
+    "surface_optical",
+    "surface_seed",
+    "surface_checksum",
+    "surface_meta",
+    "world_x",
+    "world_y",
+    "absolute_direction",
+    "terrain_traversability",
+    "DAY",
+    "NIGHT",
+    "TIME_OF_DAY",
+    # Visible physical bodies — identity / role never cognition-visible
+    "OTHER_AGENT",
+    "EXPERIMENTER",
+    "experimenter",
+    "agent_id",
+    "entity_id",
+    "entity_type",
+    "optical_source_type",
+    "visible_body",
+    "body_is_agent",
+    "TEACHER",
+    "DEMONSTRATOR",
+    "SOCIAL_SIGNAL",
+    "SOURCE_ID",
 )
 
 
@@ -72,11 +116,22 @@ def accessible_observation(
     planet_config: PlanetConfig,
     body_config: PhysicalBodyConfig,
     include_signal_fields: bool = True,
+    near_field_cfg: Any = None,
+    foreign_bodies: Any = None,
+    vestibular_cfg: Any = None,
+    neck_proprioception_cfg: Any = None,
+    articulated_head_cfg: Any = None,
+    oscillatory_cfg: Any = None,
+    orientation_meta: Any = None,
+    prev_omega: float | None = None,
 ) -> dict[str, float]:
     """Canonical physically accessible observation fragment (dict[str, float]).
 
     Signal keys appear only when world.FIELD_* exists AND include_signal_fields.
     Default PSR has no FIELD arrays, so observation keys stay unchanged.
+    Near-field exo_* fragments appear only when near_field_cfg is enabled
+    and perception_enabled (ablation: perception_enabled=False → no exo_*).
+    Vestibular vest_* / neck prop_neck_* appear only when those sensors are ON.
     """
     w = int(planet_config.width)
     h = int(planet_config.height)
@@ -127,6 +182,59 @@ def accessible_observation(
         means = c.reshape(c.shape[0], -1).mean(axis=1) if c.ndim >= 2 else c.reshape(-1)
         for i, val in enumerate(means.tolist()[:5]):
             frag[f"internal.c{i}"] = _clip01(float(val))
+    # Directional near-field exteroception (PHYSICAL_PERCEPTION_01 + body optics).
+    if near_field_cfg is not None:
+        from mechanistic_mind.physical_system.near_field_exteroception import cognition_exo_fragments
+        exo = cognition_exo_fragments(
+            world=world, body=body, cfg=near_field_cfg, foreign_bodies=foreign_bodies
+        )
+        for k, v in exo.items():
+            frag[str(k)] = _clip01(float(v))
+        from mechanistic_mind.physical_system.near_field_exteroception import cognition_surface_fragments
+        surf = cognition_surface_fragments(
+            world=world, body=body, cfg=near_field_cfg, foreign_bodies=foreign_bodies
+        )
+        for k, v in surf.items():
+            frag[str(k)] = _clip01(float(v))
+        from mechanistic_mind.physical_system.near_field_exteroception import cognition_spatial_fragments
+        spat = cognition_spatial_fragments(
+            world=world, body=body, cfg=near_field_cfg, foreign_bodies=foreign_bodies
+        )
+        for k, v in spat.items():
+            frag[str(k)] = _clip01(float(v))
+    # Vestibular / neck proprioception (anonymous; no compass / absolute heading).
+    if vestibular_cfg is not None:
+        from mechanistic_mind.physical_system.vestibular_proprioception import (
+            cognition_vestibular_fragments,
+        )
+        vest = cognition_vestibular_fragments(
+            body,
+            vestibular_cfg,
+            orientation_meta=orientation_meta if isinstance(orientation_meta, dict) else None,
+            prev_omega=prev_omega,
+        )
+        for k, v in vest.items():
+            frag[str(k)] = float(v)
+    if neck_proprioception_cfg is not None:
+        from mechanistic_mind.physical_system.vestibular_proprioception import (
+            cognition_neck_proprioception_fragments,
+        )
+        prop = cognition_neck_proprioception_fragments(
+            body,
+            neck_proprioception_cfg,
+            articulated_head=articulated_head_cfg,
+        )
+        for k, v in prop.items():
+            frag[str(k)] = float(v)
+    # Oscillatory L/R banded receptors (anonymous; no source id/direction/frequency).
+    if oscillatory_cfg is not None:
+        from mechanistic_mind.physical_system.oscillatory_signaling import cognition_osc_fragments
+        head_on = bool(getattr(articulated_head_cfg, "enabled", False)) if articulated_head_cfg else False
+        osc = cognition_osc_fragments(
+            body, world, oscillatory_cfg, articulated_head=head_on,
+        )
+        for k, v in osc.items():
+            frag[str(k)] = float(v)
     # Leak guard on own output
     hits = audit_cognition_payload(frag)
     if hits:
@@ -142,9 +250,11 @@ def observation_bundle(
     planet_config: PlanetConfig,
     body_config: PhysicalBodyConfig,
     include_signal_fields: bool = True,
+    near_field_cfg: Any = None,
+    foreign_bodies: Any = None,
 ) -> dict[str, Any]:
     """Observer-facing pair: WORLD TRUTH + AGENT OBSERVATION (separated)."""
-    return {
+    bundle: dict[str, Any] = {
         "world_truth": world_truth_summary(world),
         "agent_observation": accessible_observation(
             world=world,
@@ -153,6 +263,14 @@ def observation_bundle(
             planet_config=planet_config,
             body_config=body_config,
             include_signal_fields=include_signal_fields,
+            near_field_cfg=near_field_cfg,
+            foreign_bodies=foreign_bodies,
         ),
         "boundary": "cognition_receives_agent_observation_only",
     }
+    if near_field_cfg is not None and getattr(near_field_cfg, "enabled", False):
+        from mechanistic_mind.physical_system.near_field_exteroception import sample_near_field
+        bundle["near_field_sensor_gt"] = sample_near_field(
+            world=world, body=body, cfg=near_field_cfg, foreign_bodies=foreign_bodies
+        )
+    return bundle

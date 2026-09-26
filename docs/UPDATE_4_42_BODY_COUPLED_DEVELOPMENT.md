@@ -110,7 +110,7 @@ immediate L1 = 0; distal L1 = 0.155. Matched immediate, different distal.
 
 ## Architecture notes
 
-No `.git` in `<local-lab-tree>`. Existing persist `EMIT` / `action_relief` unused.
+No `.git` in `~/Desktop/psy`. Existing persist `EMIT` / `action_relief` unused.
 4.42 adds only distinct X vs A_PAT channels, delayed distal body on `internal_a`/`load_c`,
 and the probe/control suite. 4.41 learning rule unchanged. M1 is physical A
 because A_PAT is channel 1.

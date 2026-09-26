@@ -35,15 +35,29 @@ FORBIDDEN = (
 )
 
 
+# Same-tick / same-payload signature reuse (identical digest; bounded map).
+_SIG_CACHE: dict[tuple[tuple[str, Any], ...], str] = {}
+_SIG_CACHE_MAX = 8192
+
+
 def _sig(payload: dict[str, Any]) -> str:
-    items = sorted(
-        (
-            str(k),
-            round(float(v), 4) if isinstance(v, (int, float)) and not isinstance(v, bool) else str(v),
+    items = tuple(
+        sorted(
+            (
+                str(k),
+                round(float(v), 4) if isinstance(v, (int, float)) and not isinstance(v, bool) else str(v),
+            )
+            for k, v in payload.items()
         )
-        for k, v in payload.items()
     )
-    return sha1("|".join(f"{k}:{v}" for k, v in items).encode()).hexdigest()[:12]
+    hit = _SIG_CACHE.get(items)
+    if hit is not None:
+        return hit
+    digest = sha1("|".join(f"{k}:{v}" for k, v in items).encode()).hexdigest()[:12]
+    if len(_SIG_CACHE) >= _SIG_CACHE_MAX:
+        _SIG_CACHE.clear()
+    _SIG_CACHE[items] = digest
+    return digest
 
 
 def _q(fragment: dict[str, float], bins: int = 5) -> dict[str, float]:
@@ -92,6 +106,8 @@ def learn_transition(
     reliability_weight: float = 1.0,
 ) -> str:
     """Learn one action-conditioned transition from ordinary experience."""
+    from mechanistic_mind.research.psc_opt import bump_pack_version, invalidate_row_caches
+
     store["ticks"] = int(tick)
     ant = _q(antecedent)
     cons = _q(consequent)
@@ -130,6 +146,8 @@ def learn_transition(
     ev = row.setdefault("evidence_ticks", [])
     ev.append(tick)
     row["evidence_ticks"] = ev[-24:]
+    invalidate_row_caches(row)
+    bump_pack_version(store)
 
     # exposure audit: append single-step and maintain rolling episode for full-seq audit
     elog = store.setdefault("exposure_log", [])
@@ -162,23 +180,41 @@ def predict_one_step(
     store: dict[str, Any],
     antecedent: dict[str, float],
     action: str,
+    *,
+    backend: str | None = None,
+    _ant_q: dict[str, float] | None = None,
 ) -> dict[str, Any]:
-    key = transition_key(_q(antecedent), action)
-    row = (store.get("transitions") or {}).get(key)
+    """Action-conditioned one-step retrieval / soft match.
+
+    ``backend`` / ``MM_PSC_BACKEND`` selects implementation only:
+    ``legacy`` | ``packed`` | ``numba``. Semantics must EXACT_MATCH.
+
+    ``_ant_q``: optional precomputed ``_q(antecedent)`` (same tick reuse).
+    """
+    from mechanistic_mind.research.psc_opt import (
+        ensure_pack,
+        mean_cons_cached,
+        reliability_cached,
+        resolve_backend,
+        soft_match_legacy,
+        soft_match_numba,
+        soft_match_packed,
+    )
+
+    ant = _ant_q if _ant_q is not None else _q(antecedent)
+    key = f"{_sig(ant)}||{action}"
+    transitions = store.get("transitions") or {}
+    row = transitions.get(key)
     if not row or int(row.get("support") or 0) < MIN_SUPPORT:
-        # soft match nearest antecedent with same action
-        best = None
-        best_d = 1e9
-        ant = _q(antecedent)
-        for r in (store.get("transitions") or {}).values():
-            if r.get("action") != action:
-                continue
-            if int(r.get("support") or 0) < MIN_SUPPORT:
-                continue
-            d = _frag_distance(ant, r.get("antecedent") or {})
-            if d < best_d:
-                best_d = d
-                best = r
+        mode = resolve_backend(backend)
+        if mode == "legacy":
+            best, best_d = soft_match_legacy(transitions, ant, action)
+        else:
+            pack = ensure_pack(store)
+            if mode == "numba":
+                best, best_d = soft_match_numba(pack, ant, action)
+            else:
+                best, best_d = soft_match_packed(pack, ant, action)
         if best is None or best_d > MATCH_TOL:
             return {"status": "NO_MATCH", "action": action, "key": key}
         row = best
@@ -188,9 +224,9 @@ def predict_one_step(
         "action": action,
         "key": key,
         "transition_id": row["transition_id"],
-        "predicted": mean_cons(row),
+        "predicted": dict(mean_cons_cached(row)),
         "support": row["support"],
-        "reliability": reliability(row),
+        "reliability": reliability_cached(row),
         "depth": 1,
     }
 
@@ -230,10 +266,11 @@ def compose_trajectories(
 
     # seed: one-step from start for each action (snapshot-conditioned)
     roots = []
+    start_q = _q(start)
     for act in branch_actions:
         if expansions >= MAX_EXPANSIONS:
             break
-        step = predict_one_step(store, start, act)
+        step = predict_one_step(store, start, act, _ant_q=start_q)
         expansions += 1
         if step.get("status") != "MATCH":
             continue
@@ -295,6 +332,7 @@ def compose_trajectories(
         if len(workspace) >= MAX_WORKSPACE:
             break
         last = cur["states"][-1]
+        last_q = _q(last)
         # prefer continuing with specified horizon actions if provided
         next_acts = list(branch_actions)
         if actions_horizon and cur["depth"] < len(actions_horizon):
@@ -306,7 +344,7 @@ def compose_trajectories(
             if branched >= MAX_BRANCH or expansions >= MAX_EXPANSIONS:
                 break
             expansions += 1
-            step = predict_one_step(store, last, act)
+            step = predict_one_step(store, last, act, _ant_q=last_q)
             if step.get("status") != "MATCH":
                 continue
             # interface: predicted previous consequent should match this transition's antecedent

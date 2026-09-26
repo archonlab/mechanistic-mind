@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""First-run bootstrap for Psy Observer Web (publication / Beta 1).
+"""First-run bootstrap for Psy Observer Web (publication / Beta 3).
 
 Creates `.venv_psy_web` and installs `requirements-observer.txt` when needed.
 Uses only the Python standard library so it can run before the venv exists.

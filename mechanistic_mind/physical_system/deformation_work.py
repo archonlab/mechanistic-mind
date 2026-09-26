@@ -43,6 +43,9 @@ class DeformationWorkConfig:
     reservoir_max: float = 4.0
     reservoir_init: float = 2.0
     recovery_to_reservoir: bool = True
+    # BODY-01: optional passive reservoir trickle (work units / tick). Default 0
+    # preserves historical snapshots (missing key → 0). Not experimenter supply.
+    passive_reservoir_trickle: float = 0.0
 
     @property
     def enabled(self) -> bool:

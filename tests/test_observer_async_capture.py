@@ -86,6 +86,7 @@ def test_sim_advances_during_slow_capture():
 def test_capture_queue_latest_wins_bounded():
     s = ObserverSession(config=SessionConfig(seed=17, speed=50.0, ui_hz=50.0))
     s.apply_experiment(_exp())
+    s.subscribe(lambda frame: None, eager=True)
     s._capture_test_delay_s = 0.2
     s.play()
     time.sleep(0.6)

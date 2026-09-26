@@ -1,4 +1,4 @@
-# Psy Observer Web (Beta 1) — Python dependencies
+# Psy Observer Web (Beta 3) — Python dependencies
 # Install into a fresh venv: pip install -r requirements-observer.txt
 fastapi>=0.110
 uvicorn[standard]>=0.27

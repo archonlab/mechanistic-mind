@@ -86,7 +86,7 @@ export function detectPhases(state: AnalysisState): Phase[] {
       end,
       name: waitHeavy ? 'LOW-MOBILITY PERIOD' : 'CONTINUED ACTIVITY',
       reason: waitHeavy
-        ? 'At least one agent WAIT rate >70% over run aggregates.'
+        ? 'At least one agent WAIT rate >70% over OBSERVED tick occupancy (may be incomplete under sparse LIVE coverage).'
         : 'Remaining tick span after prior regime markers.',
     });
   }

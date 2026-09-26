@@ -22,12 +22,30 @@ export type ProjectionResult = {
   cognition_pipeline: Record<string, any> | null;
   prospection_view: Record<string, any> | null;
   perception: Record<string, any> | null;
+  agent_observation?: Record<string, number> | null;
   reason?: string;
 };
 
 export function canonicalBodyId(agentId: string): string {
-  const m = /^agent_(\d+)$/.exec(String(agentId));
-  return m ? `body-${m[1]}` : 'body-0';
+  const id = String(agentId || '');
+  const m = /^agent_(\d+)$/.exec(id);
+  if (m) return `body-${m[1]}`;
+  // Undercover / legacy experimenter labels must NEVER collapse onto body-0.
+  if (id === 'undercover' || id.startsWith('experimenter')) {
+    // Prefer explicit body-N if embedded; else body-2 (typical Undercover slot).
+    const emb = /body-(\d+)/.exec(id);
+    if (emb) return `body-${emb[1]}`;
+    return 'body-2';
+  }
+  if (/^body-\d+$/.test(id)) return id;
+  return 'body-0';
+}
+
+/** Normalize legacy experimenter-body-0 labels onto canonical undercover id. */
+export function normalizeAgentId(agentId: string): string {
+  const id = String(agentId || '');
+  if (id === 'undercover' || id.startsWith('experimenter')) return 'undercover';
+  return id;
 }
 
 export function frameTick(frame: any): number | null {
@@ -130,6 +148,7 @@ export function resolveSelectedProjection(frame: any, agentId: string): Projecti
       cognition_pipeline: null,
       prospection_view: null,
       perception: null,
+      agent_observation: null,
       reason: checked.reason,
     };
   }
@@ -152,6 +171,11 @@ export function resolveSelectedProjection(frame: any, agentId: string): Projecti
     cognition_pipeline: view.cognition_pipeline || null,
     prospection_view: view.prospection_view || null,
     perception: view.perception || null,
+    agent_observation:
+      view.agent_observation
+      || view.perception?.agent_observation
+      || view.physical?.near_field_exteroception?.fragments
+      || null,
   };
 }
 
@@ -183,6 +207,10 @@ export function applyProjectionToFrame(base: any, agentId: string): any {
     cognition_pipeline: proj.cognition_pipeline || { status: 'NOT AVAILABLE', stages: [] },
     prospection_view: proj.prospection_view || { status: 'NOT AVAILABLE', branches: [] },
     perception: proj.perception || { status: 'NOT AVAILABLE', reason: proj.reason },
+    agent_observation: proj.agent_observation
+      ?? proj.perception?.agent_observation
+      ?? proj.physical?.near_field_exteroception?.fragments
+      ?? null,
     // Keep agents_views intact for COMPARE / re-projection
     agents_views: base?.agents_views,
     signal_forensics: projectSignalForensics(base?.signal_forensics, agentId, base?.structured_events),

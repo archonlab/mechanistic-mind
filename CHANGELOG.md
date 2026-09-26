@@ -1,17 +1,21 @@
 # Changelog
 
-## Unreleased
+## MM 1.0 Tiktaalik Public Beta 3.1
 
-### Performance
+- Public cut `MM-1.0-Tiktaalik-Public-Beta-3.1` (`v1.0.0-tiktaalik-public-beta-3.1`).
+- Canonical public preset `TIKTAALIK_BETA31` (two-agent, `LOCO_FACTORIZED`).
+- Factorized composite motors with restored historical predictive feed for NECK / OSC / PUSH.
+- SMC / HSS / contextual production wiring closure; OSC physical emission/reception.
+- Observer composite motor HUD and RECENT side-channel HUD; vision controls in this cut.
+- Performance / memory / persistence work already in this tree; mechanism-integrity validation.
+- Frozen Public Beta 3 package is unchanged. Known limitations are documented, not repaired.
 
-- Improved long-run cognition performance by caching repeated predictive-equivalence
-  class-mean calculations and removing unnecessary deep copies from hot cognition
-  paths. Internal development benchmarks on the two-agent full-experimental
-  configuration (with experimental physical signals) measured up to ~3.36× lower
-  late-run tick cost versus the pre-optimization baseline, with deterministic and
-  scientific-history equivalence preserved. This figure is configuration-specific
-  and is not a universal speedup claim.
+### MM 1.0 Tiktaalik Public Beta 3 packaging
 
+- Public release tree `Release/MM-1.0-Tiktaalik-Public-Beta-3/` with Observer bootstrap launchers, Scientific V3, Analyzer Next, Save & Stop.
+- Recommended first-run Observer preset: two-agent, PSC off, Climate Control off, `OBSERVED_COMPOSITE` selected before Play; enable PSC around tick 1000 without reset.
+- Analyzer compact canonical history now carries path/unique-cell summaries so legacy movement fields are not reported as misleading zeros.
+- Save & Stop ENOSPC retry regression (mocked disk-full). Analyze Current paused V3 2034-tick fixture retained.
 
 ### Update 4.76 — Acquired Transition Reinstatement
 

@@ -160,7 +160,7 @@ describe('tick-level action occupancy accounting', () => {
     assert.equal(a0.actions.occupancy_total, 3);
     assert.equal(Number(a0.cognition.scenario_selected), 1);
     assert.equal(Number(a0.cognition.fallback_wait_selections), 1);
-    assert.ok(a.analysis_log.includes('ACTION / SCENARIO SELECTION EVENTS'));
+    assert.ok(a.analysis_log.includes('STRUCTURED COGNITIVE EVENTS'));
   });
 
   it('TEST7: runtime cumulative cannot overwrite canonical scientific tick counts', () => {

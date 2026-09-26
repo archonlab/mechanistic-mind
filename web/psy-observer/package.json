@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "test": "node --test src/rendererMath.test.ts src/observerProjection.test.ts src/analysis/runAnalysis.test.ts src/analysis/runArchive.test.ts src/analysis/tickAccounting.test.ts src/analysis/scientificEvidence.test.ts src/analysis/actionAccounting.test.ts src/analysis/sustainedStreakEvents.test.ts src/timelineAgentFilter.test.ts src/scenarioSelectedObservability.test.ts",
+    "test": "node --test src/recentSidechannelHud.test.ts src/rendererMath.test.ts src/observerProjection.test.ts src/experimenterKeyboard.test.ts src/liveBounds.test.ts src/lifecycleReceipt.test.ts src/observer/stores.test.ts src/observer/railNav.test.ts src/observer/worldPresentation.test.ts src/analysis/runAnalysis.test.ts src/analysis/runArchive.test.ts src/analysis/tickAccounting.test.ts src/analysis/scientificEvidence.test.ts src/analysis/actionAccounting.test.ts src/analysis/sustainedStreakEvents.test.ts src/analysis/configurationHistory.test.ts src/analysis/measurementIntegrity.test.ts src/analysis/visionForensics.test.ts src/analysis/analyzeCurrentEvidenceAgreement.test.ts src/timelineAgentFilter.test.ts src/scenarioSelectedObservability.test.ts src/geoCache.test.ts src/analysis/unwrappedTrajectory.test.ts src/desktop/floatingWindows.test.ts src/desktop/viewportGeometry.test.ts src/analysis/compositeMotorForensics.test.ts src/observe/observeV2.test.ts src/singleAgentHud.test.ts src/activeSensorOrientation.test.ts src/components/tiktaalikEyeModel.test.ts src/components/tiktaalikFpvModel.test.ts src/desktop/experimentVisionTab.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -39,9 +39,37 @@ export type AgentAgg = {
   /** True after SUSTAINED MOVE threshold event emitted for the current streak. */
   sustained_move_threshold_emitted: boolean;
   distance: number;
+  /** WRAP-aware Euclidean path length (unique ticks only). */
+  path_length_euclidean: number;
+  /** WRAP-aware Manhattan path (unique ticks); legacy `distance` may still mix runtime. */
+  path_length_manhattan_wrap: number;
+  unwrapped_dx: number;
+  unwrapped_dy: number;
   unique_cells: Set<string>;
   last_xy: { x: number; y: number } | null;
   start_xy: { x: number; y: number } | null;
+  /** Display-only pose from LIVE frame — must NEVER poison path baseline. */
+  live_pose_xy: { x: number; y: number } | null;
+  /** Unwrapped trajectory cursor (starts at first sample). */
+  unwrapped_xy: { x: number; y: number } | null;
+  unwrapped_min: { x: number; y: number } | null;
+  unwrapped_max: { x: number; y: number } | null;
+  max_excursion_from_start: number;
+  boundary_crossings_x: number;
+  boundary_crossings_y: number;
+  cell_boundary_crossings: number;
+  unique_position_ticks: number;
+  duplicate_observer_samples_ignored: number;
+  trajectory_gaps_skipped: number;
+  path_during_requested_WAIT: number;
+  path_during_requested_MOVE: number;
+  unwrapped_dx_during_WAIT: number;
+  unwrapped_dy_during_WAIT: number;
+  unwrapped_dx_during_MOVE: number;
+  unwrapped_dy_during_MOVE: number;
+  neighborhood_replacements: number;
+  last_center_cell: string | null;
+  realized_displacement_sum: number;
   max_speed: number;
   speed_sum: number;
   speed_n: number;
@@ -133,6 +161,9 @@ export type AnalysisState = {
   /** Raw Observer timeline sample count (diagnostic; not simulation duration). */
   timeline_samples: number;
   causal_pairs: Array<{ tick: number; parent: string; child: string; meta?: any }>;
+  /** Beta 2 WORLD_INTERVENTION provenance for configuration history. */
+  world_interventions: any[];
+  initial_world_fingerprint: string | null;
 };
 
 export function emptyResource() {
@@ -157,9 +188,33 @@ export function makeAgentAgg(agent_id: string, body_id: string, seed: number | n
     sustained_wait_threshold_emitted: false,
     sustained_move_threshold_emitted: false,
     distance: 0,
+    path_length_euclidean: 0,
+    path_length_manhattan_wrap: 0,
+    unwrapped_dx: 0,
+    unwrapped_dy: 0,
     unique_cells: new Set(),
     last_xy: null,
     start_xy: null,
+    live_pose_xy: null,
+    unwrapped_xy: null,
+    unwrapped_min: null,
+    unwrapped_max: null,
+    max_excursion_from_start: 0,
+    boundary_crossings_x: 0,
+    boundary_crossings_y: 0,
+    cell_boundary_crossings: 0,
+    unique_position_ticks: 0,
+    duplicate_observer_samples_ignored: 0,
+    trajectory_gaps_skipped: 0,
+    path_during_requested_WAIT: 0,
+    path_during_requested_MOVE: 0,
+    unwrapped_dx_during_WAIT: 0,
+    unwrapped_dy_during_WAIT: 0,
+    unwrapped_dx_during_MOVE: 0,
+    unwrapped_dy_during_MOVE: 0,
+    neighborhood_replacements: 0,
+    last_center_cell: null,
+    realized_displacement_sum: 0,
     max_speed: 0,
     speed_sum: 0,
     speed_n: 0,
@@ -238,22 +293,44 @@ export function createAnalysisState(): AnalysisState {
     event_samples: 0,
     timeline_samples: 0,
     causal_pairs: [],
+    world_interventions: [],
+    initial_world_fingerprint: null,
   };
 }
 
 export function ensureAgent(state: AnalysisState, agent_id: string, body_id?: string, seed?: number | null) {
-  if (!state.agents[agent_id]) {
-    state.agents[agent_id] = makeAgentAgg(agent_id, body_id || canonicalBody(agent_id), seed ?? null);
+  const aid = normalizeAgentId(agent_id);
+  const bid = body_id || canonicalBody(aid);
+  if (!state.agents[aid]) {
+    state.agents[aid] = makeAgentAgg(aid, bid, seed ?? null);
   } else {
-    if (body_id) state.agents[agent_id].body_id = body_id;
-    if (seed != null) state.agents[agent_id].seed = seed;
+    if (body_id) state.agents[aid].body_id = body_id;
+    else if (!state.agents[aid].body_id || state.agents[aid].body_id === 'body-0') {
+      state.agents[aid].body_id = bid;
+    }
+    if (seed != null) state.agents[aid].seed = seed;
   }
-  return state.agents[agent_id];
+  return state.agents[aid];
+}
+
+/** Normalize legacy experimenter-body-* onto canonical undercover (new runs). */
+export function normalizeAgentId(agentId: string) {
+  const id = String(agentId || '');
+  if (id === 'undercover' || id.startsWith('experimenter')) return 'undercover';
+  return id;
 }
 
 export function canonicalBody(agentId: string) {
-  const m = /^agent_(\d+)$/.exec(String(agentId));
-  return m ? `body-${m[1]}` : 'body-0';
+  const id = normalizeAgentId(agentId);
+  const m = /^agent_(\d+)$/.exec(id);
+  if (m) return `body-${m[1]}`;
+  if (id === 'undercover') {
+    const emb = /body-(\d+)/.exec(String(agentId || ''));
+    if (emb) return `body-${emb[1]}`;
+    return 'body-2';
+  }
+  if (/^body-\d+$/.test(id)) return id;
+  return 'body-0';
 }
 
 export function recordFirst(state: AnalysisState, key: string, tick: number, meta?: any) {
@@ -368,30 +445,144 @@ function resetStreakState(agg: AgentAgg) {
 }
 
 /**
+ * Periodic minimum-image displacement on one axis (WRAP_PERIODIC).
+ * 31.9 → 0.1 on L=32 → +0.2; 0.1 → 31.9 → −0.2.
+ */
+export function wrapDelta(a: number, b: number, size: number): number {
+  let d = b - a;
+  const half = size / 2;
+  if (d > half) d -= size;
+  else if (d < -half) d += size;
+  return d;
+}
+
+function centerCellKey(x: number, y: number, w?: number | null, h?: number | null): string {
+  let cx = Math.floor(x);
+  let cy = Math.floor(y);
+  if (w != null && w > 0) cx = ((cx % w) + w) % w;
+  if (h != null && h > 0) cy = ((cy % h) + h) % h;
+  return `${cx},${cy}`;
+}
+
+/**
  * Apply body position once per simulation tick.
  * Repeated samples of the same tick must not inflate distance.
+ * Evidence gaps (tick jumps > 1) rebase without inventing multi-wrap path.
+ * When worldW/worldH are provided, accumulate WRAP-aware Euclidean / Manhattan
+ * and unwrapped displacement. Raw non-wrap Manhattan retained only as
+ * `distance` legacy label when dims missing.
  */
-export function ingestXy(agg: AgentAgg, x: number, y: number, speed?: number, tick?: number): boolean {
+export function ingestXy(
+  agg: AgentAgg,
+  x: number,
+  y: number,
+  speed?: number,
+  tick?: number,
+  worldW?: number,
+  worldH?: number,
+): boolean {
   if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+  const w = worldW != null && Number.isFinite(worldW) && worldW > 0 ? worldW : null;
+  const h = worldH != null && Number.isFinite(worldH) && worldH > 0 ? worldH : null;
   if (tick != null && Number.isFinite(tick)) {
     if (agg.last_xy_tick != null && tick === agg.last_xy_tick) {
       // Same tick re-sample: keep latest coords without adding distance.
+      agg.duplicate_observer_samples_ignored += 1;
       agg.last_xy = { x, y };
       return false;
     }
     if (agg.last_xy_tick != null && tick < agg.last_xy_tick) return false;
+    // Evidence gap: rebase path baseline; do not invent displacement across missing ticks.
+    // Do NOT count cell_boundary_crossings across gaps — that would invent crossings.
+    if (agg.last_xy_tick != null && tick > agg.last_xy_tick + 1) {
+      agg.trajectory_gaps_skipped += 1;
+      agg.last_xy = { x, y };
+      agg.last_xy_tick = tick;
+      agg.unique_position_ticks += 1;
+      const cell = centerCellKey(x, y, w, h);
+      if (agg.last_center_cell != null && agg.last_center_cell !== cell) {
+        // Observed sample landed in a different cell after a gap — not a measured crossing.
+        agg.neighborhood_replacements += 1;
+      }
+      agg.last_center_cell = cell;
+      agg.unique_cells.add(cell);
+      if (speed != null && Number.isFinite(speed)) {
+        agg.max_speed = Math.max(agg.max_speed, speed);
+        agg.speed_sum += speed;
+        agg.speed_n += 1;
+      }
+      return true;
+    }
     agg.last_xy_tick = tick;
   }
   if (!agg.start_xy) agg.start_xy = { x, y };
-  if (agg.last_xy) {
-    agg.distance += Math.abs(x - agg.last_xy.x) + Math.abs(y - agg.last_xy.y);
+  if (!agg.unwrapped_xy) {
+    agg.unwrapped_xy = { x, y };
+    agg.unwrapped_min = { x, y };
+    agg.unwrapped_max = { x, y };
   }
+  agg.unique_position_ticks += 1;
+  if (agg.last_xy) {
+    let dx: number;
+    let dy: number;
+    if (w != null && h != null) {
+      const rawDx = x - agg.last_xy.x;
+      const rawDy = y - agg.last_xy.y;
+      dx = wrapDelta(agg.last_xy.x, x, w);
+      dy = wrapDelta(agg.last_xy.y, y, h);
+      if (Math.abs(rawDx - dx) > 1e-12) agg.boundary_crossings_x += 1;
+      if (Math.abs(rawDy - dy) > 1e-12) agg.boundary_crossings_y += 1;
+      // Legacy field: keep name but prefer wrap-aware Manhattan when dims known.
+      agg.distance += Math.abs(dx) + Math.abs(dy);
+      agg.path_length_manhattan_wrap += Math.abs(dx) + Math.abs(dy);
+      const step = Math.hypot(dx, dy);
+      agg.path_length_euclidean += step;
+      const act = agg.last_action;
+      if (act === 'WAIT') {
+        agg.path_during_requested_WAIT += step;
+        agg.unwrapped_dx_during_WAIT += dx;
+        agg.unwrapped_dy_during_WAIT += dy;
+      } else if (act && String(act).startsWith('MOVE')) {
+        agg.path_during_requested_MOVE += step;
+        agg.unwrapped_dx_during_MOVE += dx;
+        agg.unwrapped_dy_during_MOVE += dy;
+      }
+      if (agg.unwrapped_xy) {
+        agg.unwrapped_xy = { x: agg.unwrapped_xy.x + dx, y: agg.unwrapped_xy.y + dy };
+        agg.unwrapped_dx = agg.unwrapped_xy.x - (agg.start_xy?.x ?? x);
+        agg.unwrapped_dy = agg.unwrapped_xy.y - (agg.start_xy?.y ?? y);
+        const exc = Math.hypot(agg.unwrapped_dx, agg.unwrapped_dy);
+        if (exc > agg.max_excursion_from_start) agg.max_excursion_from_start = exc;
+        if (agg.unwrapped_min && agg.unwrapped_max) {
+          agg.unwrapped_min.x = Math.min(agg.unwrapped_min.x, agg.unwrapped_xy.x);
+          agg.unwrapped_min.y = Math.min(agg.unwrapped_min.y, agg.unwrapped_xy.y);
+          agg.unwrapped_max.x = Math.max(agg.unwrapped_max.x, agg.unwrapped_xy.x);
+          agg.unwrapped_max.y = Math.max(agg.unwrapped_max.y, agg.unwrapped_xy.y);
+        }
+      }
+    } else {
+      // Dims unknown: raw deltas only (explicitly non-WRAP; may inflate on torus).
+      dx = x - agg.last_xy.x;
+      dy = y - agg.last_xy.y;
+      agg.distance += Math.abs(dx) + Math.abs(dy);
+    }
+  }
+  const cell = centerCellKey(x, y, w, h);
+  if (agg.last_center_cell != null && agg.last_center_cell !== cell) {
+    agg.neighborhood_replacements += 1;
+    agg.cell_boundary_crossings += 1;
+  }
+  agg.last_center_cell = cell;
   agg.last_xy = { x, y };
-  agg.unique_cells.add(`${Math.floor(x)},${Math.floor(y)}`);
+  agg.unique_cells.add(cell);
   if (speed != null && Number.isFinite(speed)) {
     agg.max_speed = Math.max(agg.max_speed, speed);
     agg.speed_sum += speed;
     agg.speed_n += 1;
+    if (agg.last_xy_tick != null) {
+      // One-tick realized displacement proxy from reported speed.
+      agg.realized_displacement_sum += Math.abs(speed);
+    }
   }
   return true;
 }

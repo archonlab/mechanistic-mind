@@ -18,7 +18,7 @@ MAX_BRANCHES = 8
 MAX_DEPTH = 3
 MAX_SECOND = 4
 
-# Performance: ancestry antecedent/predicted are flat float maps.
+# BETA2-03: ancestry antecedent/predicted are flat float maps.
 _USE_ANCESTRY_DICT_COPY = True
 
 

@@ -38,10 +38,15 @@ export type ObserverFrame = {
   model_banner?: Record<string, any>;
   cognition_pipeline?: Record<string, any>;
   prospection_view?: Record<string, any>;
+  experimenter_interaction?: Record<string, any>;
   agents_observer?: any[];
   agents_views?: Record<string, any>;
   signal_forensics?: Record<string, any>;
   structured_events?: any[];
+  world_interventions?: any[];
+  motor_control?: Record<string, any>;
+  scientific_history?: Record<string, any>;
+  signal_context_interpretation?: Record<string, any>;
   experiment?: Record<string, any>;
   trajectory?: { points: TrajectoryPoint[]; capacity: number; boundary: string };
   telemetry?: { series: any[]; capacity: number };

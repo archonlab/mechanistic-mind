@@ -30,6 +30,7 @@ web/psy-observer/dist/
 
 # Local Observer runtime state
 .psy_observer/
+.psy_pe_cold/
 *.log
 
 # OS / IDE
@@ -63,3 +64,13 @@ telemetry/*.bin
 
 # Generated runtime results
 results/
+
+# Packaging copies (canonical public artifact is the GitHub Release tarball)
+/Release/
+
+# Abandoned / live scientific staging and Analyzer job dirs
+**/.live-*/
+**/.tmp-*/
+analysis_jobs/
+**/analysis_jobs/
+
