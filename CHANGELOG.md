@@ -1,4 +1,43 @@
+## Acanthostega Beta 4.0 — Analyzer report truthfulness (unpublished sibling)
+
+- Analyzer reports now use layered coverage, explicit count units, PSC regime reconstruction from saved DecisionReceipts, contiguous WAIT/MOVE streaks, model-aware vision titles, and a DEVELOPMENT_FIXTURE boundary for `resource-*` objects.
+- `resource-*` entities remain in runtime as development fixtures. They are not canonical ontology. No physics/cognition/protocol/fingerprint/evidence mutation.
+- Same saved run is re-analyzed read-only. Not published.
+
+## Acanthostega Beta 4.0 — PSC UI authority (unpublished sibling)
+
+- Current runtime PSC is shown first from the live overlay. Next-run draft (including initial OFF) is labelled separately and cannot imply that the current run is OFF.
+- Sibling package: `Release/MM-Acanthostega-Beta-4.0-PSC-UI-Authority/` (does not overwrite Runtime-Regressions).
+- No physics/cognition/protocol/fingerprint/evidence/scheduler changes. Not published.
+
+## Acanthostega Beta 4.0 — packaged PSC / Dual FPV / audio observability (unpublished sibling)
+
+- PSC Current-runtime panel now follows the live schedule (tick-stable experiment cache no longer hides the tick-1000 ON transition).
+- Dual FPV publishes both agents' exact traces without requiring card selection or FPV-center interest.
+- Eye Hearing shows honest playback status (SIGNAL / TRUE ZERO / NO SOURCE / SUSPENDED), not generic LIVE silence.
+- Sibling package: `Release/MM-Acanthostega-Beta-4.0-Runtime-Regressions/` (does not overwrite Lifecycle).
+- No physics/cognition/protocol/fingerprint/evidence changes. Not published.
+
+## Acanthostega Beta 4.0 — own application window and process lifecycle (unpublished sibling)
+
+- Dedicated Chromium `--app=` window owned by the launcher; closing it or **More → Exit MM Observer** stops the backend and releases the loopback port.
+- Sibling package: `Release/MM-Acanthostega-Beta-4.0-Lifecycle/` (does not overwrite Analyzer-Progress).
+- No physics/cognition/protocol/fingerprint/evidence changes. Not published.
+
+## Acanthostega Beta 4.0 — Analyzer progress / heartbeat / frozen snapshot (unpublished sibling)
+
+- Analyzer UX: alive/working state, frozen evidence snapshot, heartbeat ≠ progress, compact operational log, cooperative cancel, reconnect.
+- Sibling package: `Release/MM-Acanthostega-Beta-4.0-Analyzer-Progress/` (does not overwrite FPV-Hearing).
+- No physics/cognition/protocol/fingerprint/evidence changes. Not published.
+
 # Changelog
+
+## Acanthostega Beta 4.0 — Dual FPV × Hearing lifecycle repair (unpublished sibling)
+
+- Observer fix: Eye dock Dual FPV stays independently LIVE during researcher Hearing playback.
+- `eye_dock_dual_fpv` is dock-open owned (not Vision-subtab-gated); client retains per-agent exact traces.
+- Sibling package: `Release/MM-Acanthostega-Beta-4.0-FPV-Hearing/` (does not overwrite PSC-Hearing).
+- No physics/cognition/protocol/fingerprint/evidence changes. Not published.
 
 ## MM 1.0 Tiktaalik Public Beta 3.1.1
 

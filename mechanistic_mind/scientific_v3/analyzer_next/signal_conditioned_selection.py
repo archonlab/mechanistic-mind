@@ -174,7 +174,10 @@ def aggregate_signal_conditioned_selection(run_dir: Path) -> dict[str, Any]:
     obs_by: dict[tuple[str, int], dict[str, Any]] = {}
     for row in _iter_jsonl(run_dir / "scientific_observations.jsonl"):
         aid = str(row.get("cognitive_agent_id") or "")
-        tick = int(row.get("tick") or -1)
+        from .tick_normalize import coerce_tick
+
+        tick = coerce_tick(row.get("tick"), default=-1)
+        tick = -1 if tick is None else int(tick)
         acc = row.get("accessible") if isinstance(row.get("accessible"), dict) else {}
         obs_by[(aid, tick)] = acc
 
@@ -235,7 +238,10 @@ def aggregate_signal_conditioned_selection(run_dir: Path) -> dict[str, Any]:
     for row in _iter_jsonl(run_dir / "scientific_decisions.jsonl"):
         n_dec += 1
         aid = str(row.get("cognitive_agent_id") or "")
-        tick = int(row.get("tick") or -1)
+        from .tick_normalize import coerce_tick
+
+        tick = coerce_tick(row.get("tick"), default=-1)
+        tick = -1 if tick is None else int(tick)
         acc = obs_by.get((aid, tick)) or {}
         ag = by_agent.setdefault(
             aid,

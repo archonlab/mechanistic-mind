@@ -234,6 +234,14 @@ def cognition_osc_fragments(
     """Anonymous L/R band channels. Empty when OFF / perception OFF / no fields."""
     if not cfg.enabled or not cfg.perception_enabled:
         return {}
+    if getattr(world, "local_signal_transport", None) is not None:
+        # Acanthostega LOCAL PHYSICAL SIGNAL TRANSPORT: same anonymous osc_l_*/osc_r_* channels,
+        # filled only by physically received (attenuated, delayed, thresholded) band energy.
+        from mechanistic_mind.physical_system.local_physical_signal_transport import auditory_fragments
+
+        local = auditory_fragments(world, body)
+        if local is not None:
+            return local
     bands = getattr(world, "OSC_BANDS", None)
     if bands is None:
         return {}

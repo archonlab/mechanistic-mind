@@ -1013,6 +1013,36 @@ def write_vision_artifacts(out_dir: Path, artifacts: dict[str, Any]) -> dict[str
     return paths
 
 
+def apply_model_aware_vision_title(text: str, identity: dict[str, Any] | None) -> str:
+    ident = identity or {}
+    preset = str(ident.get("public_preset") or ident.get("preset_model_line") or ident.get("display_name") or "").upper()
+    line = str(ident.get("model_line") or "").upper()
+    title = "VISION ANALYSIS"
+    if "ACANTHOSTEGA" in preset or "ACANTHOSTEGA" in line or "BETA4" in preset:
+        title = "ACANTHOSTEGA BETA 4 VISION ANALYSIS"
+    elif "TIKTAALIK" in preset or "TIKTAALIK" in line or "BETA 3.1" in preset or "BETA31" in preset:
+        title = "TIKTAALIK BETA 3.1 VISION ANALYSIS"
+    out = str(text or "")
+    if not out.strip():
+        return out
+    if out.startswith("BETA 3.1 VISION ANALYSIS"):
+        out = title + out[len("BETA 3.1 VISION ANALYSIS"):]
+    elif "VISION ANALYSIS" in out[:80] and "ACANTHOSTEGA" in title:
+        out = out.replace("BETA 3.1 VISION ANALYSIS", title, 1)
+    if title.startswith("ACANTHOSTEGA") and "Legacy-compatible optical channels" not in out:
+        extra = (
+            "\nCHANNEL FAMILIES (do not equate optical occupancy with recognition or body exposure)\n"
+            "  - legacy exo channels\n"
+            "  - surface optical channels\n"
+            "  - spatial optical structure\n"
+            "  - body-exposure Observer GT (report UNAVAILABLE when provenance is absent)\n"
+            "  - receptor evidence\n"
+            "  - researcher reconstruction\n"
+        )
+        out = out.replace("========================", "========================\n" + extra, 1)
+    return out
+
+
 def format_beta31_vision_section(artifacts: dict[str, Any]) -> str:
     s = artifacts.get("vision_summary") or {}
     lines = [

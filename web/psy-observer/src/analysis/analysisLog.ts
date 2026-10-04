@@ -13,10 +13,13 @@ function show(v: any): string {
 
 /** Clean plain-text analysis log for clipboard / download. */
 export function formatAnalysisLog(analysis: RunAnalysis): string {
+  const truthful = (analysis as any).truthful_markdown;
+  if (typeof truthful === 'string' && truthful.trim()) return truthful;
   const id = analysis.identity;
   const lines: string[] = [];
   lines.push('MECHANISTIC MIND — RUN ANALYSIS');
   lines.push('================================');
+  if (analysis.lifecycle?.banner) lines.push(analysis.lifecycle.banner);
   lines.push('');
   const meta = analysis.evidence_meta;
   if (meta) {
@@ -30,7 +33,8 @@ export function formatAnalysisLog(analysis: RunAnalysis): string {
     lines.push(`Scientific tick range analyzed: ${meta.scientific_tick_range[0]}–${meta.scientific_tick_range[1]}`);
     lines.push(`Coverage: ${meta.coverage}`);
     lines.push(`Complete tick-level re-analysis: ${meta.complete_tick_level_reanalysis ? 'YES' : 'NO'}`);
-    lines.push(`Evidence files: ${(meta.evidence_files || []).join(', ') || 'NONE'}`);
+    const evFiles = meta.evidence_files || [];
+    lines.push(`Evidence files: ${evFiles.length ? evFiles.join(', ') : 'export manifest did not retain filenames (streams were consumed)'}`);
     lines.push(`Evidence counts: ${JSON.stringify(meta.evidence_counts || {})}`);
     lines.push(`Used cumulative runtime summaries: ${meta.used_cumulative_runtime_summaries ? 'YES' : 'NO'}`);
     if (meta.used_cumulative_runtime_summaries && meta.cumulative_runtime_summaries?.length) {
@@ -61,6 +65,28 @@ export function formatAnalysisLog(analysis: RunAnalysis): string {
 
   if (analysis.configuration_history) {
     lines.push(...formatConfigurationHistoryLog(analysis.configuration_history));
+    lines.push('');
+  }
+  const layered = (analysis as any).layered_coverage;
+  if (layered?.layers) {
+    lines.push('LAYERED COVERAGE');
+    lines.push(`  CORE: ${layered.layers.CORE_CAUSAL_CHAIN_COVERAGE?.status || '—'}  AUX: ${layered.auxiliary}`);
+    lines.push(`  RUN METADATA: ${layered.layers.RUN_METADATA_COVERAGE}`);
+    lines.push(`  WORLD/PHYSICAL: ${layered.layers.WORLD_PHYSICAL_COVERAGE}`);
+    lines.push(`  VISION PROVENANCE: ${layered.layers.VISION_PROVENANCE_COVERAGE}`);
+    lines.push(`  SIGNAL PROVENANCE: ${layered.layers.SIGNAL_PROVENANCE_COVERAGE}`);
+    lines.push(`  RUNTIME TRANSITION: ${layered.layers.RUNTIME_TRANSITION_COVERAGE}`);
+    lines.push(`  OBSERVER TIMELINE: ${layered.layers.OBSERVER_TIMELINE_COVERAGE}`);
+    lines.push('');
+  }
+  const pscTxt = (analysis as any).psc_regime_report_text;
+  if (typeof pscTxt === 'string' && pscTxt.trim()) {
+    lines.push(pscTxt.trimEnd());
+    lines.push('');
+  }
+  const fixture = (analysis as any).development_fixture_section;
+  if (typeof fixture === 'string' && fixture.trim()) {
+    lines.push(fixture.trimEnd());
     lines.push('');
   }
 
@@ -95,10 +121,17 @@ export function formatAnalysisLog(analysis: RunAnalysis): string {
     lines.push(`    SCENARIO_SELECTED event rows: ${show(a.cognition.scenario_selected)} (WAIT ${show(a.cognition.scenario_selected_wait)} / MOVE ${show(a.cognition.scenario_selected_move)})`);
     {
       const v3 = (analysis as any).scientific_v3_core;
+      const histRow = ((analysis as any).canonical_history_agents || {})[a.agent_id] || {};
+      const perAgentDr = histRow.decision_receipts;
       const v3Dec = Number(v3?.decision_receipts || 0);
       if (v3 && v3.evidence_version === 'SCIENTIFIC_V3' && v3Dec > 0) {
         lines.push(`  SCIENTIFIC_V3 DECISION EVIDENCE (authoritative):`);
-        lines.push(`    DecisionReceipts: ${v3Dec}`);
+        if (perAgentDr != null) {
+          lines.push(`    Per-agent DecisionReceipts: ${perAgentDr} (unit: agent-ticks)`);
+          lines.push(`    Global DecisionReceipts (all agents): ${v3Dec} (unit: receipts)`);
+        } else {
+          lines.push(`    Global DecisionReceipts (all agents): ${v3Dec} (unit: receipts)`);
+        }
         lines.push(`    Coverage: ${show(v3.decision_coverage || 'COMPLETE')}`);
         lines.push(`    Note: SCENARIO_SELECTED=0 does NOT mean cognition/decision evidence is absent.`);
       }
@@ -118,8 +151,8 @@ export function formatAnalysisLog(analysis: RunAnalysis): string {
     }
     lines.push(`  Unique cells (observed trajectory): ${show(a.movement.unique_cells)}  current_cell ${show((a.movement as any).current_cell)}  Rotation accum: ${show(a.movement.rotation_accumulated)}`);
     lines.push(`  BODY: deform_events ${show(a.body.deformation_events)}  work_limited ${show(a.body.work_limited_events)}`);
-    lines.push(`  RESOURCES A: ${show(a.resources.resource_A)}`);
-    lines.push(`  RESOURCES B: ${show(a.resources.resource_B)}`);
+    lines.push(`  RESOURCES A (DEVELOPMENT_FIXTURE): ${show(a.resources.resource_A)}`);
+    lines.push(`  RESOURCES B (DEVELOPMENT_FIXTURE): ${show(a.resources.resource_B)}`);
     lines.push(`  WORK RESERVOIR: ${show(a.resources.work_reservoir)}`);
     lines.push(`  COGNITION AGGREGATES (runtime metrics; NOT inferred from structured events):`);
     lines.push(`    Prediction count: ${show(a.cognition.prediction_count)}  error ${show(a.cognition.prediction_error)}  prospective ${show(a.cognition.prospective_compositions)}  novel ${show(a.cognition.novel_compositions)}`);
@@ -278,6 +311,11 @@ export function formatAnalysisLog(analysis: RunAnalysis): string {
   if (typeof b31 === 'string' && b31.trim()) {
     lines.push('');
     lines.push(b31.trimEnd());
+  }
+  const vpc = (analysis as any).volumetric_physical_causal_report_text;
+  if (typeof vpc === 'string' && vpc.trim()) {
+    lines.push('');
+    lines.push(vpc.trimEnd());
   }
   lines.push('');
 

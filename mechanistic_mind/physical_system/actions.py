@@ -36,6 +36,15 @@ OSC_ACTIONS = (
     "OSC_AMP_DOWN",
     "OSC_EMIT",
 )
+# Body-local relative_z rate steps (MRWA+EBAE ON). UP raises tip (+relative_z); DOWN lowers.
+EFFECTOR_Z_ACTIONS = (
+    "LEFT_EFFECTOR_Z_UP",
+    "LEFT_EFFECTOR_Z_DOWN",
+    "RIGHT_EFFECTOR_Z_UP",
+    "RIGHT_EFFECTOR_Z_DOWN",
+)
+LEFT_EFFECTOR_Z_ACTIONS = ("LEFT_EFFECTOR_Z_UP", "LEFT_EFFECTOR_Z_DOWN")
+RIGHT_EFFECTOR_Z_ACTIONS = ("RIGHT_EFFECTOR_Z_UP", "RIGHT_EFFECTOR_Z_DOWN")
 
 BRIDGE_ID = "body_velocity_impulse_v1"
 BRIDGE_NECK = "neck_motor_v1"
@@ -85,6 +94,12 @@ def available_actions(
     articulated_head: bool = False,
     physical_push: bool = False,
     oscillatory_signaling: bool = False,
+    physical_grasp_release: bool = False,
+    physical_bilateral_grasp_release: bool = False,
+    physical_bilateral_bring_together: bool = False,
+    material_composition_merge: bool = False,
+    explicit_surface_deposition: bool = False,
+    effector_relative_z: bool = False,
 ) -> tuple[str, ...]:
     """Physical motor repertoire. Optional DOFs only when mechanisms enabled."""
     out = list(CANONICAL_ACTIONS)
@@ -94,6 +109,18 @@ def available_actions(
         out.extend(PUSH_ACTIONS)
     if oscillatory_signaling:
         out.extend(OSC_ACTIONS)
+    if physical_grasp_release:
+        out.extend(("GRASP", "RELEASE"))
+    if physical_bilateral_grasp_release:
+        out.extend(("LEFT_GRASP", "LEFT_RELEASE", "RIGHT_GRASP", "RIGHT_RELEASE"))
+    if physical_bilateral_bring_together:
+        out.extend(("BRING_TOGETHER", "SEPARATE"))
+    if material_composition_merge:
+        out.append("COMBINE")
+    if explicit_surface_deposition:
+        out.append("APPLY_TO_SURFACE")
+    if effector_relative_z:
+        out.extend(EFFECTOR_Z_ACTIONS)
     return tuple(out)
 
 

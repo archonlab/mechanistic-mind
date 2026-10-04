@@ -232,11 +232,18 @@ def resolve_mechanism_config(
         nested = dict(req["mechanisms"])
         req = {**nested, **{k: v for k, v in req.items() if k != "mechanisms"}}
 
+    from mechanistic_mind.physical_system.locomotion_profile import ACANTHOSTEGA_ONLY_MECHANISM_IDS
+
     explicit_keys = {
         k for k, v in req.items()
         if k not in {"vision_radius", "cognition_enabled"}
         and _coerce_bool(v) is not None
-        and (k in _registry_ids() or k in WORLD_SUBSYSTEM_IDS or k == "cognition")
+        and (
+            k in _registry_ids()
+            or k in WORLD_SUBSYSTEM_IDS
+            or k == "cognition"
+            or k in ACANTHOSTEGA_ONLY_MECHANISM_IDS
+        )
     }
     # cognition_enabled alias
     if "cognition_enabled" in req and _coerce_bool(req.get("cognition_enabled")) is not None:
@@ -521,13 +528,19 @@ def _sensor_availability(runtime: Any, mechanism_id: str) -> dict[str, Any]:
         bands = getattr(getattr(runtime, "world", None), "OSC_BANDS", None)
         n = int(getattr(osc, "n_bands", 6) or 6) if osc else 6
         channels = [f"osc_l_{i}" for i in range(n)] + [f"osc_r_{i}" for i in range(n)]
-        out["available"] = bool(on and bands is not None)
+        # Acanthostega local physical signal transport replaces the OSC_BANDS diffusion field as the
+        # authoritative signal state (the field is intentionally absent). Tiktaalik: unchanged path.
+        lps_state = getattr(getattr(runtime, "world", None), "local_signal_transport", None)
+        out["available"] = bool(on and (bands is not None or lps_state is not None))
         out["details"] = {
             "channels": channels,
             "emitter_actions": ["OSC_FREQ_UP", "OSC_FREQ_DOWN", "OSC_AMP_UP", "OSC_AMP_DOWN", "OSC_EMIT"],
             "note": "zero band energy is valid; availability ≠ nonzero activity",
             "finite_propagation": getattr(osc, "finite_propagation", "NOT_IMPLEMENTED") if osc else None,
         }
+        if lps_state is not None:
+            out["details"]["finite_propagation"] = "IMPLEMENTED_BY_LOCAL_PHYSICAL_SIGNAL_TRANSPORT"
+            out["details"]["signal_state_authority"] = "local_physical_signal_transport"
     elif mechanism_id == "resource_ecology_A":
         ce = getattr(getattr(cfg, "planet", None), "climate_ecology", None)
         out["available"] = bool(getattr(ce, "resource_ecology_A_enabled", False)) if ce else False

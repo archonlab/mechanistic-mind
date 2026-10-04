@@ -3,8 +3,9 @@ import { applyTheme, readThemePref, setThemePref, type ThemePref } from '../obse
 
 const OPTIONS: { id: ThemePref; label: string }[] = [
   { id: 'system', label: 'System' },
-  { id: 'light', label: 'Light' },
   { id: 'dark', label: 'Dark' },
+  { id: 'light', label: 'Light' },
+  { id: 'aquatic', label: 'Aquatic' },
 ];
 
 export function ThemeControl() {
@@ -20,22 +21,20 @@ export function ThemeControl() {
   }, [pref]);
 
   return (
-    <div className="lab-cluster theme-control" aria-label="Appearance">
-      <span className="lab-kicker">THEME</span>
-      {OPTIONS.map((opt) => (
-        <button
-          key={opt.id}
-          type="button"
-          className={pref === opt.id ? 'active' : ''}
-          aria-pressed={pref === opt.id}
-          onClick={() => {
-            setThemePref(opt.id);
-            setPref(opt.id);
-          }}
-        >
-          {opt.label}
-        </button>
-      ))}
+    <div className="theme-control" aria-label="Appearance">
+      <select
+        aria-label="Theme"
+        value={pref}
+        onChange={(e) => {
+          const next = e.target.value as ThemePref;
+          setThemePref(next);
+          setPref(next);
+        }}
+      >
+        {OPTIONS.map((opt) => (
+          <option key={opt.id} value={opt.id}>{opt.label}</option>
+        ))}
+      </select>
     </div>
   );
 }

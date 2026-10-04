@@ -204,6 +204,7 @@ def _compact_vision_optical_for_slot(
                 body=slot.body,
                 cfg=nfe,
                 foreign_bodies=fb_pairs,
+                physical_config=getattr(slot, "config", None),
             )
             src_cells: list[dict[str, Any]] = []
             for b, _c, bid in foreign_bodies or []:
@@ -787,13 +788,29 @@ class ScientificHistoryWriter:
 
 
 def copy_scientific_into(run_dir: Path, live_dir: Path | None) -> dict[str, Any]:
-    """Copy scientific evidence files into a finalized run directory."""
+    """Promote scientific evidence files into a finalized run directory.
+
+    Prefer same-filesystem hardlinks to avoid a second full byte copy of multi-GB
+    packages (ENOSPC root cause during live→tmp duplication). Falls back to
+    copy2 only when hardlink is impossible (cross-device / unsupported).
+    Does not alter JSONL semantics. Incomplete staging remains under `.tmp-*`.
+    """
+    import os
     import shutil
 
-    info: dict[str, Any] = {"copied": False, "files": []}
+    info: dict[str, Any] = {
+        "copied": False,
+        "files": [],
+        "hardlinked": [],
+        "byte_copied": [],
+        "promotion_mode": None,
+    }
     if live_dir is None or not Path(live_dir).is_dir():
         return info
     live = Path(live_dir)
+    run = Path(run_dir)
+    hard_ok = 0
+    copy_ok = 0
     for name in (
         "scientific_timeline.jsonl",
         "scientific_events.jsonl",
@@ -810,11 +827,32 @@ def copy_scientific_into(run_dir: Path, live_dir: Path | None) -> dict[str, Any]
         "scientific_revisions.jsonl",
     ):
         src = live / name
-        if src.is_file():
-            dst = Path(run_dir) / name
+        if not src.is_file():
+            continue
+        dst = run / name
+        if dst.exists():
+            dst.unlink()
+        linked = False
+        try:
+            if src.stat().st_dev == run.stat().st_dev:
+                os.link(src, dst)
+                linked = True
+                hard_ok += 1
+                info["hardlinked"].append(name)
+        except OSError:
+            linked = False
+        if not linked:
             shutil.copy2(src, dst)
-            info["files"].append(name)
+            copy_ok += 1
+            info["byte_copied"].append(name)
+        info["files"].append(name)
     info["copied"] = bool(info["files"])
+    if hard_ok and not copy_ok:
+        info["promotion_mode"] = "HARDLINK_SAME_FILESYSTEM"
+    elif hard_ok and copy_ok:
+        info["promotion_mode"] = "MIXED_HARDLINK_AND_COPY"
+    elif copy_ok:
+        info["promotion_mode"] = "BYTE_COPY_FALLBACK"
     return info
 
 

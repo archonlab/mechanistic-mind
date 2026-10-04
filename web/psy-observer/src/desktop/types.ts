@@ -18,6 +18,7 @@ export type ExperimentScreen =
   | 'set_resources'
   | 'experimental'
   | 'set_predictive'
+  | 'set_psc'
   | 'set_vision';
 
 export type FloatingWindowId =
@@ -59,10 +60,11 @@ export const HOME_TOOLS: { id: DeviceTool; label: string }[] = [
 
 export const EXPERIMENT_MENU: { id: ExperimentScreen; label: string }[] = [
   { id: 'set_world', label: 'Set World' },
-  { id: 'set_model', label: 'Set Model' },
   { id: 'set_ecology', label: 'Set Ecology' },
-  { id: 'set_resources', label: 'Set Resources' },
-  { id: 'set_predictive', label: 'Predictive / PSC' },
+  { id: 'set_model', label: 'Set Model' },
+  { id: 'set_resources', label: 'Set Body' },
+  { id: 'set_psc', label: 'PSC' },
+  { id: 'experimental', label: 'Ablations' },
   { id: 'set_vision', label: 'Vision' },
-  { id: 'experimental', label: 'Experimental' },
+  { id: 'menu', label: 'Review / Apply' },
 ];

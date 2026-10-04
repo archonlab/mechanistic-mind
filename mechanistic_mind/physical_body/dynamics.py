@@ -1,5 +1,7 @@
 """WORLD <-> PhysicalBody coupling. No psyche/N/receptors/actions."""
 from __future__ import annotations
+from typing import Any
+
 import numpy as np
 
 from mechanistic_mind.physical_body.config import PhysicalBodyConfig
@@ -16,6 +18,9 @@ def step_physical_body(
     endogenous_motor_enabled: bool = False,
     skip_material: bool = False,
     skip_mechanical: bool = False,
+    locomotion_profile: Any | None = None,
+    locomotion_profile_active: bool = False,
+    locomotor_active: bool = False,
 ) -> PhysicalBodyState:
     h, w = planet.T.shape
     cells = body.cells(w, h, cfg.footprint)
@@ -102,20 +107,44 @@ def step_physical_body(
     # --- mechanical ---
     if cfg.mechanical_enabled and not skip_mechanical:
         body.mech = 0.85 * body.mech + cfg.wave_coupling * u_w
-        ax = cfg.flow_coupling * vx_w - cfg.drag * body.vx
-        ay = cfg.flow_coupling * vy_w - cfg.drag * body.vy
-        ax += 0.15 * body.mech * (1.0 if abs(vx_w) + abs(vy_w) < 1e-9 else np.sign(vx_w) or 1.0)
-        ay += 0.15 * body.mech * (0.0 if abs(vx_w) + abs(vy_w) < 1e-9 else np.sign(vy_w))
-        # Experimental endogenous motor (default OFF): continuous contribution, not discrete MOVE.
+        f_flow_x = cfg.flow_coupling * vx_w
+        f_flow_y = cfg.flow_coupling * vy_w
+        if abs(vx_w) + abs(vy_w) < 1e-9:
+            f_wave_x = 0.15 * body.mech
+            f_wave_y = 0.0
+        else:
+            f_wave_x = 0.15 * body.mech * (np.sign(vx_w) or 1.0)
+            f_wave_y = 0.15 * body.mech * np.sign(vy_w)
         ax_endo = float(body.motor_ux) if endogenous_motor_enabled else 0.0
         ay_endo = float(body.motor_uy) if endogenous_motor_enabled else 0.0
-        ax += ax_endo
-        ay += ay_endo
-        body.vx = float(np.clip(body.vx + ax / cfg.mass, -cfg.v_max, cfg.v_max))
-        body.vy = float(np.clip(body.vy + ay / cfg.mass, -cfg.v_max, cfg.v_max))
-        if cfg.displacement_enabled:
-            body.x = float(wrap_coord(body.x + body.vx, w))
-            body.y = float(wrap_coord(body.y + body.vy, h))
+        if locomotion_profile_active and locomotion_profile is not None:
+            from mechanistic_mind.physical_system.locomotion_profile import integrate_com_translation
+
+            integrate_com_translation(
+                body,
+                body_cfg=cfg,
+                f_site=(f_flow_x + f_wave_x, f_flow_y + f_wave_y),
+                f_terrain=(0.0, 0.0),
+                f_ambient=(0.0, 0.0),
+                extra_drag=0.0,
+                locomotor_active=bool(locomotor_active),
+                profile=locomotion_profile,
+                width=w,
+                height=h,
+                apply_translation=True,
+                profile_active=True,
+            )
+            if endogenous_motor_enabled:
+                body.vx = float(np.clip(body.vx + ax_endo / cfg.mass, -cfg.v_max, cfg.v_max))
+                body.vy = float(np.clip(body.vy + ay_endo / cfg.mass, -cfg.v_max, cfg.v_max))
+        else:
+            ax = f_flow_x - cfg.drag * body.vx + f_wave_x + ax_endo
+            ay = f_flow_y - cfg.drag * body.vy + f_wave_y + ay_endo
+            body.vx = float(np.clip(body.vx + ax / cfg.mass, -cfg.v_max, cfg.v_max))
+            body.vy = float(np.clip(body.vy + ay / cfg.mass, -cfg.v_max, cfg.v_max))
+            if cfg.displacement_enabled:
+                body.x = float(wrap_coord(body.x + body.vx, w))
+                body.y = float(wrap_coord(body.y + body.vy, h))
 
     body.tick += 1
     return body

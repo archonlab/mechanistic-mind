@@ -9,7 +9,9 @@ frames; PAUSED/INSPECT/step use full detail.
 """
 from __future__ import annotations
 
+import gc
 import json
+import os
 import threading
 import time
 import uuid
@@ -446,7 +448,7 @@ class ObserverSession:
         out["mismatches"] = mismatches
         return out
 
-    def reset(self, *, seed: int | None = None, cognition_enabled: bool | None = None) -> dict[str, Any]:
+    def reset(self, *, seed: int | None = None, cognition_enabled: bool | None = None, public_preset: str | None = None) -> dict[str, Any]:
         prior_finalize = None
         if getattr(self, "runtime", None) is not None and int(self.runtime.tick) > 0 and self._finalize_key is None:
             # Discarding an unsaved active run: persist under RESET when possible.
@@ -462,9 +464,44 @@ class ObserverSession:
                     self.config.cognition_enabled = bool(cognition_enabled)
                 cfg = tiktaalik_config()
                 cfg.cognition.cognition_enabled = bool(self.config.cognition_enabled)
+                if public_preset:
+                    from mechanistic_mind.model.lines import stamp_config_from_preset
+
+                    stamp_config_from_preset(cfg, public_preset)
                 self.runtime = PhysicalSystemRuntime(seed=self.config.seed, config=cfg)
                 self._runtime_generation += 1
                 self._clear_integrity_locked()
+                # P1/P2/P3: fresh runtime → no stale derived VOLUME/SURFACE display cache.
+                try:
+                    from mechanistic_mind.physical_system.researcher_physical_optical_audit_view import (
+                        invalidate_o6_display_cache,
+                    )
+                    invalidate_o6_display_cache(getattr(self.runtime, "world", None))
+                except Exception:
+                    pass
+                try:
+                    from mechanistic_mind.physical_system.observer_camera_occupancy_consumer import (
+                        invalidate_vw7_volume_caches,
+                    )
+                    invalidate_vw7_volume_caches(getattr(self.runtime, "world", None))
+                    setattr(self.runtime, "_observer_volume_held_static_id", None)
+                    self._volume_client_static_id = None
+                except Exception:
+                    pass
+                try:
+                    from mechanistic_mind.ui.psy_observer_web.observer_serialization_fragment_cache import (
+                        clear as _p4_clear,
+                    )
+                    _p4_clear(reason="APPLY_NEW_RUNTIME")
+                except Exception:
+                    pass
+                try:
+                    from mechanistic_mind.ui.psy_observer_web.observer_canonical_response_encoding import (
+                        clear as _p4b_clear,
+                    )
+                    _p4b_clear(reason="APPLY_NEW_RUNTIME")
+                except Exception:
+                    pass
                 # Fresh reset → full normal organism defaults (climate OFF).
                 integrity = self._bind_and_preflight_locked(
                     requested_mechanisms={"cognition": bool(self.config.cognition_enabled)},
@@ -528,10 +565,12 @@ class ObserverSession:
                 out["preflight"] = integrity.get("preflight")
                 out["mechanism_result"] = self.runtime.mechanisms()
                 out["mechanism_integrity"] = self.mechanism_integrity_status()
-                from mechanistic_mind.physical_system.experiment_canonical import canonical_from_runtime
+                from mechanistic_mind.physical_system.experiment_canonical import runtime_readback
 
-                self._canonical_config = canonical_from_runtime(self.runtime)
-                self._canonical_config["pe_cold_history_eviction"] = bool(self.config.pe_cold_history_eviction)
+                self._canonical_config = runtime_readback(
+                    self.runtime,
+                    pe_cold=bool(self.config.pe_cold_history_eviction),
+                )
                 self._canonical_requested = deepcopy(self._canonical_config)
                 self._applied_receipt = self.applied_configuration_receipt()
                 out["applied_configuration"] = self._applied_receipt
@@ -1070,6 +1109,7 @@ class ObserverSession:
                 # happens outside `_step_lock` in the capture worker.
                 geometry_traversability=self._geo_overlay_for_capture_locked(detail=detail_s),
                 include_cognition=_inc_cog,
+                observer_interest=_interest,
             )
         finally:
             if _gc_was:
@@ -1293,7 +1333,27 @@ class ObserverSession:
         runtime_block = experiment.setdefault("runtime", {})
         if isinstance(runtime_block, dict):
             runtime_block["pe_cold_history_eviction"] = bool(pe_cold["applied"])
+            cog = getattr(getattr(self.runtime, "config", None), "cognition", None)
+            runtime_block["psc_motor_resolution"] = str(
+                getattr(cog, "psc_motor_resolution", None) or "LOCO_FACTORIZED"
+            )
+            runtime_block["public_preset"] = getattr(
+                getattr(self.runtime, "config", None), "public_preset", None
+            )
         frame.setdefault("header", {})["pe_cold_history_eviction"] = bool(pe_cold["applied"])
+        frame.setdefault("header", {})["psc_motor_resolution"] = (
+            runtime_block.get("psc_motor_resolution") if isinstance(runtime_block, dict) else None
+        )
+        if isinstance(self._canonical_config, dict) and self._canonical_config:
+            self._canonical_config["pe_cold_history_eviction"] = bool(pe_cold["applied"])
+            if isinstance(runtime_block, dict) and runtime_block.get("psc_motor_resolution"):
+                self._canonical_config["psc_motor_resolution"] = runtime_block["psc_motor_resolution"]
+            eco_live = getattr(getattr(self.runtime, "config", None), "ecology_preset", None)
+            if eco_live:
+                self._canonical_config["ecology_preset"] = str(eco_live)
+            active = dict(self._canonical_config)
+            experiment["active_experiment"] = active
+            frame["active_experiment"] = active
         sim_tick_now = int(self.runtime.tick)
         lag = max(0, sim_tick_now - live_tick)
         self._observer_lag_ticks = lag
@@ -1301,6 +1361,8 @@ class ObserverSession:
             "observer_lag_ticks": lag,
             "sim_tick": sim_tick_now,
             "frame_tick": live_tick,
+            "package_identity": os.environ.get("PSY_OBSERVER_PACKAGE_IDENTITY"),
+            "instance_id": os.environ.get("PSY_OBSERVER_INSTANCE_ID"),
         })
         self._stat_live_frame_builds += 1
         self._buffer.append(frame)
@@ -1654,6 +1716,7 @@ class ObserverSession:
             ),
             "preflight_status": (self._preflight_result or {}).get("status"),
             "evidence_mode": "FULL_SCIENTIFIC",
+            **(self.runtime.model_identity() if hasattr(self.runtime, "model_identity") else {}),
             "psc_prediction": __import__(
                 "mechanistic_mind.research.psc_opt", fromlist=["backend_provenance"]
             ).backend_provenance(),
@@ -1671,6 +1734,7 @@ class ObserverSession:
                     "runtime_type": type(self.runtime).__name__,
                     "seed": int(getattr(self.runtime, "seed", self.config.seed)),
                     "alongside": "SCIENTIFIC_V2_TIERED",
+                    **(self.runtime.model_identity() if hasattr(self.runtime, "model_identity") else {}),
                     **(self._checkpoint_resume_meta or {}),
                 },
             )
@@ -2367,6 +2431,167 @@ class ObserverSession:
         out["preflight"] = self._preflight_result
         out["mechanism_integrity"] = self.mechanism_integrity_status()
         self._maybe_push(out, force=True)
+        return out
+
+    def researcher_surface_column_transfer(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Researcher setup/intervention: one TRANSFER_SURFACE_COLUMN_SLICE transaction.
+
+        Researcher-only (selection_provenance=INTERVENTION_SETUP, agent_action=false). Not a motor
+        command, not an agent control, never routed to cognition. Seed authority = runtime seed.
+        """
+        from mechanistic_mind.physical_system import conservative_surface_column_transfer as cst
+
+        data = dict(payload or {})
+        with self._step_lock:
+            with self._lock:
+                rt = self.runtime
+                world = getattr(rt, "world", None)
+                cfg = getattr(rt, "config", None)
+                if world is None or not cst.conservative_surface_column_transfer_is_active(cfg):
+                    return {
+                        "accepted": False,
+                        "status": "REJECTED",
+                        "rejection_reason": cst.R_INACTIVE,
+                        "researcher_only": True,
+                        "agent_action": False,
+                    }
+                receipt = cst.apply_surface_column_transfer(
+                    world,
+                    cfg,
+                    source_cell_x=data.get("source_cell_x"),
+                    source_cell_y=data.get("source_cell_y"),
+                    destination_cell_x=data.get("destination_cell_x"),
+                    destination_cell_y=data.get("destination_cell_y"),
+                    requested_thickness=data.get("requested_thickness"),
+                    expected_source_revision=data.get("expected_source_revision"),
+                    expected_destination_revision=data.get("expected_destination_revision"),
+                    tick=int(getattr(rt, "tick", 0) or 0),
+                    researcher_id=str(data.get("researcher_id") or "observer_researcher"),
+                    selection_provenance=cst.SELECTION_PROVENANCE,
+                    agent_action=False,
+                    world_seed=int(getattr(rt, "seed")),
+                    reason=str(data.get("reason") or "observer_researcher_intervention"),
+                )
+                return {"accepted": receipt.get("status") == "COMMITTED", "receipt": receipt}
+
+    def researcher_local_signal_emission(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Researcher calibration emission (INTERVENTION_SETUP) for local physical signal transport.
+
+        Queues ONE physical emission at a world position; it propagates by the same medium law and
+        reaches bodies only through physical reception. Never a message, never delivered to cognition.
+        """
+        from mechanistic_mind.physical_system import local_physical_signal_transport as lps
+
+        data = dict(payload or {})
+        with self._step_lock:
+            with self._lock:
+                rt = self.runtime
+                world = getattr(rt, "world", None)
+                cfg = getattr(rt, "config", None)
+                if world is None or not lps.local_physical_signal_transport_is_active(cfg):
+                    return {"accepted": False, "status": "REJECTED", "rejection_reason": "MECHANISM_INACTIVE",
+                            "researcher_only": True, "agent_action": False}
+                x, y = data.get("x"), data.get("y")
+                if x is None or y is None:
+                    slots = list(getattr(rt, "slots", None) or [rt])
+                    b = slots[0].body
+                    x, y = float(b.x), float(b.y)
+                receipt = lps.queue_researcher_emission(
+                    world, cfg, x=x, y=y,
+                    frequency=data.get("frequency"), amplitude=data.get("amplitude"),
+                    band_energies=data.get("band_energies"),
+                    researcher_id=str(data.get("researcher_id") or "observer_researcher"),
+                )
+                return {"accepted": receipt.get("status") == "QUEUED", "receipt": receipt,
+                        "researcher_only": True, "agent_action": False}
+
+    def researcher_acoustic_probe(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Configure passive Observer acoustic probe (researcher-only). Never emits or enqueues LPS."""
+        from mechanistic_mind.physical_system.observer_acoustic_probe import configure_probe, ensure_probe_state
+
+        data = dict(payload or {})
+        with self._step_lock:
+            with self._lock:
+                rt = self.runtime
+                world = getattr(rt, "world", None)
+                if world is None:
+                    return {"accepted": False, "status": "NO_WORLD", "researcher_only": True}
+                ensure_probe_state(world)
+                out = configure_probe(
+                    world,
+                    enabled=data.get("enabled") if "enabled" in data else None,
+                    x=data.get("x") if "x" in data else None,
+                    y=data.get("y") if "y" in data else None,
+                    clear_history=bool(data.get("clear_history")),
+                )
+                out["tick"] = int(getattr(rt, "tick", 0) or 0)
+                return out
+
+    def researcher_forced_motor(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Researcher-only composite motor probe. Not an organism policy or object-id picker."""
+        data = dict(payload or {})
+        loco = str(data.get("locomotion") or "WAIT")
+        manip = str(data.get("manipulator") or "NONE").upper()
+        slot_i = int(data.get("slot") or 0)
+        from mechanistic_mind.physical_system.material_composition import material_composition_merge_is_active
+        from mechanistic_mind.physical_system.physical_manipulator import (
+            bilateral_grasp_release_is_active,
+            bring_together_is_active,
+            grasp_release_is_active,
+        )
+        with self._lock:
+            rt = self.runtime
+            slots = list(getattr(rt, "slots", None) or [rt])
+            if slot_i < 0 or slot_i >= len(slots):
+                slot_i = 0
+            slot = slots[slot_i]
+            cfg = getattr(slot, "config", None)
+            left = str(data.get("manipulator_left") or "NONE").upper()
+            right = str(data.get("manipulator_right") or "NONE").upper()
+            pair = str(data.get("manipulator_pair") or data.get("manipulator") or "NONE").upper()
+            token = str(data.get("manipulator") or "NONE").upper()
+            if token in {"LEFT_GRASP", "LEFT_RELEASE"}:
+                left = token.split("_", 1)[1]
+            elif token in {"RIGHT_GRASP", "RIGHT_RELEASE"}:
+                right = token.split("_", 1)[1]
+            elif token in {"BRING_TOGETHER", "SEPARATE", "COMBINE"}:
+                pair = token
+            if pair not in {"BRING_TOGETHER", "SEPARATE", "COMBINE", "NONE"}:
+                pair = "NONE"
+            from mechanistic_mind.physical_system.explicit_surface_deposition import (
+                APPLY_TO_SURFACE,
+                explicit_surface_deposition_is_active,
+            )
+            apply_surface = bool(data.get("apply_to_surface")) or str(data.get("command") or "").upper() == APPLY_TO_SURFACE
+            apply_surface = apply_surface and explicit_surface_deposition_is_active(cfg)
+            if bring_together_is_active(cfg) or bilateral_grasp_release_is_active(cfg):
+                slot._forced_motor_once = {
+                    "locomotion": loco,
+                    "manipulator": "NONE",
+                    "manipulator_left": left if left in {"GRASP", "RELEASE", "NONE"} else "NONE",
+                    "manipulator_right": right if right in {"GRASP", "RELEASE", "NONE"} else "NONE",
+                    "manipulator_pair": pair if (bring_together_is_active(cfg) and (pair != "COMBINE" or material_composition_merge_is_active(cfg))) else "NONE",
+                    "apply_to_surface": apply_surface,
+                    "neck": "NONE",
+                    "push": False,
+                }
+            elif grasp_release_is_active(cfg):
+                slot._forced_motor_once = {
+                    "locomotion": loco,
+                    "manipulator": manip if manip in {"GRASP", "RELEASE", "NONE"} else "NONE",
+                    "neck": "NONE",
+                    "push": False,
+                }
+            else:
+                return {
+                    "accepted": False,
+                    "error": "grasp_channel_inactive",
+                    "researcher_only": True,
+                }
+        out = self.step(1)
+        out["accepted"] = True
+        out["researcher_only"] = True
+        out["probed_manipulator"] = manip
         return out
 
     def _scientific_step_once_unlocked(self) -> None:
@@ -3863,6 +4088,42 @@ class ObserverSession:
                 else:
                     self.runtime = PhysicalSystemRuntime.restore(payload)
                 self._runtime_generation += 1
+                # P1/P3: clear incompatible derived display caches (O6 SURFACE); never pollute snapshot schema.
+                try:
+                    from mechanistic_mind.physical_system.researcher_physical_optical_audit_view import (
+                        invalidate_o6_display_cache,
+                    )
+                    invalidate_o6_display_cache(getattr(self.runtime, "world", None))
+                except Exception:
+                    pass
+                try:
+                    from mechanistic_mind.physical_system.observer_camera_occupancy_consumer import (
+                        invalidate_vw7_volume_caches,
+                    )
+                    invalidate_vw7_volume_caches(getattr(self.runtime, "world", None))
+                except Exception:
+                    pass
+                try:
+                    setattr(self.runtime, "_observer_surface_held_static_id", None)
+                    self._surface_client_static_id = None
+                    setattr(self.runtime, "_observer_volume_held_static_id", None)
+                    self._volume_client_static_id = None
+                except Exception:
+                    pass
+                try:
+                    from mechanistic_mind.ui.psy_observer_web.observer_serialization_fragment_cache import (
+                        clear as _p4_clear,
+                    )
+                    _p4_clear(reason="RESTORE")
+                except Exception:
+                    pass
+                try:
+                    from mechanistic_mind.ui.psy_observer_web.observer_canonical_response_encoding import (
+                        clear as _p4b_clear,
+                    )
+                    _p4b_clear(reason="RESTORE")
+                except Exception:
+                    pass
                 self.status = "PAUSED"
                 self.mode = "LIVE"
                 self.inspect_tick = None
@@ -3904,10 +4165,12 @@ class ObserverSession:
                 }
                 frame = self._capture_locked()
         self._maybe_push(frame, force=True)
-        from mechanistic_mind.physical_system.experiment_canonical import canonical_from_runtime
+        from mechanistic_mind.physical_system.experiment_canonical import runtime_readback
 
-        self._canonical_config = canonical_from_runtime(self.runtime)
-        self._canonical_config["pe_cold_history_eviction"] = bool(self.config.pe_cold_history_eviction)
+        self._canonical_config = runtime_readback(
+            self.runtime,
+            pe_cold=bool(self.config.pe_cold_history_eviction),
+        )
         self._canonical_requested = deepcopy(self._canonical_config)
         self._applied_receipt = self.applied_configuration_receipt()
         out = self._with_receipt(
@@ -4011,7 +4274,54 @@ class ObserverSession:
             snap = self._observer_interest.add(product)
         else:
             snap = self._observer_interest.remove(product)
-        return {"interest": snap}
+            if str(product) == "surface_light":
+                try:
+                    self._surface_client_static_id = None
+                    setattr(self.runtime, "_observer_surface_held_static_id", None)
+                except Exception:
+                    pass
+            if str(product) == "volume_xray":
+                try:
+                    self._volume_client_static_id = None
+                    setattr(self.runtime, "_observer_volume_held_static_id", None)
+                except Exception:
+                    pass
+        return {"interest": snap, "runtime_tick": int(getattr(self.runtime, "tick", 0) or 0),
+                "runtime_generation": int(self._runtime_generation)}
+
+    def set_surface_static_held(self, static_payload_id: str | None) -> dict[str, Any]:
+        """P3: client acknowledges held SURFACE static base (UI session only)."""
+        sid = str(static_payload_id).strip() if static_payload_id else None
+        if sid == "":
+            sid = None
+        self._surface_client_static_id = sid
+        try:
+            setattr(self.runtime, "_observer_surface_held_static_id", sid)
+        except Exception:
+            pass
+        return {
+            "accepted": True,
+            "surface_static_payload_id": sid,
+            "observer_only": True,
+            "schema": "OBSERVER_SURFACE_INCREMENTAL_PAYLOAD_V1",
+        }
+
+    def set_volume_static_held(self, static_payload_id: str | None) -> dict[str, Any]:
+        """P2: client acknowledges held VOLUME static base (UI session only)."""
+        sid = str(static_payload_id).strip() if static_payload_id else None
+        if sid == "":
+            sid = None
+        self._volume_client_static_id = sid
+        try:
+            setattr(self.runtime, "_observer_volume_held_static_id", sid)
+        except Exception:
+            pass
+        return {
+            "accepted": True,
+            "volume_static_payload_id": sid,
+            "observer_only": True,
+            "schema": "OBSERVER_VOLUME_INCREMENTAL_PAYLOAD_V1",
+        }
 
     def sensorimotor_consequence_panel(self) -> dict:
         if not self._observer_interest.wants(PRODUCT_SMC):
@@ -6131,10 +6441,131 @@ class ObserverSession:
             from mechanistic_mind.ui.psy_observer_web.geometry.ground_truth import sample_local_flow
 
             gt = sample_local_flow(self.runtime, x=float(ix) + 0.5, y=float(iy) + 0.5)
+            surface_column = None
+            volumetric_occupancy = None
+            world = getattr(self.runtime, "world", None)
+            if world is not None and getattr(world, "surface_columns", None) is not None:
+                from mechanistic_mind.physical_system.procedural_surface_columns import (
+                    cell_inspection,
+                    procedural_surface_columns_is_active,
+                )
+                if procedural_surface_columns_is_active(getattr(self.runtime, "config", None)):
+                    # Researcher-only authoritative column summary; distinct from indexed contents.
+                    surface_column = cell_inspection(world, int(ix), int(iy))
+            if world is not None and getattr(world, "volumetric_occupancy", None) is not None:
+                from mechanistic_mind.physical_system.volumetric_world_material_occupancy import (
+                    observer_column_inspector_payload,
+                    volumetric_world_material_occupancy_is_active,
+                )
+                if volumetric_world_material_occupancy_is_active(getattr(self.runtime, "config", None)):
+                    # Passiveitative sparse absolute-Z occupancy; free gaps = complement of occupied.
+                    volumetric_occupancy = observer_column_inspector_payload(world, int(ix), int(iy))
+                    from mechanistic_mind.physical_system.physical_optical_material_profile import (
+                        physical_optical_material_profile_is_active,
+                        resolve_occupied_interval_profile,
+                    )
+                    if volumetric_occupancy is not None and physical_optical_material_profile_is_active(
+                        getattr(self.runtime, "config", None)
+                    ):
+                        intervals = list(volumetric_occupancy.get("intervals") or [])
+                        enriched = []
+                        for it in intervals:
+                            row = dict(it) if isinstance(it, dict) else {}
+                            row["physical_optical_material_profile"] = resolve_occupied_interval_profile(row)
+                            row["physical_optical_material_profile_label"] = (
+                                "MATERIAL PROPERTY ONLY · NO PHYSICAL LIGHT TRANSPORT · NOT DISPLAY RGB"
+                            )
+                            enriched.append(row)
+                        volumetric_occupancy = {
+                            **volumetric_occupancy,
+                            "intervals": enriched,
+                            "physical_optical_material_profile_enabled": True,
+                        }
+            occupancy_support_contact = None
+            if world is not None:
+                from mechanistic_mind.physical_system.occupancy_support_and_contact_queries import (
+                    observer_support_inspector_payload,
+                    occupancy_support_and_contact_queries_is_active,
+                )
+                cfg = getattr(self.runtime, "config", None)
+                if occupancy_support_and_contact_queries_is_active(cfg):
+                    body = getattr(self.runtime, "body", None)
+                    try:
+                        from mechanistic_mind.physical_system.flat_ground_gravity import read_z
+
+                        qz = float(read_z(body)) if body is not None else 0.0
+                    except Exception:
+                        qz = float(getattr(body, "z", 0.0) or 0.0) if body is not None else 0.0
+                    occupancy_support_contact = observer_support_inspector_payload(
+                        world, int(ix), int(iy), qz, config=cfg
+                    )
+            volumetric_material_separation = None
+            if world is not None:
+                from mechanistic_mind.physical_system.volumetric_world_material_separation import (
+                    observer_separation_inspector_payload,
+                    volumetric_world_material_separation_is_active,
+                )
+                cfg2 = getattr(self.runtime, "config", None)
+                if volumetric_world_material_separation_is_active(cfg2):
+                    volumetric_material_separation = observer_separation_inspector_payload(world, cfg2)
+            volumetric_material_reintegration = None
+            if world is not None:
+                from mechanistic_mind.physical_system.volumetric_world_material_reintegration import (
+                    observer_reintegration_inspector_payload,
+                    volumetric_world_material_reintegration_is_active,
+                )
+                cfg3 = getattr(self.runtime, "config", None)
+                if volumetric_world_material_reintegration_is_active(cfg3):
+                    volumetric_material_reintegration = observer_reintegration_inspector_payload(world, cfg3)
+            effector_held_occupancy_exertion_bridge = None
+            if world is not None:
+                from mechanistic_mind.physical_system.effector_held_occupancy_exertion_bridge import (
+                    observer_bridge_inspector_payload,
+                    effector_held_occupancy_exertion_bridge_is_active,
+                )
+                cfg4 = getattr(self.runtime, "config", None)
+                if effector_held_occupancy_exertion_bridge_is_active(cfg4):
+                    effector_held_occupancy_exertion_bridge = observer_bridge_inspector_payload(world, cfg4)
+            minimal_vision_3d_geometric_interface = None
+            if world is not None:
+                from mechanistic_mind.physical_system.minimal_vision_3d_geometric_interface import (
+                    observer_vision_3d_inspector_payload,
+                    minimal_vision_3d_geometric_interface_is_active,
+                )
+                cfg5 = getattr(self.runtime, "config", None)
+                if minimal_vision_3d_geometric_interface_is_active(cfg5):
+                    body = getattr(self.runtime, "body", None)
+                    # PassivePassive: derive live LOS for selected organism → inspected cell.
+                    phenotype_sample = None
+                    try:
+                        nfe = getattr(cfg5, "near_field_exteroception", None)
+                        if body is not None and nfe is not None and getattr(nfe, "enabled", False):
+                            from mechanistic_mind.physical_system.near_field_exteroception import (
+                                sample_near_field,
+                            )
+                            phenotype_sample = sample_near_field(
+                                world=world, body=body, cfg=nfe, physical_config=cfg5, diagnostic=True,
+                            )
+                    except Exception:
+                        phenotype_sample = None
+                    minimal_vision_3d_geometric_interface = observer_vision_3d_inspector_payload(
+                        world,
+                        cfg5,
+                        body=body,
+                        target_cell=(int(ix), int(iy)),
+                        phenotype_sample=phenotype_sample,
+                    )
             return {
                 "accepted": True,
                 "ground_truth": gt,
                 "empirical": cell,
+                **({"surface_column": surface_column} if surface_column is not None else {}),
+                **({"volumetric_occupancy": volumetric_occupancy} if volumetric_occupancy is not None else {}),
+                **({"occupancy_support_contact": occupancy_support_contact} if occupancy_support_contact is not None else {}),
+                **({"volumetric_material_separation": volumetric_material_separation} if volumetric_material_separation is not None else {}),
+                **({"volumetric_material_reintegration": volumetric_material_reintegration} if volumetric_material_reintegration is not None else {}),
+                **({"effector_held_occupancy_exertion_bridge": effector_held_occupancy_exertion_bridge} if effector_held_occupancy_exertion_bridge is not None else {}),
+                **({"minimal_vision_3d_geometric_interface": minimal_vision_3d_geometric_interface} if minimal_vision_3d_geometric_interface is not None else {}),
                 "honesty": {
                     "observer_only": True,
                     "empirical_not_terrain": True,
@@ -6216,6 +6647,7 @@ class ObserverSession:
         """Merge Apply payload into the session canonical config (PATCH preserve)."""
         from mechanistic_mind.physical_system.experiment_canonical import (
             PRESET_BETA3,
+            annotate_preset_match,
             canonical_from_runtime,
             merge_canonical,
             normalize_preset_name,
@@ -6241,7 +6673,7 @@ class ObserverSession:
             base["pe_cold_history_eviction"] = bool(self.config.pe_cold_history_eviction)
         complete = merge_canonical(base, payload)
         complete["seed"] = int(complete.get("seed") or self.config.seed)
-        return complete
+        return annotate_preset_match(complete)
 
     def applied_configuration_receipt(self) -> dict[str, Any]:
         from mechanistic_mind.physical_system.experiment_canonical import (
@@ -6258,6 +6690,7 @@ class ObserverSession:
             "configured": {
                 "fingerprint": canonical_fingerprint(self._canonical_config or requested),
                 "public_preset": (self._canonical_config or {}).get("public_preset"),
+                "model_line": (self._canonical_config or {}).get("model_line"),
             },
             "requested": {
                 "fingerprint": cmp["requested_fingerprint"],
@@ -6302,7 +6735,7 @@ class ObserverSession:
             rt.set_optical_mapping(str(vision["optical_mapping"]), reinstall=True)
 
     def apply_experiment(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """APPLY & RESET WORLD — rebuild runtime from one complete canonical snapshot."""
+        """APPLY EXPERIMENT — rebuild runtime from one complete canonical snapshot at tick 0."""
         self._halt_runner("PAUSED")
         self._invalidate_pending_captures_locked()
         with self._step_lock:
@@ -6310,10 +6743,18 @@ class ObserverSession:
                 before = self._control_state()
                 from mechanistic_mind.physical_system.experiment_canonical import (
                     PRESET_BETA3,
+                    is_acanthostega_public_preset,
                     normalize_preset_name,
                     stamp_vision_on_config,
                 )
                 complete = self._resolve_complete_experiment(payload)
+                preset_id = normalize_preset_name(complete.get("public_preset"))
+                if is_acanthostega_public_preset(preset_id):
+                    complete["public_preset"] = preset_id
+                    complete["model_line"] = "ACANTHOSTEGA"
+                elif preset_id:
+                    complete["public_preset"] = preset_id
+                    complete["model_line"] = "TIKTAALIK"
                 self._canonical_requested = deepcopy(complete)
                 seed = int(complete.get("seed") or self.config.seed)
                 cognition = dict(complete.get("mechanisms") or {})
@@ -6326,6 +6767,17 @@ class ObserverSession:
                     cog_kwargs["cognition_enabled"] = bool(complete["cognition_enabled"])
                 if complete.get("psc_motor_resolution"):
                     cog_kwargs["psc_motor_resolution"] = str(complete["psc_motor_resolution"])
+                # PSC schedule is distinct from initial ON/OFF: preserve Apply draft schedule.
+                if "psc_off_ticks" in complete or "psc_schedule" in complete:
+                    sched = complete.get("psc_schedule") if isinstance(complete.get("psc_schedule"), dict) else {}
+                    raw_off = complete.get("psc_off_ticks", sched.get("psc_off_ticks") if isinstance(sched, dict) else None)
+                    if raw_off is None:
+                        cog_kwargs["psc_off_ticks"] = None
+                    else:
+                        try:
+                            cog_kwargs["psc_off_ticks"] = int(raw_off)
+                        except (TypeError, ValueError):
+                            cog_kwargs["psc_off_ticks"] = None
                 self.config.seed = seed
                 self.config.target_tick = complete.get("target_tick", payload.get("target_tick", self.config.target_tick))
                 if "buffer_capacity" in complete:
@@ -6408,6 +6860,39 @@ class ObserverSession:
                     except (TypeError, ValueError):
                         pass
                 preset_id = normalize_preset_name(complete.get("public_preset"))
+                from mechanistic_mind.physical_system.experiment_canonical import (
+                    preset_canonical as _preset_canonical_for_builder,
+                )
+                from mechanistic_mind.model.lines import stamp_config_from_preset
+
+                _canon = (
+                    _preset_canonical_for_builder(preset_id, seed=int(complete.get("seed") or seed))
+                    if preset_id
+                    else {}
+                )
+                _builder_name = (_canon or {}).get("builder") if isinstance(_canon, dict) else None
+                _built = None
+                if _builder_name:
+                    import mechanistic_mind.model.acanthostega as _aca_builders
+
+                    _fn = getattr(_aca_builders, str(_builder_name), None)
+                    if callable(_fn):
+                        _built = _fn()
+                if _built is not None:
+                    # Preserve ecology-stamped planet + top-level ecology identity.
+                    # Builder replacement previously kept planet but dropped ecology_preset
+                    # back to PhysicalSystemConfig default ("CURRENT" → Basic/Legacy world).
+                    _eco_preset = getattr(cfg, "ecology_preset", None)
+                    _built.planet = cfg.planet
+                    _built.cognition = cog
+                    if _eco_preset is not None:
+                        _built.ecology_preset = _eco_preset
+                    cfg = _built
+                    # Re-stamp ecology onto the built config so climate/resources match draft.
+                    cfg = make_ecology_config(eco_name, base=cfg)
+                    cfg.cognition = cog
+                else:
+                    stamp_config_from_preset(cfg, complete.get("public_preset"))
                 agent_count = int(complete.get("agent_count") or 1)
                 if preset_id == PRESET_BETA3 and complete.get("agent_count") is None:
                     agent_count = 2
@@ -6427,6 +6912,298 @@ class ObserverSession:
                     apply_fresh_defaults=True,
                 )
                 stamp_config_mechanisms(cfg, resolved)
+                from mechanistic_mind.physical_system.locomotion_profile import (
+                    GENTLE_TERRAIN_LOCOMOTION,
+                    set_gentle_terrain_locomotion,
+                )
+                from mechanistic_mind.physical_system.resource_objects import (
+                    PHYSICAL_RESOURCE_OBJECT_VISION,
+                    PHYSICAL_RESOURCE_OBJECTS,
+                    set_physical_resource_object_vision,
+                    set_physical_resource_objects,
+                )
+                if str(getattr(cfg, "model_line", "")).upper() == "ACANTHOSTEGA":
+                    requested_g = (complete.get("mechanisms") or {}).get(GENTLE_TERRAIN_LOCOMOTION)
+                    if requested_g is not None:
+                        set_gentle_terrain_locomotion(cfg, bool(requested_g))
+                    requested_o = (complete.get("mechanisms") or {}).get(PHYSICAL_RESOURCE_OBJECTS)
+                    if requested_o is not None:
+                        set_physical_resource_objects(cfg, bool(requested_o))
+                    requested_v = (complete.get("mechanisms") or {}).get(PHYSICAL_RESOURCE_OBJECT_VISION)
+                    if requested_v is not None:
+                        set_physical_resource_object_vision(cfg, bool(requested_v))
+                    from mechanistic_mind.physical_system.physical_manipulator import (
+                        BILATERAL_BRING_TOGETHER,
+                        set_bilateral_bring_together,
+                    )
+                    requested_p = (complete.get("mechanisms") or {}).get(BILATERAL_BRING_TOGETHER)
+                    if requested_p is not None:
+                        set_bilateral_bring_together(cfg, bool(requested_p))
+                    from mechanistic_mind.physical_system.material_composition import (
+                        MATERIAL_COMPOSITION_MERGE, set_material_composition_merge,
+                    )
+                    requested_merge = (complete.get("mechanisms") or {}).get(MATERIAL_COMPOSITION_MERGE)
+                    if requested_merge is not None:
+                        set_material_composition_merge(cfg, bool(requested_merge))
+                    from mechanistic_mind.physical_system.passive_material_properties import (
+                        PASSIVE_MATERIAL_PROPERTIES,
+                        set_passive_material_properties,
+                    )
+                    requested_props = (complete.get("mechanisms") or {}).get(PASSIVE_MATERIAL_PROPERTIES)
+                    if requested_props is not None:
+                        set_passive_material_properties(cfg, bool(requested_props))
+                    from mechanistic_mind.physical_system.explicit_surface_deposition import (
+                        EXPLICIT_SURFACE_DEPOSITION,
+                        set_explicit_surface_deposition,
+                    )
+                    requested_deposit = (complete.get("mechanisms") or {}).get(EXPLICIT_SURFACE_DEPOSITION)
+                    if requested_deposit is not None:
+                        set_explicit_surface_deposition(cfg, bool(requested_deposit))
+                    from mechanistic_mind.physical_system.surface_affinity_traction import (
+                        SURFACE_AFFINITY_TRACTION,
+                        set_surface_affinity_traction,
+                    )
+                    requested_traction = (complete.get("mechanisms") or {}).get(SURFACE_AFFINITY_TRACTION)
+                    if requested_traction is not None:
+                        set_surface_affinity_traction(cfg, bool(requested_traction))
+                    from mechanistic_mind.physical_system.surface_traction_experience import (
+                        SURFACE_TRACTION_EXPERIENCE_BRIDGE,
+                        set_surface_traction_experience,
+                    )
+                    requested_experience = (complete.get("mechanisms") or {}).get(
+                        SURFACE_TRACTION_EXPERIENCE_BRIDGE
+                    )
+                    if requested_experience is not None:
+                        set_surface_traction_experience(cfg, bool(requested_experience))
+                    from mechanistic_mind.physical_system.surface_traction_prediction import (
+                        MECHANISM_ID as SURFACE_TRACTION_PREDICTION_ADAPTATION,
+                        set_surface_traction_prediction,
+                    )
+                    requested_prediction = (complete.get("mechanisms") or {}).get(
+                        SURFACE_TRACTION_PREDICTION_ADAPTATION
+                    )
+                    if requested_prediction is not None:
+                        set_surface_traction_prediction(cfg, bool(requested_prediction))
+                        if bool(requested_prediction) and getattr(cfg, "cognition", None) is not None:
+                            from mechanistic_mind.physical_system.surface_traction_prediction import (
+                                surface_traction_prediction_is_active,
+                            )
+                            if surface_traction_prediction_is_active(cfg):
+                                cfg.cognition.sensorimotor_consequence_model = True
+                    from mechanistic_mind.physical_system.physical_surface_optical_coating import (
+                        MECHANISM_ID as PHYSICAL_SURFACE_OPTICAL_COATING,
+                        set_physical_surface_optical_coating,
+                    )
+                    requested_coating = (complete.get("mechanisms") or {}).get(
+                        PHYSICAL_SURFACE_OPTICAL_COATING
+                    )
+                    if requested_coating is not None:
+                        set_physical_surface_optical_coating(cfg, bool(requested_coating))
+                    from mechanistic_mind.physical_system.world_material_transaction import (
+                        MECHANISM_ID as WORLD_MATERIAL_TRANSACTIONS,
+                        set_world_material_transactions,
+                    )
+                    requested_transactions = (complete.get("mechanisms") or {}).get(
+                        WORLD_MATERIAL_TRANSACTIONS
+                    )
+                    if requested_transactions is not None:
+                        set_world_material_transactions(cfg, bool(requested_transactions))
+                    from mechanistic_mind.physical_system.spatial_contents import (
+                        MECHANISM_ID as MULTI_CONTENT_SPATIAL_INDEX,
+                        set_multi_content_spatial_index,
+                    )
+                    requested_index = (complete.get("mechanisms") or {}).get(
+                        MULTI_CONTENT_SPATIAL_INDEX
+                    )
+                    if requested_index is not None:
+                        set_multi_content_spatial_index(cfg, bool(requested_index))
+                    from mechanistic_mind.physical_system.procedural_surface_columns import (
+                        MECHANISM_ID as PROCEDURAL_SURFACE_COLUMNS,
+                        set_procedural_surface_columns,
+                    )
+                    requested_columns = (complete.get("mechanisms") or {}).get(
+                        PROCEDURAL_SURFACE_COLUMNS
+                    )
+                    if requested_columns is not None:
+                        set_procedural_surface_columns(cfg, bool(requested_columns))
+                    from mechanistic_mind.physical_system.conservative_surface_column_transfer import (
+                        MECHANISM_ID as CONSERVATIVE_SURFACE_COLUMN_TRANSFER,
+                        set_conservative_surface_column_transfer,
+                    )
+                    requested_transfer = (complete.get("mechanisms") or {}).get(
+                        CONSERVATIVE_SURFACE_COLUMN_TRANSFER
+                    )
+                    if requested_transfer is not None:
+                        set_conservative_surface_column_transfer(cfg, bool(requested_transfer))
+                    from mechanistic_mind.physical_system.local_physical_signal_transport import (
+                        MECHANISM_ID as LOCAL_PHYSICAL_SIGNAL_TRANSPORT,
+                        set_local_physical_signal_transport,
+                    )
+                    requested_local_signal = (complete.get("mechanisms") or {}).get(
+                        LOCAL_PHYSICAL_SIGNAL_TRANSPORT
+                    )
+                    if requested_local_signal is not None:
+                        set_local_physical_signal_transport(cfg, bool(requested_local_signal))
+                    from mechanistic_mind.physical_system.physical_contact_acoustic_emission import (
+                        MECHANISM_ID as PHYSICAL_CONTACT_ACOUSTIC_EMISSION,
+                        set_physical_contact_acoustic_emission,
+                    )
+                    requested_contact_acoustic = (complete.get("mechanisms") or {}).get(
+                        PHYSICAL_CONTACT_ACOUSTIC_EMISSION
+                    )
+                    if requested_contact_acoustic is not None:
+                        set_physical_contact_acoustic_emission(cfg, bool(requested_contact_acoustic))
+                    from mechanistic_mind.physical_system.free_resource_object_kinematics import (
+                        MECHANISM_ID as FREE_RESOURCE_OBJECT_KINEMATICS,
+                        set_free_resource_object_kinematics,
+                    )
+                    requested_free_object = (complete.get("mechanisms") or {}).get(
+                        FREE_RESOURCE_OBJECT_KINEMATICS
+                    )
+                    if requested_free_object is not None:
+                        set_free_resource_object_kinematics(cfg, bool(requested_free_object))
+                    from mechanistic_mind.physical_system.physical_body_resource_object_contact import (
+                        MECHANISM_ID as PHYSICAL_BODY_RESOURCE_OBJECT_CONTACT,
+                        set_body_object_contact,
+                    )
+                    requested_boc = (complete.get("mechanisms") or {}).get(
+                        PHYSICAL_BODY_RESOURCE_OBJECT_CONTACT
+                    )
+                    if requested_boc is not None:
+                        set_body_object_contact(cfg, bool(requested_boc))
+                    from mechanistic_mind.physical_system.body_resource_object_contact_impulse import (
+                        MECHANISM_ID as BODY_RESOURCE_OBJECT_CONTACT_IMPULSE,
+                        set_body_object_impulse,
+                    )
+                    requested_boi = (complete.get("mechanisms") or {}).get(
+                        BODY_RESOURCE_OBJECT_CONTACT_IMPULSE
+                    )
+                    if requested_boi is not None:
+                        set_body_object_impulse(cfg, bool(requested_boi))
+                    from mechanistic_mind.physical_system.body_resource_object_impact_acoustic_emission import (
+                        MECHANISM_ID as BODY_RESOURCE_OBJECT_IMPACT_ACOUSTIC_EMISSION,
+                        set_body_object_impact_acoustics,
+                    )
+                    requested_oia = (complete.get("mechanisms") or {}).get(
+                        BODY_RESOURCE_OBJECT_IMPACT_ACOUSTIC_EMISSION
+                    )
+                    if requested_oia is not None:
+                        set_body_object_impact_acoustics(cfg, bool(requested_oia))
+                    from mechanistic_mind.physical_system.physical_resource_object_pair_contact import (
+                        MECHANISM_ID as PHYSICAL_RESOURCE_OBJECT_PAIR_CONTACT,
+                        set_resource_object_pair_contact,
+                    )
+                    requested_ooc = (complete.get("mechanisms") or {}).get(
+                        PHYSICAL_RESOURCE_OBJECT_PAIR_CONTACT
+                    )
+                    if requested_ooc is not None:
+                        set_resource_object_pair_contact(cfg, bool(requested_ooc))
+                    from mechanistic_mind.physical_system.resource_object_pair_contact_impulse import (
+                        MECHANISM_ID as RESOURCE_OBJECT_PAIR_CONTACT_IMPULSE,
+                        set_resource_object_pair_impulse,
+                    )
+                    requested_ooi = (complete.get("mechanisms") or {}).get(
+                        RESOURCE_OBJECT_PAIR_CONTACT_IMPULSE
+                    )
+                    if requested_ooi is not None:
+                        set_resource_object_pair_impulse(cfg, bool(requested_ooi))
+                    from mechanistic_mind.physical_system.held_resource_object_foreign_body_contact import (
+                        MECHANISM_ID as HELD_RESOURCE_OBJECT_FOREIGN_BODY_CONTACT,
+                        set_held_foreign_body_contact,
+                    )
+                    requested_hfc = (complete.get("mechanisms") or {}).get(
+                        HELD_RESOURCE_OBJECT_FOREIGN_BODY_CONTACT
+                    )
+                    if requested_hfc is not None:
+                        set_held_foreign_body_contact(cfg, bool(requested_hfc))
+                    # Remaining Acanthostega / Beta4 mechanisms from canonical map
+                    # (HOTC, SETMR, EBAE, transmission, Phase C children, …).
+                    from mechanistic_mind.physical_system.mechanism_registry import (
+                        set_mechanism as _set_mech_remaining,
+                    )
+
+                    for _mid, _en in (complete.get("mechanisms") or {}).items():
+                        try:
+                            _set_mech_remaining(cfg, str(_mid), bool(_en))
+                        except Exception:
+                            continue
+                else:
+                    from mechanistic_mind.physical_system.passive_material_properties import (
+                        set_passive_material_properties,
+                    )
+                    set_passive_material_properties(cfg, False)
+                    from mechanistic_mind.physical_system.explicit_surface_deposition import (
+                        set_explicit_surface_deposition,
+                    )
+                    set_explicit_surface_deposition(cfg, False)
+                    from mechanistic_mind.physical_system.surface_affinity_traction import (
+                        set_surface_affinity_traction,
+                    )
+                    set_surface_affinity_traction(cfg, False)
+                    from mechanistic_mind.physical_system.surface_traction_experience import (
+                        set_surface_traction_experience,
+                    )
+                    set_surface_traction_experience(cfg, False)
+                    from mechanistic_mind.physical_system.surface_traction_prediction import (
+                        set_surface_traction_prediction,
+                    )
+                    set_surface_traction_prediction(cfg, False)
+                    from mechanistic_mind.physical_system.physical_surface_optical_coating import (
+                        set_physical_surface_optical_coating,
+                    )
+                    set_physical_surface_optical_coating(cfg, False)
+                    from mechanistic_mind.physical_system.world_material_transaction import (
+                        set_world_material_transactions,
+                    )
+                    set_world_material_transactions(cfg, False)
+                    from mechanistic_mind.physical_system.spatial_contents import (
+                        set_multi_content_spatial_index,
+                    )
+                    set_multi_content_spatial_index(cfg, False)
+                    from mechanistic_mind.physical_system.procedural_surface_columns import (
+                        set_procedural_surface_columns,
+                    )
+                    set_procedural_surface_columns(cfg, False)
+                    from mechanistic_mind.physical_system.conservative_surface_column_transfer import (
+                        set_conservative_surface_column_transfer,
+                    )
+                    set_conservative_surface_column_transfer(cfg, False)
+                    from mechanistic_mind.physical_system.local_physical_signal_transport import (
+                        set_local_physical_signal_transport,
+                    )
+                    set_local_physical_signal_transport(cfg, False)
+                    from mechanistic_mind.physical_system.physical_contact_acoustic_emission import (
+                        set_physical_contact_acoustic_emission,
+                    )
+                    set_physical_contact_acoustic_emission(cfg, False)
+                    from mechanistic_mind.physical_system.free_resource_object_kinematics import (
+                        set_free_resource_object_kinematics,
+                    )
+                    set_free_resource_object_kinematics(cfg, False)
+                    from mechanistic_mind.physical_system.physical_body_resource_object_contact import (
+                        set_body_object_contact,
+                    )
+                    set_body_object_contact(cfg, False)
+                    from mechanistic_mind.physical_system.body_resource_object_contact_impulse import (
+                        set_body_object_impulse,
+                    )
+                    set_body_object_impulse(cfg, False)
+                    from mechanistic_mind.physical_system.body_resource_object_impact_acoustic_emission import (
+                        set_body_object_impact_acoustics,
+                    )
+                    set_body_object_impact_acoustics(cfg, False)
+                    from mechanistic_mind.physical_system.physical_resource_object_pair_contact import (
+                        set_resource_object_pair_contact,
+                    )
+                    set_resource_object_pair_contact(cfg, False)
+                    from mechanistic_mind.physical_system.held_resource_object_foreign_body_contact import (
+                        set_held_foreign_body_contact,
+                    )
+                    set_held_foreign_body_contact(cfg, False)
+                    from mechanistic_mind.physical_system.resource_object_pair_contact_impulse import (
+                        set_resource_object_pair_impulse,
+                    )
+                    set_resource_object_pair_impulse(cfg, False)
                 stamp_vision_on_config(cfg, vis)
                 non_cog = {
                     k: v for k, v in mech_payload.items()
@@ -6456,6 +7233,20 @@ class ObserverSession:
                     )
                 self._runtime_generation += 1
                 self._clear_integrity_locked()
+                try:
+                    from mechanistic_mind.ui.psy_observer_web.observer_serialization_fragment_cache import (
+                        clear as _p4_clear,
+                    )
+                    _p4_clear(reason="APPLY_RESOLVED")
+                except Exception:
+                    pass
+                try:
+                    from mechanistic_mind.ui.psy_observer_web.observer_canonical_response_encoding import (
+                        clear as _p4b_clear,
+                    )
+                    _p4b_clear(reason="APPLY_RESOLVED")
+                except Exception:
+                    pass
                 from mechanistic_mind.physical_system.mechanism_configuration import (
                     apply_resolved_to_runtime,
                     build_runtime_manifest,
@@ -6467,6 +7258,18 @@ class ObserverSession:
                     setter = getattr(self.runtime, "set_psc_motor_resolution", None)
                     if callable(setter):
                         setter(psc_mode)
+                # Apply draft PSC schedule onto the new runtime (not live-only).
+                if "psc_off_ticks" in complete or (
+                    isinstance(complete.get("psc_schedule"), dict) and "psc_off_ticks" in complete["psc_schedule"]
+                ):
+                    sched = complete.get("psc_schedule") if isinstance(complete.get("psc_schedule"), dict) else {}
+                    raw_off = complete.get("psc_off_ticks", sched.get("psc_off_ticks"))
+                    setter_off = getattr(self.runtime, "set_psc_off_ticks", None)
+                    if callable(setter_off):
+                        try:
+                            setter_off(None if raw_off is None else int(raw_off))
+                        except (TypeError, ValueError):
+                            setter_off(None)
                 self._stamp_runtime_vision_locked(vis)
                 preflight = run_preflight(self.runtime, resolved)
                 if preflight.status != "READY":
@@ -6487,6 +7290,21 @@ class ObserverSession:
                 else:
                     self._runtime_mechanism_manifest = None
                 self._applied_receipt = self.applied_configuration_receipt()
+                from mechanistic_mind.physical_system.experiment_canonical import runtime_readback
+
+                active = runtime_readback(
+                    self.runtime,
+                    pe_cold=bool(self.config.pe_cold_history_eviction),
+                )
+                if complete.get("ui_hz") is not None:
+                    active["ui_hz"] = float(complete["ui_hz"])
+                if complete.get("buffer_capacity") is not None:
+                    active["buffer_capacity"] = int(complete["buffer_capacity"])
+                if complete.get("target_tick") is not None:
+                    active["target_tick"] = complete.get("target_tick")
+                if complete.get("terrain_seed") is not None:
+                    active["terrain_seed"] = complete.get("terrain_seed")
+                self._canonical_config = deepcopy(active)
                 integrity = {
                     "resolved": resolved.to_dict(),
                     "preflight": self._preflight_result,
@@ -6548,6 +7366,9 @@ class ObserverSession:
         out["mechanism_result"] = self.runtime.mechanisms()
         out["mechanism_integrity"] = self.mechanism_integrity_status()
         out["applied_configuration"] = self._applied_receipt
+        out["active_experiment"] = deepcopy(self._canonical_config or {})
+        if isinstance(out.get("experiment"), dict):
+            out["experiment"]["active_experiment"] = deepcopy(self._canonical_config or {})
         return out
 
 

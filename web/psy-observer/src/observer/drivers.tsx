@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { applyObserverInterest, interestFor } from './interest';
-import { clockStore } from './stores';
+import { applyObserverInterest, interestFor, syncDerivedViewportSubscription, type VolumeWorkspaceMode } from './interest';
+import { clockStore, tabVisibilityStore } from './stores';
 import { useStatusStore, useWorkspaceStore } from './useExternalStore';
 
 /** 500 ms clock writes clockStore only — never App state. */
@@ -21,6 +21,31 @@ export function InterestDriver() {
     const plan = interestFor(ws.workspace, ws.inspector);
     void applyObserverInterest(plan);
   }, [ws.workspace, ws.inspector]);
+  return null;
+}
+
+/**
+ * P1: central MAP/VOLUME/SURFACE mode owns derived payload subscription.
+ * Does not step/reset simulation. Preserves audio/left-dock independently.
+ */
+export function DerivedViewportSubscriptionDriver({ mode }: { mode: VolumeWorkspaceMode }) {
+  const ws = useWorkspaceStore();
+  useEffect(() => {
+    void syncDerivedViewportSubscription(mode);
+  }, [mode, ws.workspace, ws.inspector]);
+  return null;
+}
+
+/** P1: suspend researcher render loops when the browser tab is hidden (sim continues). */
+export function TabVisibilityDriver() {
+  useEffect(() => {
+    const sync = () => {
+      tabVisibilityStore.set(Boolean(document.hidden));
+    };
+    sync();
+    document.addEventListener('visibilitychange', sync);
+    return () => document.removeEventListener('visibilitychange', sync);
+  }, []);
   return null;
 }
 

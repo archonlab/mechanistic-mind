@@ -139,6 +139,11 @@ def step_orientation_mechanics(
     terrain_cfg: Any | None = None,
     ambient_cfg: Any | None = None,
     locomotor_active: bool = False,
+    locomotion_profile: Any | None = None,
+    locomotion_profile_active: bool = False,
+    elevation_runtime_config: Any | None = None,
+    elevation_body_id: str | None = None,
+    elevation_tick: int | None = None,
 ) -> dict[str, Any]:
     """Experimental tick: rotated site sampling, local forces, net force + torque, angular update.
 
@@ -218,6 +223,7 @@ def step_orientation_mechanics(
     exposures = []
     terrain_meta: dict[str, Any] = {"enabled": False}
     ambient_meta: dict[str, Any] = {"enabled": False}
+    locomotion_receipt: dict[str, Any] | None = None
 
     if site_mech and body_cfg.mechanical_enabled:
         for si, (iy, ix) in enumerate(cells):
@@ -262,6 +268,9 @@ def step_orientation_mechanics(
         Fy /= max(1, n_sites)
         # Terrain: potential force + extra dissipative drag (external channel only).
         extra_drag = 0.0
+        f_site = (float(Fx), float(Fy))
+        f_terrain = (0.0, 0.0)
+        f_ambient = (0.0, 0.0)
         if terrain_cfg is not None and bool(getattr(terrain_cfg, "enabled", False)):
             from mechanistic_mind.planet.terrain import sample_terrain_force
 
@@ -273,8 +282,10 @@ def step_orientation_mechanics(
                 body_vy=float(body.vy),
                 locomotor_active=bool(locomotor_active),
             )
-            Fx += float(terrain_meta.get("fx") or 0.0)
-            Fy += float(terrain_meta.get("fy") or 0.0)
+            f_terrain = (
+                float(terrain_meta.get("fx") or 0.0),
+                float(terrain_meta.get("fy") or 0.0),
+            )
             extra_drag = float(terrain_meta.get("extra_drag") or 0.0)
         if ambient_cfg is not None and bool(getattr(ambient_cfg, "enabled", False)):
             from mechanistic_mind.planet.ambient import sample_ambient_force
@@ -287,23 +298,309 @@ def step_orientation_mechanics(
                 body_vy=float(body.vy),
                 locomotor_active=bool(locomotor_active),
             )
-            Fx += float(ambient_meta.get("fx") or 0.0)
-            Fy += float(ambient_meta.get("fy") or 0.0)
+            f_ambient = (
+                float(ambient_meta.get("fx") or 0.0),
+                float(ambient_meta.get("fy") or 0.0),
+            )
+        Fx = f_site[0] + f_terrain[0] + f_ambient[0]
+        Fy = f_site[1] + f_terrain[1] + f_ambient[1]
         # Body-local site loads for next-tick deformation work / passive env deformation.
         if site_forces:
             F_world = np.array([[sf["fx"], sf["fy"]] for sf in site_forces], dtype=np.float64)
             R = rotation_matrix(theta)
             body.deformation_env_force = (R.T @ F_world.T).T
+        locomotion_receipt = None
         # translation from mean site force + drag (+ terrain drag)
         if apply_translation and orient_cfg.apply_net_force_to_com:
-            drag_eff = float(body_cfg.drag) + max(0.0, extra_drag)
-            Fx_t = Fx - drag_eff * body.vx
-            Fy_t = Fy - drag_eff * body.vy
-            body.vx = float(np.clip(body.vx + Fx_t / body_cfg.mass, -body_cfg.v_max, body_cfg.v_max))
-            body.vy = float(np.clip(body.vy + Fy_t / body_cfg.mass, -body_cfg.v_max, body_cfg.v_max))
-            if body_cfg.displacement_enabled:
-                body.x = float(wrap_coord(body.x + body.vx, w))
-                body.y = float(wrap_coord(body.y + body.vy, h))
+            from mechanistic_mind.physical_system.locomotion_profile import integrate_com_translation
+
+            x_before_loco, y_before_loco = float(body.x), float(body.y)
+            vx_before_loco, vy_before_loco = float(body.vx), float(body.vy)
+            bnlt_ctx = None
+            if elevation_runtime_config is not None:
+                from mechanistic_mind.physical_system.body_normal_load_traction import (
+                    body_normal_load_traction_is_active,
+                    prepare_body_coulomb_context,
+                )
+                if body_normal_load_traction_is_active(elevation_runtime_config):
+                    bnlt_ctx = prepare_body_coulomb_context(
+                        planet,
+                        body,
+                        elevation_runtime_config,
+                        body_mass=float(body_cfg.mass),
+                        body_id=str(elevation_body_id or "body"),
+                    )
+            locomotion_receipt = integrate_com_translation(
+                body,
+                body_cfg=body_cfg,
+                f_site=f_site,
+                f_terrain=f_terrain,
+                f_ambient=f_ambient,
+                extra_drag=extra_drag,
+                locomotor_active=bool(locomotor_active),
+                profile=locomotion_profile,
+                width=w,
+                height=h,
+                apply_translation=True,
+                profile_active=bool(locomotion_profile_active),
+                body_normal_load=bnlt_ctx,
+            )
+            # Surface elevation support: proposal already applied; gate may revert / debit work.
+            from mechanistic_mind.physical_system.surface_elevation_support import (
+                surface_elevation_support_active_on_world,
+                commit_body_elevation_gate,
+            )
+            elev = None
+            if surface_elevation_support_active_on_world(planet, elevation_runtime_config):
+                elev = commit_body_elevation_gate(
+                    planet,
+                    elevation_runtime_config,
+                    body,
+                    x0=x_before_loco,
+                    y0=y_before_loco,
+                    x1=float(body.x),
+                    y1=float(body.y),
+                    body_id=str(elevation_body_id or "body"),
+                    body_mass=float(body_cfg.mass),
+                    tick=int(elevation_tick or 0),
+                )
+                if locomotion_receipt is not None and isinstance(elev, dict):
+                    locomotion_receipt["surface_elevation_gate"] = {
+                        "accepted": elev.get("accepted"),
+                        "event_kinds": elev.get("event_kinds"),
+                        "work_debit": elev.get("work_debit"),
+                        "block_reason": elev.get("block_reason"),
+                    }
+                    locomotion_receipt["displacement"] = [
+                        float(body.x) - x_before_loco,
+                        float(body.y) - y_before_loco,
+                    ]
+
+            if bnlt_ctx is not None and locomotion_receipt is not None:
+                from mechanistic_mind.physical_system.body_normal_load_traction import (
+                    record_body_traction_receipt,
+                )
+                friction = locomotion_receipt.get("body_normal_load_friction") or {
+                    "vx": float(body.vx),
+                    "vy": float(body.vy),
+                    "applied": False,
+                    "mode": bnlt_ctx.get("mode"),
+                }
+                record_body_traction_receipt(
+                    planet,
+                    tick=int(elevation_tick or 0),
+                    body_id=str(elevation_body_id or "body"),
+                    ctx=bnlt_ctx,
+                    friction=friction,
+                    velocity_before=[vx_before_loco, vy_before_loco],
+                    velocity_after=[float(body.vx), float(body.vy)],
+                    start_position=[x_before_loco, y_before_loco],
+                    end_position=[float(body.x), float(body.y)],
+                    gentle_grounded_damping_bypassed=bool(
+                        locomotion_receipt.get("gentle_grounded_damping_bypassed")
+                    ),
+                    gentle_v_stop_bypassed=bool(
+                        locomotion_receipt.get("gentle_v_stop_bypassed")
+                    ),
+                )
+                # Coherent slope dynamics work-identity receipt (researcher-only).
+                try:
+                    from mechanistic_mind.physical_system.coherent_slope_dynamics import (
+                        finalize_body_tick_receipt,
+                        coherent_slope_dynamics_is_active,
+                    )
+
+                    if coherent_slope_dynamics_is_active(elevation_runtime_config):
+                        plan = elev if isinstance(elev, dict) else None
+                        d_fric = float(friction.get("kinetic_dissipated") or 0.0)
+                        static_hold = bool(
+                            (friction.get("state_class") == "STATIC_HOLD")
+                            or (friction.get("physical_static_hold"))
+                        )
+                        finalize_body_tick_receipt(
+                            planet,
+                            elevation_runtime_config,
+                            entity_id=str(elevation_body_id or "body"),
+                            entity_kind="body",
+                            m_eff=float(bnlt_ctx.get("m_eff") or body_cfg.mass),
+                            g=float(bnlt_ctx.get("g") or 0.0),
+                            vx=float(body.vx),
+                            vy=float(body.vy),
+                            z=float(getattr(body, "z", 0.0) or 0.0),
+                            d_friction=d_fric,
+                            w_motor=0.0,
+                            endpoint_delta_u=(
+                                None if plan is None else plan.get("endpoint_delta_u")
+                            ),
+                            endpoint_pe_applied=float(
+                                0.0 if plan is None else (plan.get("endpoint_pe_applied") or 0.0)
+                            ),
+                            endpoint_pe_dissipated=float(
+                                0.0 if plan is None else (plan.get("endpoint_pe_dissipated") or 0.0)
+                            ),
+                            slope_meta={
+                                "n_hat": bnlt_ctx.get("slope_n_hat"),
+                                "g_t_magnitude": bnlt_ctx.get("slope_g_t_magnitude"),
+                                "N_projected": bnlt_ctx.get("normal_load_N"),
+                                "a_xy": bnlt_ctx.get("slope_a_xy"),
+                                "force_meta": locomotion_receipt.get("slope_force_meta"),
+                            },
+                            static_hold=static_hold,
+                        )
+                except Exception:
+                    pass
+                static_res = locomotion_receipt.get("body_static_traction")
+                if static_res is not None and bnlt_ctx.get("static_traction_active"):
+                    from mechanistic_mind.physical_system.body_static_traction_threshold import (
+                        record_static_traction_receipt,
+                    )
+                    record_static_traction_receipt(
+                        planet,
+                        tick=int(elevation_tick or 0),
+                        body_id=str(elevation_body_id or "body"),
+                        result=static_res,
+                        velocity_before=[vx_before_loco, vy_before_loco],
+                        velocity_after=[float(body.vx), float(body.vy)],
+                        start_position=[x_before_loco, y_before_loco],
+                        end_position=[float(body.x), float(body.y)],
+                        gentle_grounded_damping_bypassed=bool(
+                            locomotion_receipt.get("gentle_grounded_damping_bypassed")
+                        ),
+                        gentle_v_stop_bypassed=bool(
+                            locomotion_receipt.get("gentle_v_stop_bypassed")
+                        ),
+                    )
+                # Beta 4 MOVE breakaway repair receipt + clear tick stamp.
+                try:
+                    from mechanistic_mind.physical_system.bnlt_move_breakaway_locomotion_repair import (
+                        bnlt_move_breakaway_locomotion_repair_is_active,
+                        classify_active_move_outcome,
+                        clear_move_impulse_on_body,
+                        record_repair_step,
+                        read_move_impulse_xy,
+                        RECEIPT_KIND as _REPAIR_RECEIPT,
+                        BANNER as _REPAIR_BANNER,
+                        MECHANISM_ID as _REPAIR_ID,
+                        PROFILE_VERSION as _REPAIR_PROFILE,
+                    )
+                    import math as _math
+
+                    if bnlt_move_breakaway_locomotion_repair_is_active(elevation_runtime_config):
+                        static_meta = locomotion_receipt.get("body_static_traction") or {}
+                        fric_meta = locomotion_receipt.get("body_normal_load_friction") or {}
+                        dx = float(body.x) - float(x_before_loco)
+                        dy = float(body.y) - float(y_before_loco)
+                        disp = float(_math.hypot(dx, dy))
+                        j_move = read_move_impulse_xy(body)
+                        cls = classify_active_move_outcome(
+                            locomotor_active=bool(locomotor_active),
+                            grounded=bool(bnlt_ctx.get("grounded")),
+                            external_ineligible=False,
+                            displacement_mag=disp,
+                            speed_after=float(_math.hypot(float(body.vx), float(body.vy))),
+                            drive_accel=static_meta.get("move_breakaway_repair_drive_accel")
+                            or static_meta.get("drive_accel"),
+                            friction_a=static_meta.get("a") or fric_meta.get("a"),
+                            rest_transition=bool(
+                                static_meta.get("rest_transition")
+                                or fric_meta.get("rest_transition")
+                            ),
+                            state_class=str(
+                                static_meta.get("state_class")
+                                or static_meta.get("mode")
+                                or ""
+                            ),
+                        )
+                        record_repair_step(
+                            planet,
+                            elevation_runtime_config,
+                            receipt={
+                                "receipt_kind": _REPAIR_RECEIPT,
+                                "mechanism": _REPAIR_ID,
+                                "profile_version": _REPAIR_PROFILE,
+                                "banner": _REPAIR_BANNER,
+                                "tick": int(elevation_tick or 0),
+                                "body_id": str(elevation_body_id or "body"),
+                                "classification": cls,
+                                "move_impulse_xy": [float(j_move[0]), float(j_move[1])],
+                                "drive_accel": static_meta.get("drive_accel"),
+                                "repair_drive_accel": static_meta.get(
+                                    "move_breakaway_repair_drive_accel"
+                                ),
+                                "legacy_trial_speed_drive_proxy": static_meta.get(
+                                    "legacy_trial_speed_drive_proxy"
+                                ),
+                                "kinetic_a": static_meta.get("a") or fric_meta.get("a"),
+                                "velocity_before": [vx_before_loco, vy_before_loco],
+                                "velocity_after": [float(body.vx), float(body.vy)],
+                                "displacement": [dx, dy],
+                                "displacement_mag": disp,
+                                "rest_transition": bool(
+                                    static_meta.get("rest_transition")
+                                    or fric_meta.get("rest_transition")
+                                ),
+                                "kinetic_dissipated": float(
+                                    static_meta.get("kinetic_dissipated")
+                                    or fric_meta.get("kinetic_dissipated")
+                                    or 0.0
+                                ),
+                                "researcher_only": True,
+                                "agent_accessible": False,
+                            },
+                        )
+                        clear_move_impulse_on_body(body)
+                except Exception:
+                    pass
+                # Beta 4 active locomotion traction vs sliding friction receipt.
+                try:
+                    from mechanistic_mind.physical_system.active_locomotion_traction_vs_sliding_friction import (
+                        active_locomotion_traction_vs_sliding_friction_is_active,
+                        record_traction_vs_sliding_step,
+                        RECEIPT_KIND as _TVS_RECEIPT,
+                        BANNER as _TVS_BANNER,
+                        MECHANISM_ID as _TVS_ID,
+                        PROFILE_VERSION as _TVS_PROFILE,
+                    )
+                    import math as _math_tvs
+
+                    if active_locomotion_traction_vs_sliding_friction_is_active(
+                        elevation_runtime_config
+                    ):
+                        static_meta = locomotion_receipt.get("body_static_traction") or {}
+                        if static_meta.get(
+                            "active_locomotion_traction_vs_sliding_friction_active"
+                        ):
+                            dx = float(body.x) - float(x_before_loco)
+                            dy = float(body.y) - float(y_before_loco)
+                            record_traction_vs_sliding_step(
+                                planet,
+                                elevation_runtime_config,
+                                receipt={
+                                    "receipt_kind": _TVS_RECEIPT,
+                                    "mechanism": _TVS_ID,
+                                    "profile_version": _TVS_PROFILE,
+                                    "banner": _TVS_BANNER,
+                                    "tick": int(elevation_tick or 0),
+                                    "body_id": str(elevation_body_id or "body"),
+                                    "locomotor_active": bool(locomotor_active),
+                                    "traction_protection_applied": bool(
+                                        static_meta.get("traction_protection_applied")
+                                    ),
+                                    "full_drive_protected": bool(
+                                        static_meta.get("full_drive_protected")
+                                    ),
+                                    "protected_mag": static_meta.get("protected_mag"),
+                                    "slip_speed_before": static_meta.get("slip_speed_before"),
+                                    "slip_speed_after": static_meta.get("slip_speed_after"),
+                                    "speed_after": static_meta.get("speed_after"),
+                                    "displacement_mag": float(_math_tvs.hypot(dx, dy)),
+                                    "velocity_after": [float(body.vx), float(body.vy)],
+                                    "researcher_only": True,
+                                    "agent_accessible": False,
+                                },
+                            )
+                except Exception:
+                    pass
 
     # angular dynamics: I alpha = tau - c omega
     I = max(1e-9, float(orient_cfg.inertia))
@@ -331,6 +628,7 @@ def step_orientation_mechanics(
         "deformation": deformation_meta,
         "terrain": terrain_meta,
         "ambient": ambient_meta,
+        "locomotion": locomotion_receipt,
     })
     if use_morph and B_site is not None:
         meta["B_site_spread"] = float(np.std([np.linalg.norm(B_site[i]) for i in range(n_sites)]))

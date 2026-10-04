@@ -307,6 +307,9 @@ def build_motor_receipt(
     physical_body_id: str,
     decision_id_value: str,
     motor_output: dict[str, Any] | None,
+    include_manipulator_channel: bool = False,
+    include_bilateral_channels: bool = False,
+    include_pair_channel: bool = False,
 ) -> dict[str, Any]:
     mo = dict(motor_output or {})
     schema = str(mo.get("schema") or "COMPOSITE_MOTOR_V1")
@@ -322,6 +325,17 @@ def build_motor_receipt(
         "oscillator": osc_compact,
         "push": bool(mo.get("push")),
     }
+    # Always record effector_z slots when present (legacy missing → 0 / NONE).
+    if "effector_z_left" in mo or "effector_z_right" in mo:
+        components["effector_z_left"] = int(mo.get("effector_z_left") or 0)
+        components["effector_z_right"] = int(mo.get("effector_z_right") or 0)
+    if include_manipulator_channel:
+        components["manipulator"] = str(mo.get("manipulator") or "NONE")
+    if include_bilateral_channels:
+        components["manipulator_left"] = str(mo.get("manipulator_left") or "NONE")
+        components["manipulator_right"] = str(mo.get("manipulator_right") or "NONE")
+    if include_pair_channel:
+        components["manipulator_pair"] = str(mo.get("manipulator_pair") or "NONE")
     return {
         "schema": "mm.scientific_v3.motor.core.v1",
         "motor_id": motor_id(run_id, tick, cognitive_agent_id),
@@ -396,6 +410,7 @@ def build_consequence_receipt(
             "work": ra["work"] - rb["work"],
         },
         "event_refs": list(event_refs or []),
+        "pair": (after.get("pair") if isinstance(after, dict) else None) or (before.get("pair") if isinstance(before, dict) else None),
         "attribution": attribution,  # UNKNOWN unless caller derives
         "provenance": P.PHYSICAL_GROUND_TRUTH,
     }

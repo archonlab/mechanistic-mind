@@ -18,6 +18,55 @@ export async function postControl(path: string, body?: unknown): Promise<Frame> 
   return r.json();
 }
 
+export async function researcherForcedMotor(body: {
+  locomotion?: string;
+  manipulator?: string;
+  manipulator_left?: string;
+  manipulator_right?: string;
+  manipulator_pair?: string;
+  apply_to_surface?: boolean;
+  slot?: number;
+}): Promise<Frame> {
+  const r = await fetch(`${API}/api/debug/forced-motor`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function researcherLocalSignalEmission(body: {
+  x?: number;
+  y?: number;
+  frequency?: number;
+  amplitude?: number;
+  band_energies?: number[];
+}): Promise<any> {
+  const r = await fetch(`${API}/api/research/local-signal-emission`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function configureAcousticProbe(body: {
+  enabled?: boolean;
+  x?: number;
+  y?: number;
+  clear_history?: boolean;
+}): Promise<any> {
+  const r = await fetch(`${API}/api/research/acoustic-probe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
 export async function getSaveJob() {
   const r = await fetch(`${API}/api/control/save-job`);
   if (!r.ok) throw new Error(await r.text());
@@ -48,6 +97,12 @@ export async function replayTick(tick: number) {
 export async function getData() {
   const r = await fetch(`${API}/api/data`);
   return r.json();
+}
+
+export async function fetchCanonicalPreset(name: string) {
+  const r = await fetch(`${API}/api/experiment/canonical-preset?name=${encodeURIComponent(name)}`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json() as Promise<{ preset: string; canonical: Record<string, unknown> }>;
 }
 
 export async function applyExperiment(body: unknown) {
@@ -147,6 +202,12 @@ export async function startAnalysisJob(opts: {
       cutoff_tick: opts.cutoff_tick ?? undefined,
     }),
   });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function listAnalysisJobs() {
+  const r = await fetch(`${API}/api/analysis/jobs`);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }

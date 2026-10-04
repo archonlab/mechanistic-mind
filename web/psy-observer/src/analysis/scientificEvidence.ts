@@ -66,19 +66,29 @@ export function analyzeEvidencePackage(
     opts?.mode
     || (String(pkg.runtime_status || '').toUpperCase() === 'RUNNING' ? 'LIVE' : 'FINAL');
 
+  const ident = pkg.identity || {};
   const frame = opts?.frame || pkg.frame || {
     header: {
       tick: pkg.analysis_cutoff_tick ?? pkg.scientific_tick_range?.[1] ?? 0,
-      status: pkg.runtime_status || 'UNKNOWN',
-      seed: pkg.identity?.seed ?? pkg.manifest?.seed,
-      runtime_generation: pkg.identity?.runtime_generation,
-      runtime_model: pkg.identity?.runtime_type || pkg.manifest?.runtime_type,
-      agent_count: pkg.identity?.agent_count || pkg.manifest?.agent_count || 1,
+      status: pkg.runtime_status || ident.status || 'UNKNOWN',
+      seed: ident.seed ?? pkg.identity?.seed ?? pkg.manifest?.seed,
+      runtime_generation: ident.runtime_generation ?? pkg.identity?.runtime_generation,
+      runtime_model: ident.runtime_type || pkg.manifest?.runtime_type,
+      agent_count: ident.agent_count || pkg.manifest?.agent_count || 1,
+      world_size: { width: ident.map_width, height: ident.map_height },
+      boundary_topology: ident.boundary,
+      cognition_enabled: ident.cognition_enabled,
+    },
+    world: {
+      width: ident.map_width,
+      height: ident.map_height,
+      boundary: ident.boundary,
     },
     experiment: {
       runtime: {
-        type: pkg.identity?.runtime_type || pkg.manifest?.runtime_type || 'UNKNOWN',
-        agent_count: pkg.identity?.agent_count || 1,
+        type: ident.runtime_type || pkg.manifest?.runtime_type || 'UNKNOWN',
+        agent_count: ident.agent_count || 1,
+        cognition_enabled: ident.cognition_enabled,
       },
     },
   };
@@ -145,6 +155,11 @@ export function analyzeEvidencePackage(
       agg.action_counts[String(k)] = Number(v);
     }
     if (row.pose_ticks) agg.unique_position_ticks = Number(row.pose_ticks);
+    if (row.longest_wait_streak != null) agg.longest_wait_streak = Number(row.longest_wait_streak);
+    if (row.longest_move_streak != null) agg.longest_move_streak = Number(row.longest_move_streak);
+    if (row.action_transitions != null) (agg as any).action_transition_count = Number(row.action_transitions);
+    if (row.gap_ticks_missing != null) agg.trajectory_gaps_skipped = Number(row.gap_ticks_missing);
+    if (row.ticks_observed) agg.ticks = Number(row.ticks_observed);
     if (row.distance_manhattan_wrap != null && Number.isFinite(Number(row.distance_manhattan_wrap))) {
       agg.distance = Number(row.distance_manhattan_wrap);
     }
@@ -182,6 +197,7 @@ export function analyzeEvidencePackage(
     || [null, null]
   );
   const uniqueAfter = analysis.coverage.unique_simulation_ticks || 0;
+  const pkgCov = String(pkg.coverage || '').toUpperCase();
   let reported = covLevel;
   let completeRe = !!pkg.complete_tick_level_reanalysis;
   if (uniqueAfter <= 0) {
@@ -194,8 +210,9 @@ export function analyzeEvidencePackage(
     uniqueAfter <= 0
       ? 'Reconstruction consumed zero unique simulation ticks — FULL coverage is not allowed.'
       : (detail.reason
-        || (reported === 'FULL'
-          ? 'Complete scientific_timeline evidence through analysis cutoff'
+        || (pkg as any).layered_coverage?.banner
+        || (pkgCov === 'FULL' || pkgCov === 'CORE_FULL_AUX_PARTIAL' || pkgCov === 'COMPLETE'
+          ? 'CORE O→D→M→C chains complete; auxiliary layers may be partial'
           : 'Partial or legacy evidence — not a full tick-level reconstruction')),
   );
   (analysis.coverage as any).runtime_span =
@@ -218,9 +235,13 @@ export function analyzeEvidencePackage(
     analysis.lifecycle.phase = 'LIVE';
     analysis.lifecycle.banner = 'ANALYSIS: RUNNING (cutoff snapshot)';
     analysis.lifecycle.live_runtime_tick = pkg.analysis_cutoff_tick ?? analysis.lifecycle.live_runtime_tick;
-  } else if (reported === 'FULL') {
+  } else if (reported === 'FULL' || reported === 'COMPLETE' || pkgCov === 'CORE_FULL_AUX_PARTIAL') {
     analysis.lifecycle.phase = 'COMPLETE';
-    analysis.lifecycle.banner = 'ANALYSIS: COMPLETE (FULL scientific evidence)';
+    const cons = (pkg as any).report_consistency;
+    const layeredBanner = (pkg as any).layered_coverage?.banner || (pkg as any).coverage_banner;
+    analysis.lifecycle.banner = (cons?.errors?.length
+      ? 'ANALYSIS COMPLETE · REPORT VALIDATION FAILED'
+      : (layeredBanner || 'ANALYSIS COMPLETE — CORE CHAINS FULL, AUXILIARY COVERAGE PARTIAL'));
   } else if (reported === 'PARTIAL') {
     analysis.lifecycle.phase = 'COMPLETE';
     analysis.lifecycle.banner = 'ANALYSIS: COMPLETE (PARTIAL evidence)';
@@ -253,8 +274,53 @@ export function analyzeEvidencePackage(
   (analysis as any).behavioral_reconstruction = pkg.behavioral_reconstruction || null;
   (analysis as any).v3_evidence_health = pkg.v3_evidence_health || null;
   (analysis as any).beta31_vision_report_text = (pkg as any).beta31_vision_report_text || null;
+  (analysis as any).volumetric_physical_causal_report_text =
+    (pkg as any).volumetric_physical_causal_report_text || null;
+  (analysis as any).volumetric_physical_causal_reconstruction =
+    (pkg as any).volumetric_physical_causal_reconstruction || null;
   (analysis as any).beta31_vision_summary = (pkg as any).beta31_vision_summary || (pkg as any).beta31_vision?.vision_summary || null;
   (analysis as any).canonical_history_agents = histAgents;
+  (analysis as any).psc_regime = (pkg as any).psc_regime;
+  (analysis as any).psc_regime_report_text = (pkg as any).psc_regime_report_text;
+  (analysis as any).layered_coverage = (pkg as any).layered_coverage;
+  (analysis as any).report_consistency = (pkg as any).report_consistency;
+  (analysis as any).development_fixture_section = (pkg as any).development_fixture_section;
+  (analysis as any).truthful_markdown = (pkg as any).truthful_markdown;
+  (analysis as any).signal_context =
+    (pkg as any).signal_conditioned_sensorimotor_selection
+    || (pkg as any).signal_context
+    || null;
+  (analysis as any).psc_regime = (pkg as any).psc_regime || (analysis as any).psc_regime;
+  (analysis as any).episode_counts = (pkg as any).episode_counts || null;
+  (analysis as any).export_json = (pkg as any).export_json || null;
+  if (!(pkg as any).runtime_status && ident.status) {
+    analysis.evidence_meta = {
+      ...(analysis.evidence_meta as any),
+      runtime_status: ident.status,
+    };
+  }
+  // Prefer Analyzer episode CONTACT count over empty Observer timeline contact_ticks.
+  const epContact = Number((pkg as any).episode_counts?.CONTACT);
+  if (Number.isFinite(epContact) && epContact > 0) {
+    (analysis.interactions as any).reconstructed_contact_episode_count = epContact;
+    (analysis.interactions as any).reconstructed_contact_episode_class = 'CONTACT';
+    (analysis.interactions as any).contact_authority = 'Analyzer episode extraction';
+    (analysis.interactions as any).contact_semantics =
+      'CONTACT episodes are reconstructed episode objects; not Observer timeline body-body contact_ticks.';
+    analysis.interactions.notes = [
+      ...(analysis.interactions.notes || []),
+      `Reconstructed CONTACT episodes: ${epContact} (distinct from body_body contact_ticks=${analysis.interactions.contact_ticks}).`,
+    ];
+  }
+  if (ident.runtime_type) analysis.identity.runtime = ident.runtime_type;
+  if (ident.seed != null) analysis.identity.seed = ident.seed;
+  if (ident.runtime_generation != null) analysis.identity.generation = ident.runtime_generation;
+  if (ident.map_width != null) analysis.identity.map_width = ident.map_width;
+  if (ident.map_height != null) analysis.identity.map_height = ident.map_height;
+  if (ident.boundary) analysis.identity.boundary = ident.boundary;
+  if (ident.agent_count) analysis.identity.agent_count = ident.agent_count;
+  if (ident.status) analysis.identity.status = ident.status;
+  if (ident.cognition_enabled != null) analysis.identity.cognition_enabled = ident.cognition_enabled;
   // DecisionReceipts are authoritative tick-level cognition evidence for V3 CORE.
   // Do not leave "structured cognition events: NOT AVAILABLE" when V3 decisions exist.
   const v3Decisions = Number((v3 as any)?.decision_receipts || 0);

@@ -7,6 +7,8 @@ type Props = {
   analysis: RunAnalysis | null;
   analyzing: boolean;
   analysisProgress?: string;
+  analysisProgressDetail?: import('../components/AnalyzeResultsPanel').AnalysisProgressState | null;
+  analysisError?: string | null;
   analysisSource: AnalysisSourceMode;
   onAnalysisSourceChange: (m: AnalysisSourceMode) => void;
   savedRuns: RunCatalogEntry[];
@@ -15,8 +17,12 @@ type Props = {
   onRefreshRuns: () => void;
   onAnalyze: () => void;
   onAnalyzeCurrent: () => void;
+  onCancelAnalysis?: () => void;
   onCopy: () => void;
   onDownload: () => void;
+  onCopyReport?: () => void;
+  onSaveMarkdown?: () => void;
+  onSaveJson?: () => void;
   onInspectTick: (t: number) => void;
   overview?: ReactNode;
 };
@@ -36,6 +42,8 @@ export const AnalyzeWorkspace = memo(function AnalyzeWorkspace(props: Props) {
           analysis={props.analysis}
           analyzing={props.analyzing}
           analysisProgress={props.analysisProgress}
+          analysisProgressDetail={props.analysisProgressDetail}
+          analysisError={props.analysisError}
           analysisSource={props.analysisSource}
           onAnalysisSourceChange={props.onAnalysisSourceChange}
           savedRuns={props.savedRuns}
@@ -43,8 +51,12 @@ export const AnalyzeWorkspace = memo(function AnalyzeWorkspace(props: Props) {
           onSelectRunId={props.onSelectRunId}
           onRefreshRuns={props.onRefreshRuns}
           onAnalyze={props.onAnalyze}
+          onCancelAnalysis={props.onCancelAnalysis}
           onCopy={props.onCopy}
           onDownload={props.onDownload}
+          onCopyReport={props.onCopyReport}
+          onSaveMarkdown={props.onSaveMarkdown}
+          onSaveJson={props.onSaveJson}
           onInspectTick={props.onInspectTick}
         />
         {props.overview}

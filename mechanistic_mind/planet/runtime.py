@@ -98,7 +98,7 @@ def run_planet(
 
 def serialize_planet_state(state: PlanetState, cfg: PlanetConfig) -> dict[str, Any]:
     """Exact snapshot including resolved external material boundary (OPEN-5)."""
-    return {
+    out = {
         "tick": int(state.tick),
         "T": state.T.tolist(),
         "M": state.M.tolist(),
@@ -194,6 +194,158 @@ def serialize_planet_state(state: PlanetState, cfg: PlanetConfig) -> dict[str, A
             else None
         ),
     }
+    objs = getattr(state, "resource_objects", None) or []
+    next_id = int(getattr(state, "resource_object_next_id", 1) or 1)
+    if objs or next_id > 1:
+        from mechanistic_mind.physical_system.resource_objects import serialize_resource_objects
+        out["resource_objects"] = serialize_resource_objects(state)
+    from mechanistic_mind.physical_system.explicit_surface_deposition import serialize_surface_deposits
+
+    deposits = serialize_surface_deposits(state)
+    if deposits:
+        out["surface_material_deposits"] = deposits
+    generation = int(getattr(state, "surface_optical_coating_generation", 0) or 0)
+    if generation:
+        out["surface_optical_coating_generation"] = generation
+    sequence = int(getattr(state, "material_transaction_sequence", 0) or 0)
+    if sequence:
+        out["material_transaction_sequence"] = sequence
+    committed_ids = list(getattr(state, "material_transaction_committed_ids", None) or [])
+    if committed_ids:
+        out["material_transaction_committed_ids"] = committed_ids[-64:]
+    transaction_history = list(getattr(state, "material_transaction_history", None) or [])
+    if transaction_history:
+        out["material_transaction_history"] = transaction_history[-16:]
+    generation = int(getattr(state, "spatial_index_generation", 0) or 0)
+    if generation:
+        out["spatial_index_generation"] = generation
+        out["spatial_index_schema"] = str(getattr(state, "spatial_index_schema", "") or "MULTI_CONTENT_SPATIAL_INDEX_V1")
+        checksum = getattr(state, "spatial_index_checksum", None)
+        if checksum:
+            out["spatial_index_checksum"] = str(checksum)
+    if getattr(state, "surface_columns", None) is not None:
+        from mechanistic_mind.physical_system.procedural_surface_columns import serialize_surface_columns
+
+        columns = serialize_surface_columns(state)
+        if columns:
+            out["surface_columns"] = columns
+    if getattr(state, "volumetric_occupancy", None) is not None:
+        from mechanistic_mind.physical_system.volumetric_world_material_occupancy import (
+            serialize_volumetric_occupancy,
+        )
+
+        vo = serialize_volumetric_occupancy(state)
+        if vo:
+            out["volumetric_occupancy"] = vo
+    if getattr(state, "local_signal_transport", None) is not None:
+        from mechanistic_mind.physical_system.local_physical_signal_transport import serialize_state
+
+        out["local_signal_transport"] = serialize_state(state.local_signal_transport)
+    if getattr(state, "contact_acoustic_state", None) is not None:
+        from mechanistic_mind.physical_system.physical_contact_acoustic_emission import (
+            serialize_state as pca_serialize,
+        )
+
+        out["contact_acoustic_state"] = pca_serialize(state.contact_acoustic_state)
+    if getattr(state, "free_object_kinematics_state", None) is not None:
+        from mechanistic_mind.physical_system.free_resource_object_kinematics import (
+            serialize_state as fok_serialize,
+        )
+
+        out["free_object_kinematics_state"] = fok_serialize(state.free_object_kinematics_state)
+    if getattr(state, "body_object_contact_state", None) is not None:
+        from mechanistic_mind.physical_system.physical_body_resource_object_contact import (
+            serialize_state as boc_serialize,
+        )
+
+        out["body_object_contact_state"] = boc_serialize(state.body_object_contact_state)
+    if getattr(state, "body_object_contact_impulse_state", None) is not None:
+        from mechanistic_mind.physical_system.body_resource_object_contact_impulse import (
+            serialize_state as boi_serialize,
+        )
+
+        out["body_object_contact_impulse_state"] = boi_serialize(state.body_object_contact_impulse_state)
+    if getattr(state, "body_object_impact_acoustic_state", None) is not None:
+        from mechanistic_mind.physical_system.body_resource_object_impact_acoustic_emission import (
+            serialize_state as oia_serialize,
+        )
+
+        out["body_object_impact_acoustic_state"] = oia_serialize(state.body_object_impact_acoustic_state)
+    if getattr(state, "resource_object_pair_contact_state", None) is not None:
+        from mechanistic_mind.physical_system.physical_resource_object_pair_contact import (
+            serialize_state as ooc_serialize,
+        )
+
+        out["resource_object_pair_contact_state"] = ooc_serialize(state.resource_object_pair_contact_state)
+    if getattr(state, "resource_object_pair_contact_impulse_state", None) is not None:
+        from mechanistic_mind.physical_system.resource_object_pair_contact_impulse import (
+            serialize_state as ooi_serialize,
+        )
+
+        out["resource_object_pair_contact_impulse_state"] = ooi_serialize(
+            state.resource_object_pair_contact_impulse_state
+        )
+    if getattr(state, "resource_object_pair_impact_acoustic_state", None) is not None:
+        from mechanistic_mind.physical_system.resource_object_pair_impact_acoustic_emission import (
+            serialize_state as ooia_serialize,
+        )
+
+        out["resource_object_pair_impact_acoustic_state"] = ooia_serialize(
+            state.resource_object_pair_impact_acoustic_state
+        )
+    if getattr(state, "authoritative_physical_acoustic_stream_state", None) is not None:
+        from mechanistic_mind.physical_system.authoritative_physical_acoustic_stream_contract import (
+            serialize_state as apas_serialize,
+        )
+
+        out["authoritative_physical_acoustic_stream_state"] = apas_serialize(
+            state.authoritative_physical_acoustic_stream_state
+        )
+    if getattr(state, "observer_acoustic_probe_state", None) is not None:
+        from mechanistic_mind.physical_system.observer_acoustic_probe import (
+            serialize_state as oap_serialize,
+        )
+
+        out["observer_acoustic_probe_state"] = oap_serialize(state.observer_acoustic_probe_state)
+    if getattr(state, "selected_organism_auditory_boundary_state", None) is not None:
+        from mechanistic_mind.physical_system.selected_organism_auditory_boundary_receipt import (
+            serialize_state as soab_serialize,
+        )
+
+        out["selected_organism_auditory_boundary_state"] = soab_serialize(
+            state.selected_organism_auditory_boundary_state
+        )
+    if getattr(state, "selected_organism_volumetric_vision_state", None) is not None:
+        from mechanistic_mind.physical_system.selected_organism_volumetric_vision_view import (
+            serialize_state as sovv_serialize,
+        )
+
+        out["selected_organism_volumetric_vision_state"] = sovv_serialize(
+            state.selected_organism_volumetric_vision_state
+        )
+    if getattr(state, "organism_receptor_grounded_3d_fpv_state", None) is not None:
+        from mechanistic_mind.physical_system.organism_receptor_grounded_3d_fpv import (
+            serialize_state as fpv_serialize,
+        )
+
+        out["organism_receptor_grounded_3d_fpv_state"] = fpv_serialize(
+            state.organism_receptor_grounded_3d_fpv_state
+        )
+    if getattr(state, "organism_auditory_transformation_trace_state", None) is not None:
+        from mechanistic_mind.physical_system.organism_auditory_transformation_trace import (
+            serialize_state as oatt_serialize,
+        )
+
+        out["organism_auditory_transformation_trace_state"] = oatt_serialize(
+            state.organism_auditory_transformation_trace_state
+        )
+    if getattr(state, "held_foreign_body_contact_state", None) is not None:
+        from mechanistic_mind.physical_system.held_resource_object_foreign_body_contact import (
+            serialize_state as hfc_serialize,
+        )
+
+        out["held_foreign_body_contact_state"] = hfc_serialize(state.held_foreign_body_contact_state)
+    return out
 
 
 def restore_planet_state(payload: dict[str, Any]) -> tuple[PlanetState, PlanetConfig]:
@@ -307,6 +459,81 @@ def restore_planet_state(payload: dict[str, Any]) -> tuple[PlanetState, PlanetCo
             else np.asarray(payload["OSC_BANDS"], dtype=np.float64)
         ),
     )
+    from mechanistic_mind.physical_system.resource_objects import restore_resource_objects
+
+    restore_resource_objects(st, payload.get("resource_objects"))
+    from mechanistic_mind.physical_system.explicit_surface_deposition import restore_surface_deposits
+
+    restore_surface_deposits(st, payload.get("surface_material_deposits"))
+    st.surface_optical_coating_generation = int(payload.get("surface_optical_coating_generation") or 0)
+    st.material_transaction_sequence = int(payload.get("material_transaction_sequence") or 0)
+    st.material_transaction_committed_ids = list(payload.get("material_transaction_committed_ids") or [])
+    st.material_transaction_history = list(payload.get("material_transaction_history") or [])
+    st.spatial_index_generation = int(payload.get("spatial_index_generation") or 0)
+    st.spatial_index_schema = str(payload.get("spatial_index_schema") or "")
+    st.spatial_index_checksum = str(payload.get("spatial_index_checksum") or "")
+    if payload.get("surface_columns"):
+        from mechanistic_mind.physical_system.procedural_surface_columns import restore_surface_columns
+
+        restore_surface_columns(st, payload.get("surface_columns"), tick=int(getattr(st, "tick", 0) or 0))
+    if payload.get("volumetric_occupancy"):
+        from mechanistic_mind.physical_system.volumetric_world_material_occupancy import (
+            restore_volumetric_occupancy,
+        )
+
+        restore_volumetric_occupancy(
+            st, payload.get("volumetric_occupancy"), tick=int(getattr(st, "tick", 0) or 0)
+        )
+    if payload.get("local_signal_transport"):
+        # Raw payload; the physical runtime restores it against its own config (missing -> OFF).
+        st._local_signal_transport_payload = dict(payload.get("local_signal_transport"))
+    if payload.get("contact_acoustic_state"):
+        # Raw payload; restored against the runtime config (missing field -> mechanism OFF).
+        st._contact_acoustic_payload = dict(payload.get("contact_acoustic_state"))
+    if payload.get("free_object_kinematics_state"):
+        # Raw payload; restored against the runtime config (missing field -> mechanism OFF).
+        st._free_object_kinematics_payload = dict(payload.get("free_object_kinematics_state"))
+    if payload.get("body_object_contact_state"):
+        # Raw payload; restored against the runtime config (missing field -> mechanism OFF).
+        st._body_object_contact_payload = dict(payload.get("body_object_contact_state"))
+    if payload.get("body_object_contact_impulse_state"):
+        st._body_object_contact_impulse_payload = dict(payload.get("body_object_contact_impulse_state"))
+    if payload.get("body_object_impact_acoustic_state"):
+        st._body_object_impact_acoustic_payload = dict(payload.get("body_object_impact_acoustic_state"))
+    if payload.get("resource_object_pair_contact_state"):
+        st._resource_object_pair_contact_payload = dict(payload.get("resource_object_pair_contact_state"))
+    if payload.get("resource_object_pair_contact_impulse_state"):
+        st._resource_object_pair_contact_impulse_payload = dict(
+            payload.get("resource_object_pair_contact_impulse_state")
+        )
+    if payload.get("resource_object_pair_impact_acoustic_state"):
+        st._resource_object_pair_impact_acoustic_payload = dict(
+            payload.get("resource_object_pair_impact_acoustic_state")
+        )
+    if payload.get("authoritative_physical_acoustic_stream_state"):
+        st._authoritative_physical_acoustic_stream_payload = dict(
+            payload.get("authoritative_physical_acoustic_stream_state")
+        )
+    if payload.get("observer_acoustic_probe_state"):
+        st._observer_acoustic_probe_payload = dict(payload.get("observer_acoustic_probe_state"))
+    if payload.get("selected_organism_auditory_boundary_state"):
+        st._selected_organism_auditory_boundary_payload = dict(
+            payload.get("selected_organism_auditory_boundary_state")
+        )
+    if payload.get("selected_organism_volumetric_vision_state"):
+        st._selected_organism_volumetric_vision_payload = dict(
+            payload.get("selected_organism_volumetric_vision_state")
+        )
+    if payload.get("organism_receptor_grounded_3d_fpv_state"):
+        st._organism_receptor_grounded_3d_fpv_payload = dict(
+            payload.get("organism_receptor_grounded_3d_fpv_state")
+        )
+    if payload.get("organism_auditory_transformation_trace_state"):
+        st._organism_auditory_transformation_trace_payload = dict(
+            payload.get("organism_auditory_transformation_trace_state")
+        )
+    if payload.get("held_foreign_body_contact_state"):
+        st._held_foreign_body_contact_payload = dict(payload.get("held_foreign_body_contact_state"))
     # Legacy snapshots without serialized grids but with terrain config enabled:
     # regenerate deterministically from experiment_seed + namespaced terrain_seed.
     te = getattr(cfg, "terrain", None)

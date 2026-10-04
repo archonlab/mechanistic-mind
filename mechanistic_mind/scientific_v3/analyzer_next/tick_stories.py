@@ -93,7 +93,7 @@ def _parse_observation_components(obs: dict[str, Any]) -> list[dict[str, Any]]:
     acc = obs.get("accessible") or {}
     out: list[dict[str, Any]] = []
     interesting_prefixes = (
-        "local.FIELD_", "exo_", "surface_c", "spatial_", "body.", "internal.", "vest_", "prop_neck_", "osc_"
+        "local.FIELD_", "exo_", "surface_c", "spatial_", "body.", "internal.", "vest_", "prop_neck_", "prop_grip_", "prop_pair_", "osc_"
     )
     for k, v in sorted(acc.items()):
         if not any(k.startswith(p) for p in interesting_prefixes):
@@ -136,6 +136,18 @@ def format_composite_motor(components: dict[str, Any] | None) -> str:
         parts.append(f"OSC:{osc}")
     if components.get("push"):
         parts.append("PUSH")
+    manip = components.get("manipulator")
+    if manip and str(manip).upper() not in ("NONE", ""):
+        parts.append(str(manip).upper())
+    left = components.get("manipulator_left")
+    if left and str(left).upper() not in ("NONE", ""):
+        parts.append(f"LEFT_{str(left).upper()}")
+    right = components.get("manipulator_right")
+    if right and str(right).upper() not in ("NONE", ""):
+        parts.append(f"RIGHT_{str(right).upper()}")
+    pair = components.get("manipulator_pair")
+    if pair and str(pair).upper() not in ("NONE", ""):
+        parts.append(str(pair).upper())
     # de-dupe WAIT/NONE if other activity
     if len(parts) > 1 and parts[0] in ("WAIT/NONE", "WAIT"):
         parts = parts[1:]

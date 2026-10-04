@@ -123,6 +123,10 @@ class TwoAgentRuntime:
                 cfg.physical_signal = PhysicalSignalConfig(mode="OFF")
             slot_seed = agent_seed(self.seed, i) if self.independent_agent_seeds else int(self.seed)
             rt = PhysicalSystemRuntime(seed=slot_seed, config=cfg)
+            rt.technical_id = f"agent_{i}"
+            rt.slot_index = i
+            rt._defer_manipulator_world = True
+            rt._lps_parent_managed = True  # shared-world local signal step runs once in the container
             if i > 0:
                 rt.world = self.slots[0].world
                 rt.tick = self.slots[0].tick
@@ -131,12 +135,98 @@ class TwoAgentRuntime:
             self.slots.append(rt)
         self.world = self.slots[0].world
         self.config = self.slots[0].config
+        from mechanistic_mind.physical_system.procedural_surface_columns import (
+            ensure_surface_columns_for_runtime,
+        )
+        # Shared world geology follows the two-agent world seed, never a per-agent stream.
+        ensure_surface_columns_for_runtime(self.world, self.config, experiment_seed=self.seed)
+        from mechanistic_mind.physical_system.volumetric_world_material_occupancy import (
+            ensure_state as ensure_volumetric_occupancy_for_runtime,
+        )
+        ensure_volumetric_occupancy_for_runtime(self.world, self.config)
+        from mechanistic_mind.physical_system.occupancy_support_and_contact_queries import (
+            ensure_state as ensure_occupancy_support_contact_for_runtime,
+        )
+        ensure_occupancy_support_contact_for_runtime(self.world, self.config)
+        from mechanistic_mind.physical_system.volumetric_world_material_separation import (
+            ensure_state as ensure_volumetric_separation_for_runtime,
+        )
+        ensure_volumetric_separation_for_runtime(self.world, self.config)
+        from mechanistic_mind.physical_system.volumetric_world_material_reintegration import (
+            ensure_state as ensure_volumetric_reintegration_for_runtime,
+        )
+        ensure_volumetric_reintegration_for_runtime(self.world, self.config)
+        from mechanistic_mind.physical_system.effector_held_occupancy_exertion_bridge import (
+            ensure_state as ensure_vw5_bridge_for_runtime,
+        )
+        ensure_vw5_bridge_for_runtime(self.world, self.config)
+        from mechanistic_mind.physical_system.minimal_vision_3d_geometric_interface import (
+            ensure_state as ensure_vw6_vision_for_runtime,
+        )
+        ensure_vw6_vision_for_runtime(self.world, self.config)
+        setattr(self.world, "_physical_system_config", self.config)
+        if getattr(self.config, "ses_decomposition_contract", None) is not None:
+            from mechanistic_mind.physical_system.ses_decomposition_contract import (
+                ensure_ses_decomposition_contract_for_runtime,
+            )
+            ensure_ses_decomposition_contract_for_runtime(self.world, self.config)
+        if getattr(self.config, "ses_runtime_transition_classifier", None) is not None:
+            from mechanistic_mind.physical_system.ses_runtime_transition_classifier import (
+                ensure_ses_runtime_transition_classifier_for_runtime,
+            )
+            ensure_ses_runtime_transition_classifier_for_runtime(self.world, self.config)
+        if getattr(self.config, "radius_aware_face_sweep", None) is not None:
+            from mechanistic_mind.physical_system.radius_aware_face_sweep import (
+                ensure_radius_aware_face_sweep_for_runtime,
+            )
+            ensure_radius_aware_face_sweep_for_runtime(self.world, self.config)
+        if getattr(self.config, "diagnostic_normal_load_shadow", None) is not None:
+            from mechanistic_mind.physical_system.diagnostic_normal_load_shadow import (
+                ensure_diagnostic_normal_load_shadow_for_runtime,
+            )
+            ensure_diagnostic_normal_load_shadow_for_runtime(self.world, self.config)
+        if getattr(self.config, "continuous_gravitational_pe_diagnostic_shadow", None) is not None:
+            from mechanistic_mind.physical_system.continuous_gravitational_pe_diagnostic_shadow import (
+                ensure_continuous_gravitational_pe_diagnostic_shadow_for_runtime,
+            )
+            ensure_continuous_gravitational_pe_diagnostic_shadow_for_runtime(self.world, self.config)
         self.last_contact = None
         self.last_resource_sim = None
         self.last_signal_receipt = None
         self._pending_sources = []
         if self.signal_enabled:
             ensure_fields(self.world)
+        # Lifecycle seam: slot0 built the shared index with only its body; slot1+ rebind the world
+        # without rebuilding. After columns/objects exist, rebuild once from the full authoritative
+        # entity set before this runtime is exposed (no scientific tick).
+        from mechanistic_mind.physical_system.spatial_contents import (
+            body_refs_for_runtime,
+            rebuild_after_authoritative_entity_change,
+        )
+        rebuild_after_authoritative_entity_change(
+            self.world,
+            body_refs_for_runtime(self),
+            tick=int(self.tick),
+            config=self.config,
+            reason="construction",
+            generation_policy="fresh",
+        )
+        self._lps_bind()
+
+    def _lps_bind(self) -> None:
+        """Acanthostega local signal: link each shared-world body to its physical body id (sensor seam)."""
+        if getattr(getattr(self, "world", None), "local_signal_transport", None) is None:
+            return
+        from mechanistic_mind.physical_system.local_physical_signal_transport import bind_body_ids
+        from mechanistic_mind.physical_system.spatial_contents import body_refs_for_runtime
+
+        bind_body_ids(body_refs_for_runtime(self))
+
+    def spatial_index_consistency(self) -> dict[str, Any]:
+        """Researcher/debug-only, read-only: shared index vs authoritative world (all slot bodies)."""
+        from mechanistic_mind.physical_system.spatial_contents import body_refs_for_runtime, spatial_index_consistency
+
+        return spatial_index_consistency(self.world, body_refs_for_runtime(self))
 
     def construction_audit(self) -> dict[str, Any]:
         """Observer/scientific audit of A vs B construction (not cognition input)."""
@@ -327,6 +417,17 @@ class TwoAgentRuntime:
         """Mechanism snapshot. Flags are kept identical across slots (see set_mechanism)."""
         return self.slots[0].mechanisms()
 
+    def mechanism_snapshot(self):
+        return self.mechanisms()
+
+    def model_identity(self) -> dict[str, Any]:
+        slot = self.slots[self.selected_index] if self.slots else None
+        if slot is not None:
+            return slot.model_identity()
+        from mechanistic_mind.model.lines import identity_for_config
+
+        return identity_for_config(getattr(self, "config", None), seed=self.seed, tick=self.tick)
+
     def set_psc_motor_resolution(self, mode: str) -> dict[str, Any]:
         """Apply motor-resolution mode to all agent slots (no resets)."""
         results = []
@@ -457,6 +558,7 @@ class TwoAgentRuntime:
 
     def observations(self) -> list[dict[str, float]]:
         out = []
+        self._lps_bind()
         for i, rt in enumerate(self.slots):
             obs = rt.agent_observation(foreign_bodies=self.foreign_bodies_for(i))
             hits = audit_cognition_payload(obs)
@@ -536,9 +638,35 @@ class TwoAgentRuntime:
         h = int(self.world.T.shape[0])
         # Pairwise soft contact for all bodies (including optional experimenter slot).
         self.last_contacts = []
+        # Acanthostega Audio B (contact acoustics): read-only pre-resolution pose/velocity snapshot.
+        pca_state = getattr(self.world, "contact_acoustic_state", None)
+        pca_rows: list[dict[str, Any]] = []
+        pca_pre = None
+        pca_ids: list[str] = []
+        if pca_state is not None:
+            from mechanistic_mind.physical_system.physical_contact_acoustic_emission import capture_pre_contact
+            from mechanistic_mind.physical_system.spatial_contents import body_refs_for_runtime
+
+            pca_refs = body_refs_for_runtime(self)
+            pca_ids = [str(r[0]) for r in pca_refs]
+            pca_pre = capture_pre_contact(pca_refs)
         with span("contact_push"):
             for ia in range(n):
                 for ib in range(ia + 1, n):
+                    _bb_enabled = bool(self.contact_enabled)
+                    from mechanistic_mind.physical_system.flat_ground_gravity import (
+                        flat_ground_gravity_is_active as _fgg_bb,
+                        vertical_overlap_at_endpoint as _v_overlap_bb,
+                    )
+                    if _bb_enabled and _fgg_bb(self.slots[0].config):
+                        if not _v_overlap_bb(
+                            self.slots[ia].body,
+                            self.slots[ib].body,
+                            kind_a="body",
+                            kind_b="body",
+                            config=self.slots[0].config,
+                        ):
+                            _bb_enabled = False
                     receipt = resolve_soft_contact(
                         self.slots[ia].body,
                         self.slots[ib].body,
@@ -546,8 +674,13 @@ class TwoAgentRuntime:
                         self.slots[ib].config.body,
                         width=w,
                         height=h,
-                        enabled=self.contact_enabled,
+                        enabled=_bb_enabled,
                     )
+                    if (not _bb_enabled) and bool(self.contact_enabled) and _fgg_bb(self.slots[0].config):
+                        receipt = dict(receipt or {})
+                        receipt["vertical_filter"] = "REJECT"
+                        receipt["vertical_separation_reason"] = "VERTICAL_SEPARATION"
+                        receipt["contact"] = False
                     push_receipt = apply_push_through_contact(
                         self.slots[ia].body,
                         self.slots[ib].body,
@@ -588,6 +721,23 @@ class TwoAgentRuntime:
                                 evidence={"pair": [ia, ib], "force_transferred": False},
                             )
                     self.last_contacts.append(receipt)
+                    if pca_state is not None and receipt is not None and ia < len(pca_ids) and ib < len(pca_ids):
+                        pca_rows.append({
+                            "a_id": pca_ids[ia], "b_id": pca_ids[ib],
+                            "mass_a": float(self.slots[ia].config.body.mass),
+                            "mass_b": float(self.slots[ib].config.body.mass),
+                            "contact_receipt": receipt, "push_receipt": push_receipt,
+                            "body_a": self.slots[ia].body, "body_b": self.slots[ib].body,
+                        })
+            if pca_state is not None:
+                # One pass after the whole contact/PUSH loop: measured new impulse -> physical emission
+                # for emission tick te = tick - 1 (the tick being resolved); transport step follows below.
+                from mechanistic_mind.physical_system.physical_contact_acoustic_emission import process_contact_pairs
+
+                self.last_contact_acoustic = process_contact_pairs(
+                    self.world, self.slots[0].config, pca_rows,
+                    emission_tick=int(self.tick) - 1, pre_contact=pca_pre,
+                )
             # Preserve last_contact as agent_0↔agent_1 (or first overlapping pair).
             self.last_contact = None
             if n >= 2:
@@ -596,6 +746,185 @@ class TwoAgentRuntime:
                     if r and r.get("contact"):
                         self.last_contact = r
                         break
+        from mechanistic_mind.physical_system.physical_manipulator import (
+            resolve_shared_world_manipulators,
+            world_manipulators_active,
+        )
+        if self.slots and world_manipulators_active(self.slots[0].config):
+            done_tick = max(0, int(self.slots[0].tick) - 1)
+            resolve_shared_world_manipulators(self.slots, self.world, tick=done_tick)
+        # Agent effector_z (deferred path): after shared manipulators, before ETC.
+        if self.slots:
+            done_tick = max(0, int(self.slots[0].tick) - 1)
+            for slot in self.slots:
+                if bool(getattr(slot, "_defer_manipulator_world", False)):
+                    slot._apply_agent_effector_relative_z_from_motor(actuation_tick=done_tick)
+        if self.slots:
+            from mechanistic_mind.physical_system.spatial_contents import (
+                body_refs_for_runtime,
+                multi_content_spatial_index_is_active,
+                reconcile_contents,
+            )
+            if multi_content_spatial_index_is_active(self.slots[0].config):
+                reconcile_contents(
+                    self.world,
+                    body_refs_for_runtime(self),
+                    tick=int(self.tick),
+                    reason="contact_and_manipulator",
+                    config=self.slots[0].config,
+                )
+            from mechanistic_mind.physical_system.physical_body_resource_object_contact import (
+                body_object_contact_is_active,
+                detect_body_resource_object_contacts,
+            )
+            if body_object_contact_is_active(self.slots[0].config):
+                # Same scientific tick as shared manipulators (slot.tick already advanced).
+                boc_tick = max(0, int(self.slots[0].tick) - 1)
+                detect_body_resource_object_contacts(
+                    self.world,
+                    body_refs_for_runtime(self),
+                    tick=boc_tick,
+                    config=self.slots[0].config,
+                )
+                from mechanistic_mind.physical_system.body_resource_object_contact_impulse import (
+                    body_object_impulse_is_active,
+                    apply_body_object_contact_impulse,
+                )
+                if body_object_impulse_is_active(self.slots[0].config):
+                    body_triples = []
+                    for bid, b in body_refs_for_runtime(self):
+                        # Match slot config by body identity / order
+                        body_cfg = self.slots[0].config.body
+                        for slot in self.slots:
+                            if slot.body is b:
+                                body_cfg = slot.config.body
+                                break
+                        body_triples.append((bid, b, body_cfg))
+                    apply_body_object_contact_impulse(
+                        self.world,
+                        body_triples,
+                        tick=boc_tick,
+                        config=self.slots[0].config,
+                    )
+                    from mechanistic_mind.physical_system.body_resource_object_impact_acoustic_emission import (
+                        body_object_impact_acoustics_is_active,
+                        process_body_object_impact_acoustics,
+                    )
+                    if body_object_impact_acoustics_is_active(self.slots[0].config):
+                        process_body_object_impact_acoustics(
+                            self.world,
+                            self.slots[0].config,
+                            emission_tick=boc_tick,
+                        )
+                from mechanistic_mind.physical_system.physical_resource_object_pair_contact import (
+                    resource_object_pair_contact_is_active,
+                    detect_resource_object_pair_contacts,
+                )
+                if resource_object_pair_contact_is_active(self.slots[0].config):
+                    detect_resource_object_pair_contacts(
+                        self.world,
+                        tick=boc_tick,
+                        config=self.slots[0].config,
+                    )
+                    from mechanistic_mind.physical_system.resource_object_pair_contact_impulse import (
+                        resource_object_pair_impulse_is_active,
+                        apply_resource_object_pair_contact_impulse,
+                    )
+                    if resource_object_pair_impulse_is_active(self.slots[0].config):
+                        apply_resource_object_pair_contact_impulse(
+                            self.world,
+                            tick=boc_tick,
+                            config=self.slots[0].config,
+                            bodies=body_refs_for_runtime(self),
+                        )
+                        from mechanistic_mind.physical_system.resource_object_pair_impact_acoustic_emission import (
+                            resource_object_pair_impact_acoustics_is_active,
+                            process_resource_object_pair_impact_acoustics,
+                        )
+                        if resource_object_pair_impact_acoustics_is_active(self.slots[0].config):
+                            process_resource_object_pair_impact_acoustics(
+                                self.world,
+                                self.slots[0].config,
+                                emission_tick=boc_tick,
+                            )
+                from mechanistic_mind.physical_system.held_resource_object_foreign_body_contact import (
+                    held_foreign_body_contact_is_active,
+                    detect_held_resource_object_foreign_body_contacts,
+                )
+                if held_foreign_body_contact_is_active(self.slots[0].config):
+                    detect_held_resource_object_foreign_body_contacts(
+                        self.world,
+                        body_refs_for_runtime(self),
+                        tick=boc_tick,
+                        config=self.slots[0].config,
+                    )
+                    from mechanistic_mind.physical_system.held_resource_object_translational_impulse_mediation import (
+                        held_translational_impulse_is_active,
+                        apply_held_resource_object_translational_impulse_mediation,
+                    )
+                    if held_translational_impulse_is_active(self.slots[0].config):
+                        body_triples = []
+                        for bid, b in body_refs_for_runtime(self):
+                            body_cfg = self.slots[0].config.body
+                            for slot in self.slots:
+                                if slot.body is b:
+                                    body_cfg = slot.config.body
+                                    break
+                            body_triples.append((bid, b, body_cfg))
+                        apply_held_resource_object_translational_impulse_mediation(
+                            self.world,
+                            body_triples,
+                            tick=boc_tick,
+                            config=self.slots[0].config,
+                        )
+            from mechanistic_mind.physical_system.effector_terrain_contact_geometry import (
+                detect_effector_terrain_contacts,
+                effector_terrain_contact_geometry_is_active,
+            )
+            if effector_terrain_contact_geometry_is_active(self.slots[0].config):
+                etc_tick = max(0, int(self.slots[0].tick) - 1)
+                holders = []
+                for bid, b in body_refs_for_runtime(self):
+                    slot_cfg = self.slots[0].config
+                    slot_rt = self.slots[0]
+                    for slot in self.slots:
+                        if slot.body is b:
+                            slot_cfg = slot.config
+                            slot_rt = slot
+                            break
+                    holders.append(
+                        {"body_id": bid, "body": b, "config": slot_cfg, "runtime": slot_rt}
+                    )
+                detect_effector_terrain_contacts(
+                    self.world,
+                    holders,
+                    tick=etc_tick,
+                    config=self.slots[0].config,
+                )
+            from mechanistic_mind.physical_system.held_resource_object_terrain_contact_geometry import (
+                detect_held_resource_object_terrain_contacts,
+                held_resource_object_terrain_contact_geometry_is_active,
+            )
+            if held_resource_object_terrain_contact_geometry_is_active(self.slots[0].config):
+                hotc_tick = max(0, int(self.slots[0].tick) - 1)
+                holders_hotc = []
+                for bid, b in body_refs_for_runtime(self):
+                    slot_cfg = self.slots[0].config
+                    slot_rt = self.slots[0]
+                    for slot in self.slots:
+                        if slot.body is b:
+                            slot_cfg = slot.config
+                            slot_rt = slot
+                            break
+                    holders_hotc.append(
+                        {"body_id": bid, "body": b, "config": slot_cfg, "runtime": slot_rt}
+                    )
+                detect_held_resource_object_terrain_contacts(
+                    self.world,
+                    holders_hotc,
+                    tick=hotc_tick,
+                    config=self.slots[0].config,
+                )
         bodies = [s.body for s in self.slots]
         body_cfgs = [s.config.body for s in self.slots]
         with span("resources"):
@@ -635,7 +964,60 @@ class TwoAgentRuntime:
                 self.last_signal_receipt = None
             # Oscillatory banded signaling (Option B) — shared world, all bodies.
             osc_cfg = getattr(self.slots[0].config, "oscillatory_signaling", None)
-            if osc_cfg is not None and osc_cfg.enabled:
+            from mechanistic_mind.physical_system.vertical_impact_acoustic_emission import (
+                process_vertical_impact_acoustic_emission,
+                vertical_impact_acoustic_emission_is_active,
+            )
+            if vertical_impact_acoustic_emission_is_active(self.slots[0].config):
+                # Shared world: consume landing responses once before sole LPS step.
+                via_tick = max(0, int(self.slots[0].tick) - 1)
+                process_vertical_impact_acoustic_emission(
+                    self.world,
+                    self.slots[0].config,
+                    emission_tick=via_tick,
+                )
+            if getattr(self.world, "local_signal_transport", None) is not None:
+                # Acanthostega LOCAL PHYSICAL SIGNAL TRANSPORT: one deterministic, process-order-free
+                # end-of-tick step for all bodies (emission at pose -> finite-speed wavefront).
+                from mechanistic_mind.physical_system.local_physical_signal_transport import step_end_of_tick
+                from mechanistic_mind.physical_system.spatial_contents import body_refs_for_runtime
+                from mechanistic_mind.ui.psy_observer_web.undercover_identity import slot_agent_body_ids
+
+                exp_slot = getattr(self, "experimenter_slot", None)
+                intervention_ids = (
+                    (slot_agent_body_ids(int(exp_slot), experimenter_slot=exp_slot)[1],)
+                    if exp_slot is not None else ()
+                )
+                lps = step_end_of_tick(
+                    self.world,
+                    self.slots[0].config,
+                    body_refs_for_runtime(self),
+                    tick_now=int(self.tick),
+                    articulated_head=bool(getattr(self.slots[0].config.articulated_head, "enabled", False)),
+                    intervention_body_ids=intervention_ids,
+                )
+                # Read-only scientific stream over committed emissions (no LPS re-step).
+                from mechanistic_mind.physical_system.authoritative_physical_acoustic_stream_contract import (
+                    sync_acoustic_stream,
+                )
+
+                sync_acoustic_stream(self.world, scientific_tick=int(self.tick))
+                from mechanistic_mind.physical_system.observer_acoustic_probe import (
+                    sample_observer_acoustic_probe,
+                )
+
+                sample_observer_acoustic_probe(self.world, scientific_tick=int(self.tick))
+                osc_meta = {
+                    "enabled": True,
+                    "transport": "LOCAL_PHYSICAL_SIGNAL_TRANSPORT_V1",
+                    "emissions": len(lps.get("emissions") or []),
+                    "receptions": len(lps.get("receptions") or []),
+                }
+                self.last_osc_meta = osc_meta
+                for rt in self.slots:
+                    rt.last_osc_meta = osc_meta
+                    rt.world = self.world
+            elif osc_cfg is not None and osc_cfg.enabled:
                 from mechanistic_mind.physical_system.oscillatory_signaling import (
                     ensure_osc_fields,
                     step_oscillatory_signaling,
@@ -828,10 +1210,13 @@ class TwoAgentRuntime:
             if i > 0:
                 snap.pop("world", None)
             agents.append(snap)
+        ident = self.model_identity()
         return {
             "schema": "mm.physical_system.two_agent.snapshot.v1",
             "experimental": True,
             "promoted": False,
+            "model": ident,
+            "runtime_version": ident.get("runtime_version") or getattr(self.config, "runtime_version", None),
             "tick": self.tick,
             "seed": self.seed,
             "independent_agent_seeds": self.independent_agent_seeds,
@@ -868,16 +1253,60 @@ class TwoAgentRuntime:
         restored: list[PhysicalSystemRuntime] = []
         for i, ag in enumerate(agents):
             if i == 0:
-                restored.append(PhysicalSystemRuntime.restore(ag))
+                restored.append(PhysicalSystemRuntime.restore(ag, world_seed=rt.seed, shared_world_member=True))
             else:
                 payload_i = deepcopy(ag)
                 payload_i["world"] = agents[0]["world"]
-                ri = PhysicalSystemRuntime.restore(payload_i)
+                ri = PhysicalSystemRuntime.restore(payload_i, world_seed=rt.seed, shared_world_member=True)
                 ri.world = restored[0].world
                 restored.append(ri)
         rt.slots = restored
         rt.world = restored[0].world
         rt.config = restored[0].config
+        for i, slot in enumerate(rt.slots):
+            slot.technical_id = f"agent_{i}"
+            slot._defer_manipulator_world = True
+            slot._lps_parent_managed = True
+            slot.world = rt.world
+        from mechanistic_mind.physical_system.physical_manipulator import sanitize_attachments
+        sanitize_attachments(rt.world, {str(s.technical_id) for s in rt.slots})
+        ident = payload.get("model") if isinstance(payload.get("model"), dict) else {}
+        preset = ident.get("public_preset") or ident.get("model_line")
+        if preset:
+            from mechanistic_mind.model.lines import stamp_config_from_preset
+
+            stamp_config_from_preset(rt.config, ident.get("public_preset") or ident.get("model_line"))
+            for slot in rt.slots:
+                stamp_config_from_preset(slot.config, ident.get("public_preset") or ident.get("model_line"))
+        from mechanistic_mind.physical_system.procedural_surface_columns import (
+            ensure_surface_columns_for_runtime,
+        )
+        ensure_surface_columns_for_runtime(rt.world, rt.config, experiment_seed=rt.seed)
+        from mechanistic_mind.physical_system.volumetric_world_material_occupancy import (
+            ensure_state as ensure_volumetric_occupancy_for_runtime,
+        )
+        ensure_volumetric_occupancy_for_runtime(rt.world, rt.config)
+        from mechanistic_mind.physical_system.occupancy_support_and_contact_queries import (
+            ensure_state as ensure_occupancy_support_contact_for_runtime,
+        )
+        ensure_occupancy_support_contact_for_runtime(rt.world, rt.config)
+        from mechanistic_mind.physical_system.volumetric_world_material_separation import (
+            ensure_state as ensure_volumetric_separation_for_runtime,
+        )
+        ensure_volumetric_separation_for_runtime(rt.world, rt.config)
+        from mechanistic_mind.physical_system.volumetric_world_material_reintegration import (
+            ensure_state as ensure_volumetric_reintegration_for_runtime,
+        )
+        ensure_volumetric_reintegration_for_runtime(rt.world, rt.config)
+        from mechanistic_mind.physical_system.effector_held_occupancy_exertion_bridge import (
+            ensure_state as ensure_vw5_bridge_for_runtime,
+        )
+        ensure_vw5_bridge_for_runtime(rt.world, rt.config)
+        from mechanistic_mind.physical_system.minimal_vision_3d_geometric_interface import (
+            ensure_state as ensure_vw6_vision_for_runtime,
+        )
+        ensure_vw6_vision_for_runtime(rt.world, rt.config)
+        setattr(rt.world, "_physical_system_config", rt.config)
         rt._pending_sources = []
         rt.last_signal_receipt = None
         rt.last_contact = None
@@ -892,4 +1321,12 @@ class TwoAgentRuntime:
             rt._agent_stats.append(_empty_agent_stats())
             rt._prev_xy.append(None)
         rt.process_order = tuple(range(len(rt.slots)))
+        # Shared-world finalization, exactly once, after every slot, body pose, ResourceObject, holder
+        # attachment (sanitized above with all slot ids) and the experimenter slot are bound: rebuild
+        # the derived multi-content spatial index from authoritative state. No tick, no physics, no
+        # receipts; slot restores ran with shared_world_member=True and did not build it.
+        from mechanistic_mind.physical_system.spatial_contents import body_refs_for_runtime, rebuild_after_restore
+
+        rebuild_after_restore(rt.world, body_refs_for_runtime(rt), tick=int(rt.tick), config=rt.config)
+        rt._lps_bind()
         return rt

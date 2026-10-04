@@ -33,7 +33,7 @@ from mechanistic_mind.research import contextual_predictive_organization as cpo
 from mechanistic_mind.research import context_grounded_prospection as cgp
 from mechanistic_mind.research import persistent_prospective_control as ppc
 
-from .actions import OSC_ACTIONS, PUSH_ACTIONS, available_actions
+from .actions import EFFECTOR_Z_ACTIONS, OSC_ACTIONS, PUSH_ACTIONS, available_actions
 from .observation import audit_cognition_payload
 from .unknown_action_probe import classify_unmodeled_actions, probe_receipt
 from . import sensorimotor_consequence as smc
@@ -140,6 +140,9 @@ class CognitionConfig:
     multistep_action_prospection: bool = False
     # Beta 3.1 organism fields (must live on CognitionConfig so Apply/restore cannot drop them).
     psc_motor_resolution: str = "LOCO_FACTORIZED"
+    # Experiment-protocol schedule: None = MANUAL; int N = auto PSC enable at tick >= N.
+    # Must be a dataclass field so snapshot/restore cannot drop the schedule.
+    psc_off_ticks: int | None = None
     sensorimotor_consequence_model: bool = False
     sensorimotor_consequence_bilateral: bool = True
     # Learn/query SMC but do not inject MATCH rows into PSC unless explicitly unset.
@@ -1089,7 +1092,7 @@ def _sidechannel_predict_tokens(state: dict[str, Any], loco_actions: list[str]) 
         a = str(raw)
         if a in loco:
             continue
-        if a.startswith("NECK_") or a in OSC_ACTIONS or a in PUSH_ACTIONS:
+        if a.startswith("NECK_") or a in OSC_ACTIONS or a in PUSH_ACTIONS or a in EFFECTOR_Z_ACTIONS:
             out.append(a)
     return out
 

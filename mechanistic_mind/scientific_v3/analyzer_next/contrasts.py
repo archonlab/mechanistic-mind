@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
-from typing import Any
+from typing import Any, Callable
 
 from .tick_stories import TickStory
 
@@ -55,8 +55,20 @@ def _bucket_stats(stories: list[TickStory]) -> dict[str, Any]:
     }
 
 
-def build_contrasts(stories: list[TickStory]) -> list[dict[str, Any]]:
+def build_contrasts(
+    stories: list[TickStory],
+    on_progress: Callable[[int, int, str], None] | None = None,
+) -> list[dict[str, Any]]:
     contrasts: list[dict[str, Any]] = []
+    total = max(1, len(stories))
+    scanned = 0
+
+    def _prog(substage: str, n: int | None = None) -> None:
+        nonlocal scanned
+        if n is not None:
+            scanned = n
+        if on_progress:
+            on_progress(scanned, total, substage)
 
     def contrast(name: str, pos: list[TickStory], neg: list[TickStory], definition: str) -> None:
         contrasts.append({
@@ -67,25 +79,41 @@ def build_contrasts(stories: list[TickStory]) -> list[dict[str, Any]]:
             "positive": _bucket_stats(pos),
             "negative": _bucket_stats(neg),
         })
+        _prog(f"contrast:{name}", scanned)
 
     by_agent: dict[str, list[TickStory]] = defaultdict(list)
-    for s in stories:
+    for i, s in enumerate(stories):
         by_agent[s.cognitive_agent_id].append(s)
+        if on_progress and (i % 2000 == 0 or i + 1 == total):
+            _prog("index_by_agent", i + 1)
 
-    vis_pos = [s for s in stories if _has_ctx(s, "VISION_EXPOSURE")]
-    vis_neg = [s for s in stories if not _has_ctx(s, "VISION_EXPOSURE")]
+    _prog("scan_visual", 0)
+    vis_pos = []
+    vis_neg = []
+    for i, s in enumerate(stories):
+        (vis_pos if _has_ctx(s, "VISION_EXPOSURE") else vis_neg).append(s)
+        if on_progress and (i % 2000 == 0 or i + 1 == total):
+            _prog("scan_visual", i + 1)
     if vis_pos and vis_neg:
         contrast("visual_exposure_vs_none", vis_pos, vis_neg,
                  "Ticks with Observer body_exposure + accessible exo_* vs without")
 
-    sig_pos = [s for s in stories if _has_ctx(s, "SIGNAL_RECEPTION")]
-    sig_neg = [s for s in stories if not _has_ctx(s, "SIGNAL_RECEPTION")]
+    sig_pos = []
+    sig_neg = []
+    for i, s in enumerate(stories):
+        (sig_pos if _has_ctx(s, "SIGNAL_RECEPTION") else sig_neg).append(s)
+        if on_progress and (i % 2000 == 0 or i + 1 == total):
+            _prog("scan_signal", i + 1)
     if sig_pos and sig_neg:
         contrast("signal_present_vs_absent", sig_pos, sig_neg,
                  "Ticks with PHYSICAL_SIGNAL_RECEIVED joined to FIELD_* observation vs without")
 
-    contact_pos = [s for s in stories if _has_ctx(s, "CONTACT")]
-    contact_neg = [s for s in stories if not _has_ctx(s, "CONTACT")]
+    contact_pos = []
+    contact_neg = []
+    for i, s in enumerate(stories):
+        (contact_pos if _has_ctx(s, "CONTACT") else contact_neg).append(s)
+        if on_progress and (i % 2000 == 0 or i + 1 == total):
+            _prog("scan_contact", i + 1)
     if contact_pos and contact_neg:
         contrast("contact_vs_no_contact", contact_pos, contact_neg,
                  "Ticks with CONTACT event vs without")

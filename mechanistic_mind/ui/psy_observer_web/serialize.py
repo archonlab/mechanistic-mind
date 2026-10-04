@@ -421,6 +421,7 @@ def agent_body_mapping(runtime: PhysicalSystemRuntime) -> list[dict[str, Any]]:
 
 
 def header_info(runtime: PhysicalSystemRuntime, *, status: str, mode: str, target_tick: int | None) -> dict[str, Any]:
+    from mechanistic_mind.model.lines import snapshot_compatibility_token
     from mechanistic_mind.model.tiktaalik import OBSERVER_API_VERSION, display_name
 
     contract = observer_cli.headless_contract()
@@ -433,11 +434,13 @@ def header_info(runtime: PhysicalSystemRuntime, *, status: str, mode: str, targe
         "application": "Psy Observer",
         "mm_version": str(contract.get("version", "unknown")),
         "runtime_model": "TwoAgentRuntime" if slots else "PhysicalSystemRuntime",
-        "experiment": display_name(),
+        "experiment": model.get("display_name") or display_name(),
         "model_family": model.get("model_family"),
         "model_version": model.get("model_version"),
+        "model_line": model.get("model_line") or "TIKTAALIK",
         "model_codename": model.get("model_codename"),
         "model_display_name": model.get("display_name"),
+        "public_preset": model.get("public_preset") or getattr(getattr(runtime, "config", None), "public_preset", None),
         "runtime_classification": model.get("classification"),
         "canonical": model.get("canonical"),
         "experimental_overrides": model.get("experimental_overrides") or {},
@@ -457,8 +460,661 @@ def header_info(runtime: PhysicalSystemRuntime, *, status: str, mode: str, targe
         "observer_web_version": OBSERVER_API_VERSION,
         "boundary_topology": "WRAP_PERIODIC",
         "world_size": {"width": int(runtime.config.planet.width), "height": int(runtime.config.planet.height)},
-        "snapshot_compatibility": "TIKTAALIK",
+        "snapshot_compatibility": snapshot_compatibility_token(model),
         "ecology_preset": getattr(runtime.config, "ecology_preset", "CURRENT") or "CURRENT",
+        "locomotion_profile": (
+            "ACANTHOSTEGA_GENTLE"
+            if str(getattr(getattr(runtime.config, "locomotion_profile", None), "active_name", "") or "")
+            == "ACANTHOSTEGA_GENTLE"
+            else "TIKTAALIK"
+        ),
+        "gentle_terrain_locomotion": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "locomotion_profile", None), "enabled", False))
+        ),
+        "physical_resource_objects": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "physical_resource_objects", None), "enabled", False))
+        ),
+        "physical_resource_object_vision": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "physical_resource_object_vision", None), "enabled", False))
+        ),
+        "single_physical_manipulator": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "single_physical_manipulator", None), "enabled", False))
+        ),
+        "physical_grasp_release": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "physical_grasp_release", None), "enabled", False))
+        ),
+        "bilateral_physical_manipulators": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "bilateral_physical_manipulators", None), "enabled", False))
+        ),
+        "bilateral_grasp_release": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "bilateral_grasp_release", None), "enabled", False))
+        ),
+        "passive_material_properties": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "passive_material_properties", None), "enabled", False))
+        ),
+        "explicit_surface_deposition": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "explicit_surface_deposition", None), "enabled", False))
+        ),
+        "surface_affinity_traction": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "surface_affinity_traction", None), "enabled", False))
+        ),
+        "surface_traction_experience_bridge": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "surface_traction_experience", None), "enabled", False))
+        ),
+        "surface_traction_prediction_adaptation": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "surface_traction_prediction", None), "enabled", False))
+        ),
+        "sensorimotor_consequence_model": bool(
+            getattr(getattr(runtime.config, "cognition", None), "sensorimotor_consequence_model", False)
+        ),
+        "physical_surface_optical_coating": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "physical_surface_optical_coating", None), "enabled", False))
+        ),
+        "world_material_transactions": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "world_material_transactions", None), "enabled", False))
+        ),
+        "multi_content_spatial_index": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "multi_content_spatial_index", None), "enabled", False))
+        ),
+        "procedural_surface_columns": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "procedural_surface_columns", None), "enabled", False))
+        ),
+        "volumetric_world_material_occupancy": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "volumetric_world_material_occupancy", None), "enabled", False))
+        ),
+        "occupancy_support_and_contact_queries": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "occupancy_support_and_contact_queries", None), "enabled", False))
+        ),
+        "volumetric_world_material_separation": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "volumetric_world_material_separation", None), "enabled", False))
+        ),
+        "volumetric_world_material_reintegration": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "volumetric_world_material_reintegration", None), "enabled", False))
+        ),
+        "effector_held_occupancy_exertion_bridge": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "effector_held_occupancy_exertion_bridge", None), "enabled", False))
+        ),
+        "minimal_vision_3d_geometric_interface": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "minimal_vision_3d_geometric_interface", None), "enabled", False))
+        ),
+        "observer_camera_occupancy_consumer": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "volumetric_world_material_occupancy", None), "enabled", False))
+        ),
+        "conservative_surface_column_transfer": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "conservative_surface_column_transfer", None), "enabled", False))
+        ),
+        "local_physical_signal_transport": bool(
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "local_physical_signal_transport", None), "enabled", False))
+        ),
+        **({"physical_contact_acoustic_emission": True} if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "physical_contact_acoustic_emission", None), "enabled", False))
+        ) else {}),
+        **({"physical_resource_object_pair_contact": True} if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "physical_resource_object_pair_contact", None), "enabled", False))
+        ) else {}),
+        **({"held_resource_object_foreign_body_contact": True} if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "held_resource_object_foreign_body_contact", None), "enabled", False))
+        ) else {}),
+        **({"held_resource_object_translational_impulse_mediation": True} if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "held_resource_object_translational_impulse_mediation", None), "enabled", False))
+        ) else {}),
+        **({"resource_object_pair_impact_acoustic_emission": True} if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "resource_object_pair_impact_acoustic_emission", None), "enabled", False))
+        ) else {}),
+        **({"resource_object_pair_contact_impulse": True} if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "resource_object_pair_contact_impulse", None), "enabled", False))
+        ) else {}),
+        **({"body_resource_object_impact_acoustic_emission": True} if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "body_resource_object_impact_acoustic_emission", None), "enabled", False))
+        ) else {}),
+        **({"free_resource_object_kinematics": True} if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "free_resource_object_kinematics", None), "enabled", False))
+        ) else {}),
+    }
+
+
+def _spatial_contents_payload(world: Any) -> dict[str, Any]:
+    index = getattr(world, "spatial_contents", None)
+    cells = []
+    if index is not None:
+        for (cell_x, cell_y), bucket in sorted(index.by_cell.items()):
+            refs = sorted(bucket, key=lambda item: (item.entity_kind, item.entity_id))
+            cells.append({
+                "cell_x": int(cell_x),
+                "cell_y": int(cell_y),
+                "physical_contents": len(refs),
+                "refs": [ref.as_dict() for ref in refs],
+            })
+    return {
+        "spatial_cell_contents": cells,
+        "spatial_index_generation": int(getattr(index, "generation", 0) or 0),
+        "spatial_index_dirty": bool(getattr(index, "dirty", False)),
+        "spatial_index_checksum": str(getattr(world, "spatial_index_checksum", "") or ""),
+        "spatial_contents_researcher_only": True,
+        "spatial_contents_not_agent_accessible": True,
+        "spatial_contents_note": "co-location is not collision. no vertical ordering.",
+    }
+
+
+def _researcher_resource_objects(
+    world: Any,
+    *,
+    object_vision_enabled: bool = False,
+    passive_properties_enabled: bool = False,
+    optical_profile_enabled: bool = False,
+) -> list[dict[str, Any]]:
+    """Observer GT only. Never copied into agent observation."""
+    from mechanistic_mind.physical_system.resource_objects import ResourceObject, ensure_resource_object_state
+    from mechanistic_mind.planet.topology import wrap_coord
+
+    objs = ensure_resource_object_state(world)
+    h = int(getattr(world, "T").shape[0]) if getattr(world, "T", None) is not None else 32
+    w = int(getattr(world, "T").shape[1]) if getattr(world, "T", None) is not None else 32
+    out = []
+    for obj in objs:
+        rec = obj.to_dict() if isinstance(obj, ResourceObject) else dict(obj)
+        x = float(rec.get("x") or 0.0)
+        y = float(rec.get("y") or 0.0)
+        rec["cell"] = [int(wrap_coord(int(np.floor(y)), h)), int(wrap_coord(int(np.floor(x)), w))]
+        rec["researcher_only"] = True
+        rec["agent_accessible"] = False
+        rec["kind"] = "PHYSICAL_RESOURCE_OBJECT"
+        rec["agent_optical_contribution_enabled"] = bool(object_vision_enabled)
+        rec["researcher_overlay_independent_of_illumination"] = True
+        rec["optical_note"] = (
+            "researcher overlay is not agent optics; "
+            "agent contribution uses existing anonymous near-field channels when enabled"
+        )
+        if getattr(world, "free_object_kinematics_state", None) is not None:
+            # Derived researcher view of the authoritative object velocity (renderer never writes back).
+            _vx, _vy = float(rec.get("vx") or 0.0), float(rec.get("vy") or 0.0)
+            _st = str(rec.get("physical_state") or "")
+            rec["speed"] = float(np.hypot(_vx, _vy))
+            rec["motion_status"] = "MOVING" if _st == "FREE_MOVING" else ("HELD" if _st == "HELD" else "FREE_REST")
+            rec["collision_physics"] = "NOT_IMPLEMENTED"
+        if str(rec.get("physical_state") or "") == "HELD":
+            hid = rec.get("holder_body_id") or "unknown"
+            mid = rec.get("manipulator_id") or "manipulator_0"
+            rec["held_overlay_label"] = f"HELD by {hid}/{mid}"
+        if passive_properties_enabled:
+            from mechanistic_mind.physical_system.passive_material_properties import (
+                researcher_property_readout,
+            )
+            rec["passive_material_properties"] = researcher_property_readout(rec.get("composition"))
+            rec["passive_material_properties_access"] = "researcher-only"
+            rec["passive_material_properties_agent_accessible"] = False
+        if optical_profile_enabled:
+            from mechanistic_mind.physical_system.physical_optical_material_profile import (
+                researcher_profile_readout,
+            )
+            rec["physical_optical_material_profile"] = researcher_profile_readout(rec.get("composition"))
+            rec["physical_optical_material_profile_access"] = "researcher-only"
+            rec["physical_optical_material_profile_agent_accessible"] = False
+            rec["physical_optical_material_profile_label"] = (
+                "MATERIAL PROPERTY ONLY · NO PHYSICAL LIGHT TRANSPORT · NOT DISPLAY RGB"
+            )
+        # Researcher-only size-geometry readout (does not leak to cognition).
+        prov = rec.get("provenance") if isinstance(rec.get("provenance"), dict) else {}
+        if prov.get("size_geometry_profile") or prov.get("size_geometry_final_radius") is not None:
+            rec["size_geometry"] = {
+                "profile_version": prov.get("size_geometry_profile"),
+                "geometry_model": prov.get("size_geometry_model"),
+                "clamp_status": prov.get("size_geometry_clamp_status"),
+                "scope_classification": prov.get("size_geometry_scope"),
+                "quantity": prov.get("size_geometry_quantity"),
+                "raw_radius": prov.get("size_geometry_raw_radius"),
+                "final_radius": prov.get("size_geometry_final_radius"),
+                "quantity_ref": prov.get("size_geometry_quantity_ref"),
+                "radius_ref": prov.get("size_geometry_radius_ref"),
+                "exponent": prov.get("size_geometry_exponent"),
+                "collision_radius": rec.get("collision_radius"),
+                "optical_radius": rec.get("optical_radius"),
+                "vertical_half_extent": rec.get("vertical_half_extent"),
+                "size_mutable_after_creation": False,
+                "optical_radius_unchanged": True,
+                "post_creation_resizing_disabled": True,
+                "researcher_only": True,
+                "agent_accessible": False,
+            }
+        out.append(rec)
+    return out
+
+
+def _researcher_manipulators(runtime: Any) -> list[dict[str, Any]]:
+    """Observer GT effector/reach. Not agent observation."""
+    from mechanistic_mind.physical_system.physical_manipulator import (
+        BILATERAL_IDS,
+        MANIP_LEFT,
+        MANIP_RIGHT,
+        MANIPULATOR_ID,
+        CANONICAL_GRASP_RADIUS,
+        CANONICAL_LATERAL_OFFSET,
+        effector_world_xy,
+        held_object_for_holder,
+        bilateral_manipulator_is_active,
+        bring_together_is_active,
+        manipulator_is_active,
+        world_manipulators_active,
+    )
+
+    slots = list(getattr(runtime, "slots", None) or [runtime])
+    out = []
+    for i, slot in enumerate(slots):
+        cfg = getattr(slot, "config", None)
+        if not world_manipulators_active(cfg):
+            continue
+        world = getattr(slot, "world", None) or getattr(runtime, "world", None)
+        t = getattr(world, "T", None)
+        h = int(t.shape[0]) if t is not None else 32
+        w = int(t.shape[1]) if t is not None else 32
+        bid = str(getattr(slot, "technical_id", None) or f"agent_{i}")
+        rec_m = getattr(slot, "last_manipulator_receipt", None) or {}
+        if bilateral_manipulator_is_active(cfg):
+            bcfg = getattr(cfg, "bilateral_physical_manipulators", None)
+            hands = rec_m.get("hands") if isinstance(rec_m.get("hands"), dict) else {}
+            for mid in BILATERAL_IDS:
+                ex, ey = effector_world_xy(
+                    slot.body, width=w, height=h, config=cfg, manipulator_id=mid, runtime=slot,
+                )
+                held = held_object_for_holder(world, bid, mid)
+                hrec = hands.get(mid) or {}
+                out.append({
+                    "body_id": bid,
+                    "manipulator_id": mid,
+                    "side": mid,
+                    "effector_x": ex,
+                    "effector_y": ey,
+                    "grasp_radius": float(getattr(bcfg, "grasp_radius", CANONICAL_GRASP_RADIUS) or CANONICAL_GRASP_RADIUS),
+                    "forward_offset": float(getattr(bcfg, "forward_offset", 0.55) or 0.55),
+                    "lateral_offset": float(getattr(bcfg, "lateral_offset", CANONICAL_LATERAL_OFFSET) or CANONICAL_LATERAL_OFFSET),
+                    "heading_authority": "body.theta",
+                    "occupied": held is not None,
+                    "held_object_id": str(held.object_id) if held is not None else None,
+                    "last_event": hrec.get("event") or rec_m.get("event"),
+                    "last_manipulator_action": hrec.get("manipulator_action"),
+                    "researcher_only": True,
+                })
+            if bring_together_is_active(cfg):
+                from mechanistic_mind.physical_system.physical_manipulator import (
+                    open_pair_aperture,
+                    pair_min_aperture,
+                    object_center_distance,
+                )
+                from mechanistic_mind.physical_system.resource_objects import clip_interaction_radius
+                left_o = held_object_for_holder(world, bid, MANIP_LEFT)
+                right_o = held_object_for_holder(world, bid, MANIP_RIGHT)
+                dist = None
+                if left_o is not None and right_o is not None and str(left_o.object_id) != str(right_o.object_id):
+                    dist = object_center_distance(left_o, right_o, width=w, height=h)
+                pair_rec = getattr(slot, "last_pair_receipt", None) or {}
+                open_ap = open_pair_aperture(cfg)
+                min_ap = pair_min_aperture(world, bid, cfg)
+                out.append({
+                    "body_id": bid,
+                    "kind": "pair_state",
+                    "aperture": float(getattr(slot, "pair_aperture", open_ap) or open_ap),
+                    "open_aperture": float(open_ap),
+                    "min_aperture": float(min_ap),
+                    "pair_state": str(getattr(slot, "pair_state", "OPEN") or "OPEN"),
+                    "contact": bool(getattr(slot, "pair_contact", False)),
+                    "surface_distance": dist,
+                    "left_held": left_o is not None,
+                    "right_held": right_o is not None,
+                    "left_interaction_radius": clip_interaction_radius(getattr(left_o, "interaction_radius", 0.2)) if left_o else None,
+                    "right_interaction_radius": clip_interaction_radius(getattr(right_o, "interaction_radius", 0.2)) if right_o else None,
+                    "last_pair_receipt": pair_rec,
+                    "last_material_transformation_receipt": getattr(slot, "last_material_transformation_receipt", None),
+                    "mixing": bool((getattr(slot, "last_material_transformation_receipt", None) or {}).get("outcome") == "MERGE_COMMITTED"),
+                    "researcher_only": True,
+                })
+            continue
+        if not manipulator_is_active(cfg):
+            continue
+        mid = str(getattr(getattr(cfg, "single_physical_manipulator", None), "manipulator_id", None) or MANIPULATOR_ID)
+        ex, ey = effector_world_xy(slot.body, width=w, height=h, config=cfg)
+        held = held_object_for_holder(world, bid, mid)
+        out.append({
+            "body_id": bid,
+            "manipulator_id": mid,
+            "effector_x": ex,
+            "effector_y": ey,
+            "grasp_radius": float(getattr(cfg.single_physical_manipulator, "grasp_radius", 0.4)),
+            "forward_offset": float(getattr(cfg.single_physical_manipulator, "forward_offset", 0.55)),
+            "heading_authority": "body.theta",
+            "occupied": held is not None,
+            "held_object_id": str(held.object_id) if held is not None else None,
+            "last_event": rec_m.get("event"),
+            "last_manipulator_action": rec_m.get("manipulator_action"),
+            "researcher_only": True,
+        })
+    return out
+
+
+def _o3a_optical_surfaces_world_payload(runtime: "PhysicalSystemRuntime", world: Any, cfg: Any) -> dict[str, Any]:
+    from mechanistic_mind.physical_system.object_body_held_optical_surfaces import (
+        object_body_held_optical_surfaces_is_active,
+        researcher_summary,
+    )
+    from mechanistic_mind.physical_system.spatial_contents import body_refs_for_runtime
+
+    if not object_body_held_optical_surfaces_is_active(cfg):
+        return {}
+    bodies = body_refs_for_runtime(runtime)
+    return {
+        "object_body_held_optical_surfaces": researcher_summary(world, cfg, bodies=bodies),
+        "object_body_held_optical_surfaces_researcher_only": True,
+    }
+
+
+def _o4_optical_reception_world_payload(runtime: "PhysicalSystemRuntime", world: Any, cfg: Any) -> dict[str, Any]:
+    from mechanistic_mind.physical_system.organism_physical_optical_reception import (
+        organism_physical_optical_reception_is_active,
+        researcher_summary,
+    )
+
+    if not organism_physical_optical_reception_is_active(cfg):
+        return {}
+    return {
+        "organism_physical_optical_reception": researcher_summary(world, cfg),
+        "organism_physical_optical_reception_researcher_only": True,
+    }
+
+
+def _o5_temporal_alignment_world_payload(runtime: "PhysicalSystemRuntime", world: Any, cfg: Any) -> dict[str, Any]:
+    from mechanistic_mind.physical_system.sensory_modality_temporal_alignment import (
+        note_observer_poll_skip,
+        researcher_summary,
+        sensory_modality_temporal_alignment_is_active,
+    )
+
+    if not sensory_modality_temporal_alignment_is_active(cfg):
+        return {}
+    # Passive poll: never create envelopes
+    note_observer_poll_skip(world)
+    return {
+        "sensory_modality_temporal_alignment": researcher_summary(world, cfg),
+        "sensory_modality_temporal_alignment_researcher_only": True,
+    }
+
+
+
+def _vw7_volume_consumer_world_payload(
+    runtime: "PhysicalSystemRuntime",
+    *,
+    want: bool,
+) -> dict[str, Any]:
+    """VW7 researcher volume payload — gated by P1 derived subscription; P2 incremental."""
+    if not want:
+        try:
+            from mechanistic_mind.physical_system.beta4_performance_benchmark import (
+                count as _b4p_count,
+                is_enabled as _b4p_on,
+            )
+            if _b4p_on():
+                _b4p_count("volume_payload_omitted")
+        except Exception:
+            pass
+        return {}
+    if getattr(runtime.config, "model_line", "") != "ACANTHOSTEGA":
+        return {}
+    if not bool(getattr(getattr(runtime.config, "volumetric_world_material_occupancy", None), "enabled", False)):
+        return {}
+    held = getattr(runtime, "_observer_volume_held_static_id", None)
+    payload = __import__(
+        "mechanistic_mind.physical_system.observer_camera_occupancy_consumer",
+        fromlist=["researcher_payload"],
+    ).researcher_payload(
+        runtime,
+        held_static_payload_id=str(held) if held else None,
+        prefer_incremental=True,
+    )
+    try:
+        desc = payload.get("observer_camera_occupancy_consumer") or {}
+        sid = desc.get("static_payload_id")
+        kind = desc.get("incremental_wire_kind")
+        inc = desc.get("observer_volume_incremental") or {}
+        if sid and (kind in ("FULL", "RESET", None) or inc.get("volume_static")):
+            if kind == "FULL" or (isinstance(inc, dict) and inc.get("volume_static")):
+                setattr(runtime, "_observer_volume_held_static_id", str(sid))
+        elif kind == "DYNAMIC" and sid:
+            setattr(runtime, "_observer_volume_held_static_id", str(sid))
+    except Exception:
+        pass
+    return payload
+
+
+def _o6_optical_audit_world_payload(
+    runtime: "PhysicalSystemRuntime",
+    world: Any,
+    cfg: Any,
+    *,
+    want: bool = True,
+) -> dict[str, Any]:
+    from mechanistic_mind.physical_system.exposed_surface_optical_interaction_authority import (
+        exposed_surface_optical_interaction_authority_is_active,
+    )
+    from mechanistic_mind.physical_system.researcher_physical_optical_audit_view import (
+        researcher_summary,
+    )
+
+    if not want:
+        try:
+            from mechanistic_mind.physical_system.beta4_performance_benchmark import (
+                count as _b4p_count,
+                is_enabled as _b4p_on,
+            )
+            if _b4p_on():
+                _b4p_count("surface_payload_omitted")
+        except Exception:
+            pass
+        return {}
+    if not exposed_surface_optical_interaction_authority_is_active(cfg):
+        return {}
+    held = getattr(runtime, "_observer_surface_held_static_id", None)
+    # Passive poll: read-only summary (+ cached columnar display); never mutates physics.
+    summary = researcher_summary(
+        world,
+        cfg,
+        runtime=runtime,
+        held_static_payload_id=str(held) if held else None,
+        prefer_incremental=True,
+    )
+    # Optimistic: after emitting a full/reset base, remember static id for next DYNAMIC wire.
+    try:
+        sid = summary.get("static_payload_id")
+        kind = summary.get("incremental_wire_kind")
+        if sid and kind in ("FULL", "RESET", None):
+            # Only advance held id when we actually sent static geometry.
+            inc = summary.get("observer_surface_incremental") or {}
+            if kind == "FULL" or (isinstance(inc, dict) and inc.get("surface_static")):
+                setattr(runtime, "_observer_surface_held_static_id", str(sid))
+        elif kind == "DYNAMIC" and sid:
+            setattr(runtime, "_observer_surface_held_static_id", str(sid))
+    except Exception:
+        pass
+    return {
+        "researcher_physical_optical_audit_view": summary,
+        "researcher_physical_optical_audit_view_researcher_only": True,
+    }
+
+
+def _acanthostega_beta4_capability_payload(runtime: "PhysicalSystemRuntime") -> dict[str, Any] | None:
+    """Researcher-only complete Beta 4.0 capability summary (not public stage toggles)."""
+    cfg = runtime.config
+    preset = str(getattr(cfg, "public_preset", "") or "").upper()
+    is_public_beta4 = preset in {"ACANTHOSTEGA_BETA4", "ACANTHOSTEGA_BETA4_0"}
+    is_vw7_fixture = "VOLUMETRIC_WORLD_VW7" in preset
+    if not is_public_beta4 and not is_vw7_fixture:
+        return None
+    if getattr(cfg, "model_line", "") != "ACANTHOSTEGA":
+        return None
+    if not bool(getattr(getattr(cfg, "volumetric_world_material_occupancy", None), "enabled", False)):
+        return None
+    stages = {
+        "VW1_occupancy": bool(getattr(getattr(cfg, "volumetric_world_material_occupancy", None), "enabled", False)),
+        "VW2_support_contact": bool(getattr(getattr(cfg, "occupancy_support_and_contact_queries", None), "enabled", False)),
+        "VW3_separation": bool(getattr(getattr(cfg, "volumetric_world_material_separation", None), "enabled", False)),
+        "VW4_reintegration_transaction": bool(getattr(getattr(cfg, "volumetric_world_material_reintegration", None), "enabled", False)),
+        "VW5_effector_bridge": bool(getattr(getattr(cfg, "effector_held_occupancy_exertion_bridge", None), "enabled", False)),
+        "VW6_minimal_vision_3d": bool(getattr(getattr(cfg, "minimal_vision_3d_geometric_interface", None), "enabled", False)),
+        "VW7_observer_consumer": bool(getattr(getattr(cfg, "volumetric_world_material_occupancy", None), "enabled", False)),
+        "free_space_v1a": bool(getattr(getattr(cfg, "free_space_state_and_pe_authority_contract", None), "enabled", False)),
+        "free_space_v1b": bool(getattr(getattr(cfg, "vertical_terrain_landing_contact_response", None), "enabled", False)),
+        "free_space_v1c": bool(getattr(getattr(cfg, "vertical_impact_acoustic_emission", None), "enabled", False)),
+        "free_space_v1d": bool(getattr(getattr(cfg, "release_and_excavation_support_loss_integration", None), "enabled", False)),
+        "V1D_release_excavation": bool(getattr(getattr(cfg, "release_and_excavation_support_loss_integration", None), "enabled", False)),
+        "O1_physical_optical_material_profile": bool(
+            getattr(getattr(cfg, "physical_optical_material_profile", None), "enabled", False)
+        ),
+        "O2_exposed_surface_optical_interaction_authority": bool(
+            getattr(getattr(cfg, "exposed_surface_optical_interaction_authority", None), "enabled", False)
+        ),
+        "O3_abstract_spectral_light_source_and_direct_transport": bool(
+            getattr(getattr(cfg, "abstract_spectral_light_source_and_direct_transport", None), "enabled", False)
+        ),
+        "O3A_object_body_held_optical_surfaces": bool(
+            getattr(getattr(cfg, "object_body_held_optical_surfaces", None), "enabled", False)
+        ),
+        "O4_organism_physical_optical_reception": bool(
+            getattr(getattr(cfg, "organism_physical_optical_reception", None), "enabled", False)
+        ),
+        "O5_sensory_modality_temporal_alignment": bool(
+            getattr(getattr(cfg, "sensory_modality_temporal_alignment", None), "enabled", False)
+        ),
+        "O6_researcher_physical_optical_audit_view": bool(
+            getattr(getattr(cfg, "exposed_surface_optical_interaction_authority", None), "enabled", False)
+        ),
+    }
+    if is_public_beta4:
+        banner = (
+            "Acanthostega Beta 4.0\n"
+            f"- volumetric occupancy: {'active' if stages['VW1_occupancy'] else 'inactive'}\n"
+            f"- free-space vertical dynamics: {'active' if stages['free_space_v1d'] else 'inactive'}\n"
+            f"- physical support/contact: {'active' if stages['VW2_support_contact'] else 'inactive'}\n"
+            f"- conservative material transactions: {'active' if stages['VW3_separation'] else 'inactive'}\n"
+            f"- organism volumetric interaction: {'active' if stages['VW5_effector_bridge'] else 'inactive'}\n"
+            f"- organism XYZ vision: {'active' if stages['VW6_minimal_vision_3d'] else 'inactive'}\n"
+            f"- MAP / 2D and VOLUME / 3D: {'available' if stages['VW7_observer_consumer'] else 'unavailable'}\n"
+            "- held→world incorporation trigger: not yet implemented"
+        )
+        return {
+            "acanthostega_beta4_capability": {
+                "schema": "ACANTHOSTEGA_BETA4_CAPABILITY_STATUS_V1",
+                "researcher_only": True,
+                "public_preset": str(getattr(cfg, "public_preset", "") or ""),
+                "model_line": str(getattr(cfg, "model_line", "") or ""),
+                "visibility_class": "PUBLIC_MODEL",
+                "stages": stages,
+                "VW7_is_physical_mechanism": False,
+                "held_to_world_physical_trigger": "BLOCKED",
+                "authority": "AUTHORITATIVE_WORLD_MATERIAL_OCCUPANCY_ABSOLUTE_Z",
+                "banner": banner,
+            }
+        }
+    banner = (
+        "VOLUMETRIC WORLD\n"
+        f"VW1 occupancy: {'ACTIVE' if stages['VW1_occupancy'] else 'INACTIVE'}\n"
+        f"VW2 support/contact: {'ACTIVE' if stages['VW2_support_contact'] else 'INACTIVE'}\n"
+        f"VW3 separation: {'ACTIVE' if stages['VW3_separation'] else 'INACTIVE'}\n"
+        f"VW4 reintegration transaction: {'ACTIVE' if stages['VW4_reintegration_transaction'] else 'INACTIVE'}\n"
+        f"VW5 effector bridge: {'ACTIVE' if stages['VW5_effector_bridge'] else 'INACTIVE'}\n"
+        f"VW6 physical XYZ vision: {'ACTIVE' if stages['VW6_minimal_vision_3d'] else 'INACTIVE'}\n"
+        f"VW7 Observer consumer: {'AVAILABLE' if stages['VW7_observer_consumer'] else 'UNAVAILABLE'}\n"
+        "Held→world incorporation trigger: BLOCKED / NOT IMPLEMENTED"
+    )
+    return {
+        "volumetric_world_vw7_cumulative": {
+            "schema": "ACANTHOSTEGA_VOLUMETRIC_WORLD_VW7_STATUS_V1",
+            "researcher_only": True,
+            "public_preset": str(getattr(cfg, "public_preset", "") or ""),
+            "model_line": str(getattr(cfg, "model_line", "") or ""),
+            "visibility_class": "DEVELOPMENT_FIXTURE",
+            "stages": stages,
+            "VW7_is_physical_mechanism": False,
+            "held_to_world_physical_trigger": "BLOCKED",
+            "authority": "AUTHORITATIVE_WORLD_MATERIAL_OCCUPANCY_ABSOLUTE_Z",
+            "banner": banner,
+        }
+    }
+
+
+def _volumetric_world_vw7_cumulative_payload(runtime: "PhysicalSystemRuntime") -> dict[str, Any] | None:
+    """Researcher-only cumulative VW1–VW7 status for the public VW7 tip preset."""
+    cfg = runtime.config
+    preset = str(getattr(cfg, "public_preset", "") or "").upper()
+    if "VOLUMETRIC_WORLD_VW7" not in preset:
+        return None
+    if getattr(cfg, "model_line", "") != "ACANTHOSTEGA":
+        return None
+    if not bool(getattr(getattr(cfg, "volumetric_world_material_occupancy", None), "enabled", False)):
+        return None
+    if not bool(getattr(getattr(cfg, "minimal_vision_3d_geometric_interface", None), "enabled", False)):
+        return None
+    stages = {
+        "VW1_occupancy": bool(getattr(getattr(cfg, "volumetric_world_material_occupancy", None), "enabled", False)),
+        "VW2_support_contact": bool(getattr(getattr(cfg, "occupancy_support_and_contact_queries", None), "enabled", False)),
+        "VW3_separation": bool(getattr(getattr(cfg, "volumetric_world_material_separation", None), "enabled", False)),
+        "VW4_reintegration_transaction": bool(getattr(getattr(cfg, "volumetric_world_material_reintegration", None), "enabled", False)),
+        "VW5_effector_bridge": bool(getattr(getattr(cfg, "effector_held_occupancy_exertion_bridge", None), "enabled", False)),
+        "VW6_minimal_vision_3d": bool(getattr(getattr(cfg, "minimal_vision_3d_geometric_interface", None), "enabled", False)),
+        "VW7_observer_consumer": bool(getattr(getattr(cfg, "volumetric_world_material_occupancy", None), "enabled", False)),
+    }
+    banner = (
+        "VOLUMETRIC WORLD\n"
+        f"VW1 occupancy: {'ACTIVE' if stages['VW1_occupancy'] else 'INACTIVE'}\n"
+        f"VW2 support/contact: {'ACTIVE' if stages['VW2_support_contact'] else 'INACTIVE'}\n"
+        f"VW3 separation: {'ACTIVE' if stages['VW3_separation'] else 'INACTIVE'}\n"
+        f"VW4 reintegration transaction: {'ACTIVE' if stages['VW4_reintegration_transaction'] else 'INACTIVE'}\n"
+        f"VW5 effector bridge: {'ACTIVE' if stages['VW5_effector_bridge'] else 'INACTIVE'}\n"
+        f"VW6 physical XYZ vision: {'ACTIVE' if stages['VW6_minimal_vision_3d'] else 'INACTIVE'}\n"
+        f"VW7 Observer consumer: {'AVAILABLE' if stages['VW7_observer_consumer'] else 'UNAVAILABLE'}\n"
+        "Held→world incorporation trigger: BLOCKED / NOT IMPLEMENTED"
+    )
+    return {
+        "volumetric_world_vw7_cumulative": {
+            "schema": "ACANTHOSTEGA_VOLUMETRIC_WORLD_VW7_STATUS_V1",
+            "researcher_only": True,
+            "public_preset": str(getattr(cfg, "public_preset", "") or ""),
+            "model_line": str(getattr(cfg, "model_line", "") or ""),
+            "stages": stages,
+            "VW7_is_physical_mechanism": False,
+            "held_to_world_physical_trigger": "BLOCKED",
+            "authority": "AUTHORITATIVE_WORLD_MATERIAL_OCCUPANCY_ABSOLUTE_Z",
+            "banner": banner,
+        }
     }
 
 
@@ -467,6 +1123,8 @@ def world_frame(
     *,
     max_side: int = 64,
     detail: str = "full",
+    observer_interest: Any | None = None,
+    derived_subscription: Any | None = None,
 ) -> dict[str, Any]:
     """Serialize planet fields.
 
@@ -474,8 +1132,158 @@ def world_frame(
     omitting M*/u/R* planes that dominate JSON size. Full detail remains on PAUSE/INSPECT.
     Compact also uses flat grid encoding and avoids duplicating planes across
     top-level / scalars / vectors (OBS-05).
+
+    P1: VOLUME/SURFACE derived geometry builds only when the resolved Observer
+    derived-payload subscription requests them. Absent interest defaults to MAP-only.
     """
+    from mechanistic_mind.ui.psy_observer_web.observer_derived_payload_subscription import (
+        resolve_derived_subscription,
+    )
+
+    _derived = derived_subscription or resolve_derived_subscription(observer_interest)
+    _want_volume = bool(getattr(_derived, "include_volume", False))
+    _want_surface = bool(getattr(_derived, "include_surface", False))
+
     w = runtime.world
+    from mechanistic_mind.physical_system.resource_objects import object_vision_is_active
+    _slot0 = (getattr(runtime, "slots", None) or [None])[0]
+    _cfg0 = getattr(_slot0, "config", None) if _slot0 is not None else getattr(runtime, "config", None)
+    _obj_vis = object_vision_is_active(_cfg0)
+    from mechanistic_mind.physical_system.passive_material_properties import (
+        passive_material_properties_is_active,
+    )
+    _props_on = passive_material_properties_is_active(_cfg0)
+    from mechanistic_mind.physical_system.physical_optical_material_profile import (
+        physical_optical_material_profile_is_active,
+        researcher_profile_readout,
+        coverage_summary as o1_coverage_summary,
+    )
+    _o1_on = physical_optical_material_profile_is_active(_cfg0)
+    from mechanistic_mind.physical_system.explicit_surface_deposition import (
+        ensure_surface_deposits,
+        researcher_deposit_readout,
+    )
+    from mechanistic_mind.physical_system.surface_affinity_traction import (
+        surface_affinity_traction_is_active,
+        traction_multiplier,
+    )
+    _traction_on = surface_affinity_traction_is_active(_cfg0)
+    _traction_tick = int(getattr(runtime, "tick", 0) or 0)
+
+    def _deposit_row(row: Any) -> dict[str, Any]:
+        payload = researcher_deposit_readout(row)
+        if _o1_on:
+            payload["physical_optical_material_profile"] = researcher_profile_readout(
+                payload.get("composition")
+            )
+            payload["physical_optical_material_profile_label"] = (
+                "MATERIAL PROPERTY ONLY · NO PHYSICAL LIGHT TRANSPORT · NOT DISPLAY RGB"
+            )
+            payload["physical_optical_material_profile_agent_accessible"] = False
+        if not _traction_on:
+            return payload
+        affinity = float(payload.get("surface_affinity") or 0.5)
+        updated = int(payload.get("last_updated_tick") or 0)
+        payload["traction_multiplier"] = traction_multiplier(affinity)
+        payload["traction_eligible"] = updated < _traction_tick
+        payload["traction_note"] = "continuous physical law"
+        payload["not_a_recipe"] = True
+        return payload
+
+    from mechanistic_mind.physical_system.physical_surface_optical_coating import (
+        coverage_from_quantity,
+        physical_surface_optical_coating_is_active,
+    )
+    _coating_on = physical_surface_optical_coating_is_active(_cfg0)
+
+    def _with_coating(payload: dict[str, Any], row: Any) -> dict[str, Any]:
+        if not _coating_on:
+            return payload
+        optical = getattr(row, "optical_response", None)
+        if optical is None and isinstance(row, dict):
+            optical = row.get("optical_response")
+        if optical is None:
+            payload["optical_coating"] = False
+            return payload
+        if isinstance(optical, dict):
+            triplet = (optical.get("c0"), optical.get("c1"), optical.get("c2"))
+        else:
+            triplet = tuple(optical)
+        quantity = float(getattr(row, "quantity", None) if not isinstance(row, dict) else row.get("quantity") or 0.0)
+        payload["optical_c0"] = float(triplet[0])
+        payload["optical_c1"] = float(triplet[1])
+        payload["optical_c2"] = float(triplet[2])
+        payload["coverage"] = coverage_from_quantity(quantity)
+        payload["optical_derivation_version"] = getattr(row, "optical_derivation_version", None)
+        payload["agent_receives_anonymous_optical_consequence"] = True
+        payload["not_a_material_identity"] = True
+        payload["not_a_traction_label"] = True
+        payload["not_a_recipe"] = True
+        payload["researcher_only"] = True
+        return payload
+
+    _deposits = [
+        _with_coating(_deposit_row(row), row)
+        for row in ensure_surface_deposits(w).values()
+    ]
+    _traction_history: list[dict[str, Any]] = []
+    if _traction_on:
+        slots = list(getattr(runtime, "slots", None) or [runtime])
+        for slot in slots:
+            _traction_history.extend(list(getattr(slot, "surface_traction_history", None) or []))
+        _traction_history = _traction_history[-8:]
+    from mechanistic_mind.physical_system.surface_traction_experience import (
+        surface_traction_experience_is_active,
+    )
+    _experience_on = surface_traction_experience_is_active(_cfg0)
+    _experience_history: list[dict[str, Any]] = []
+    if _experience_on:
+        slots = list(getattr(runtime, "slots", None) or [runtime])
+        for slot in slots:
+            _experience_history.extend(list(getattr(slot, "traction_experience_history", None) or []))
+        _experience_history = [
+            {
+                "action_tick": row.get("action_tick"),
+                "consequence_observation_tick": row.get("consequence_observation_tick"),
+                "selected_motor_command": row.get("selected_motor_command"),
+                "displacement": row.get("displacement"),
+                "prediction_error_status": row.get("prediction_error_status"),
+                "memory_status": row.get("memory_status"),
+                "memory_reference": row.get("memory_reference"),
+                "action_provenance": row.get("action_provenance"),
+                "agent_id": row.get("agent_id"),
+                "researcher_only": True,
+                "not_agent_accessible": True,
+            }
+            for row in _experience_history[-8:]
+        ]
+    from mechanistic_mind.physical_system.surface_traction_prediction import (
+        surface_traction_prediction_is_active,
+    )
+    _prediction_on = surface_traction_prediction_is_active(_cfg0)
+    _prediction_history: list[dict[str, Any]] = []
+    if _prediction_on:
+        slots = list(getattr(runtime, "slots", None) or [runtime])
+        for slot in slots:
+            _prediction_history.extend(list(getattr(slot, "traction_prediction_history", None) or []))
+        _prediction_history = [
+            {
+                "action_tick": row.get("action_tick"),
+                "consequence_observation_tick": row.get("consequence_observation_tick"),
+                "selected_motor_command": row.get("selected_motor_command"),
+                "exposure_phase": row.get("exposure_phase"),
+                "prediction_availability": row.get("prediction_availability"),
+                "aggregate_error": row.get("aggregate_error"),
+                "revision_applied": row.get("revision_applied"),
+                "memory_status": row.get("memory_status"),
+                "memory_reference": row.get("memory_reference"),
+                "action_provenance": row.get("action_provenance"),
+                "agent_id": row.get("agent_id"),
+                "researcher_only": True,
+                "not_agent_accessible": True,
+            }
+            for row in _prediction_history[-8:]
+        ]
     cfg = runtime.config.planet
     fields = discover_world_fields(runtime)
     compact = str(detail).lower() == "compact"
@@ -664,6 +1472,17 @@ def world_frame(
                     for i, slot in enumerate(getattr(runtime, "slots", None) or [])
                 ]
             } if getattr(runtime, "slots", None) else {}),
+            "resource_objects": _researcher_resource_objects(
+                w,
+                object_vision_enabled=_obj_vis,
+                passive_properties_enabled=_props_on,
+                optical_profile_enabled=_o1_on,
+            ),
+            "surface_material_deposits": _deposits,
+            **({"surface_traction_receipts": _traction_history} if _traction_on else {}),
+            **({"traction_experience_receipts": _experience_history} if _experience_on else {}),
+            **({"traction_prediction_receipts": _prediction_history} if _prediction_on else {}),
+            "manipulators": _researcher_manipulators(runtime),
         },
         "layers_available": [f["id"] for f in fields] + ["flow_mag", "body"],
         "render_modes": ["SMOOTH", "CELL", "CONTOUR", "VECTOR", "COMPOSITE"],
@@ -675,6 +1494,1083 @@ def world_frame(
         },
         "interpolation_policy": "SMOOTH/CONTOUR interpolation is VISUAL ONLY and never fed back into MM.",
         "observer_ground_truth": _climate_observer_ground_truth(runtime),
+        "resource_objects": _researcher_resource_objects(
+            w,
+            object_vision_enabled=_obj_vis,
+            passive_properties_enabled=_props_on,
+            optical_profile_enabled=_o1_on,
+        ),
+        "resource_objects_researcher_only": True,
+        "surface_material_deposits": _deposits,
+        "surface_material_deposits_researcher_only": True,
+        **({
+            "physical_optical_material_profile_summary": o1_coverage_summary(
+                objects=_researcher_resource_objects(
+                    w,
+                    object_vision_enabled=_obj_vis,
+                    passive_properties_enabled=False,
+                    optical_profile_enabled=False,
+                ),
+                deposits=_deposits,
+            ),
+            "physical_optical_material_profile_researcher_only": True,
+            "physical_optical_material_profile_label": (
+                "MATERIAL PROPERTY ONLY · NO PHYSICAL LIGHT TRANSPORT · NOT DISPLAY RGB"
+            ),
+            "physical_optical_material_profile_organism_saw_material": False,
+        } if _o1_on else {}),
+        **({
+            "exposed_surface_optical_interaction_authority": __import__(
+                "mechanistic_mind.physical_system.exposed_surface_optical_interaction_authority",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w, _cfg0),
+            "exposed_surface_optical_interaction_authority_researcher_only": True,
+        } if __import__(
+            "mechanistic_mind.physical_system.exposed_surface_optical_interaction_authority",
+            fromlist=["exposed_surface_optical_interaction_authority_is_active"],
+        ).exposed_surface_optical_interaction_authority_is_active(_cfg0) else {}),
+        **({
+            "abstract_spectral_light_source_and_direct_transport": __import__(
+                "mechanistic_mind.physical_system.abstract_spectral_light_source_and_direct_transport",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w, _cfg0),
+            "abstract_spectral_light_source_and_direct_transport_researcher_only": True,
+        } if __import__(
+            "mechanistic_mind.physical_system.abstract_spectral_light_source_and_direct_transport",
+            fromlist=["abstract_spectral_light_source_and_direct_transport_is_active"],
+        ).abstract_spectral_light_source_and_direct_transport_is_active(_cfg0) else {}),
+        **(_o3a_optical_surfaces_world_payload(runtime, w, _cfg0)),
+        **(_o4_optical_reception_world_payload(runtime, w, _cfg0)),
+        **(_o5_temporal_alignment_world_payload(runtime, w, _cfg0)),
+        **(_o6_optical_audit_world_payload(runtime, w, _cfg0, want=_want_surface)),
+        **({
+            "world_material_transaction": {
+                "transaction_id": (getattr(w, "material_transaction_history", None) or [{}])[-1].get("transaction_id"),
+                "operation": (getattr(w, "material_transaction_history", None) or [{}])[-1].get("operation_kind"),
+                "status": (getattr(w, "material_transaction_history", None) or [{}])[-1].get("status"),
+                "input_refs": (getattr(w, "material_transaction_history", None) or [{}])[-1].get("input_refs"),
+                "output_refs": (getattr(w, "material_transaction_history", None) or [{}])[-1].get("output_refs"),
+                "conservation_verified": all(
+                    bool((domain or {}).get("verified"))
+                    for domain in ((getattr(w, "material_transaction_history", None) or [{}])[-1].get("conservation") or {}).values()
+                    if isinstance(domain, dict)
+                ),
+                "rejection_reason": (getattr(w, "material_transaction_history", None) or [{}])[-1].get("rejection_reason"),
+                "researcher_only": True,
+                "not_agent_accessible": True,
+                "not_a_recipe": True,
+            },
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "world_material_transactions", None), "enabled", False))
+            and getattr(w, "material_transaction_history", None)
+        ) else {}),
+        **(_spatial_contents_payload(w) if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "multi_content_spatial_index", None), "enabled", False))
+            and getattr(w, "spatial_contents", None) is not None
+        ) else {}),
+        **(__import__(
+            "mechanistic_mind.physical_system.procedural_surface_columns", fromlist=["researcher_payload"]
+        ).researcher_payload(w) if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "procedural_surface_columns", None), "enabled", False))
+            and getattr(w, "surface_columns", None) is not None
+        ) else {}),
+        **(__import__(
+            "mechanistic_mind.physical_system.volumetric_world_material_occupancy",
+            fromlist=["researcher_payload"],
+        ).researcher_payload(w) if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "volumetric_world_material_occupancy", None), "enabled", False))
+            and getattr(w, "volumetric_occupancy", None) is not None
+        ) else {}),
+        **(__import__(
+            "mechanistic_mind.physical_system.occupancy_support_and_contact_queries",
+            fromlist=["researcher_payload"],
+        ).researcher_payload(w) if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "occupancy_support_and_contact_queries", None), "enabled", False))
+            and getattr(w, "occupancy_support_contact_state", None) is not None
+        ) else {}),
+        **(__import__(
+            "mechanistic_mind.physical_system.volumetric_world_material_separation",
+            fromlist=["researcher_payload"],
+        ).researcher_payload(w) if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "volumetric_world_material_separation", None), "enabled", False))
+            and getattr(w, "volumetric_material_separation_state", None) is not None
+        ) else {}),
+        **(__import__(
+            "mechanistic_mind.physical_system.volumetric_world_material_reintegration",
+            fromlist=["researcher_payload"],
+        ).researcher_payload(w) if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "volumetric_world_material_reintegration", None), "enabled", False))
+            and getattr(w, "volumetric_material_reintegration_state", None) is not None
+        ) else {}),
+        **(__import__(
+            "mechanistic_mind.physical_system.effector_held_occupancy_exertion_bridge",
+            fromlist=["researcher_payload"],
+        ).researcher_payload(w) if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "effector_held_occupancy_exertion_bridge", None), "enabled", False))
+            and getattr(w, "effector_held_occupancy_exertion_bridge_state", None) is not None
+        ) else {}),
+        **(__import__(
+            "mechanistic_mind.physical_system.minimal_vision_3d_geometric_interface",
+            fromlist=["researcher_payload"],
+        ).researcher_payload(w) if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and bool(getattr(getattr(runtime.config, "minimal_vision_3d_geometric_interface", None), "enabled", False))
+            and getattr(w, "minimal_vision_3d_geometric_interface_state", None) is not None
+        ) else {}),
+        **(_vw7_volume_consumer_world_payload(runtime, want=_want_volume)),
+        **(_acanthostega_beta4_capability_payload(runtime) or {}),
+        **({
+            # Researcher-only visualisation of authoritative emission state (not agent-accessible).
+            "local_signal_overlay": __import__(
+                "mechanistic_mind.physical_system.local_physical_signal_transport", fromlist=["observer_overlay"]
+            ).observer_overlay(w),
+            "local_signal_summary": __import__(
+                "mechanistic_mind.physical_system.local_physical_signal_transport", fromlist=["researcher_summary"]
+            ).researcher_summary(w),
+            "local_signal_researcher_only": True,
+            **({
+                # Researcher-only contact-impulse provenance for the overlay tooltip (not agent-accessible).
+                "contact_acoustic_summary": __import__(
+                    "mechanistic_mind.physical_system.physical_contact_acoustic_emission",
+                    fromlist=["researcher_summary"],
+                ).researcher_summary(w),
+            } if getattr(w, "contact_acoustic_state", None) is not None else {}),
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "local_signal_transport", None) is not None
+        ) else {}),
+        **({
+            # Researcher-only free-object kinematics (authoritative pose/velocity; no collision physics).
+            "free_object_kinematics": __import__(
+                "mechanistic_mind.physical_system.free_resource_object_kinematics",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "free_object_kinematics_researcher_only": True,
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "free_object_kinematics_state", None) is not None
+        ) else {}),
+        **({
+            "body_object_contact": __import__(
+                "mechanistic_mind.physical_system.physical_body_resource_object_contact",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "body_object_contact_overlay": __import__(
+                "mechanistic_mind.physical_system.physical_body_resource_object_contact",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "body_object_contact_researcher_only": True,
+            "body_object_contact_banner": (
+                "MASS + COMPLIANCE NORMAL RESPONSE · NO FRICTION · NO SOUND"
+                if getattr(w, "body_object_contact_impulse_state", None) is not None
+                else "CONTACT FACT ONLY · NO IMPULSE · NO RESPONSE · NO SOUND"
+            ),
+            "body_object_impulse": (
+                __import__(
+                    "mechanistic_mind.physical_system.body_resource_object_contact_impulse",
+                    fromlist=["researcher_summary"],
+                ).researcher_summary(w)
+                if getattr(w, "body_object_contact_impulse_state", None) is not None
+                else None
+            ),
+            "body_object_impulse_overlay": (
+                __import__(
+                    "mechanistic_mind.physical_system.body_resource_object_contact_impulse",
+                    fromlist=["overlay_payload"],
+                ).overlay_payload(w)
+                if getattr(w, "body_object_contact_impulse_state", None) is not None
+                else None
+            ),
+            "body_object_impact_acoustics": (
+                __import__(
+                    "mechanistic_mind.physical_system.body_resource_object_impact_acoustic_emission",
+                    fromlist=["researcher_summary"],
+                ).researcher_summary(w)
+                if getattr(w, "body_object_impact_acoustic_state", None) is not None
+                else None
+            ),
+            "body_object_impact_acoustics_overlay": (
+                __import__(
+                    "mechanistic_mind.physical_system.body_resource_object_impact_acoustic_emission",
+                    fromlist=["overlay_payload"],
+                ).overlay_payload(w)
+                if getattr(w, "body_object_impact_acoustic_state", None) is not None
+                else None
+            ),
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "body_object_contact_state", None) is not None
+        ) else {}),
+
+        **({
+            "resource_object_pair_contact_impulse": __import__(
+                "mechanistic_mind.physical_system.resource_object_pair_contact_impulse",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "resource_object_pair_contact_impulse_overlay": __import__(
+                "mechanistic_mind.physical_system.resource_object_pair_contact_impulse",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "resource_object_pair_contact_impulse_researcher_only": True,
+            "resource_object_pair_contact_impulse_banner": (
+                "OBJECT/OBJECT MASS + COMPLIANCE NORMAL RESPONSE · NO FRICTION · NO SOUND · "
+                "MULTI-CONTACT: ISOLATED PAIRS ONLY"
+            ),
+            "resource_object_pair_impact_acoustics": __import__(
+                "mechanistic_mind.physical_system.resource_object_pair_impact_acoustic_emission",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w) if getattr(w, "resource_object_pair_impact_acoustic_state", None) is not None else None,
+            "resource_object_pair_impact_acoustics_overlay": __import__(
+                "mechanistic_mind.physical_system.resource_object_pair_impact_acoustic_emission",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w) if getattr(w, "resource_object_pair_impact_acoustic_state", None) is not None else None,
+            "resource_object_pair_impact_acoustics_researcher_only": True,
+            "resource_object_pair_impact_acoustics_banner": (
+                "OBJECT/OBJECT IMPACT · RESOLVED PAIR IMPULSE → DISSIPATED ENERGY → LOCAL SIGNAL · "
+                "NEUTRAL BROADBAND · NO MATERIAL TIMBRE · MULTI-CONTACT UNRESOLVED = SILENT"
+            ),
+            "resource_object_pair_contact": __import__(
+                "mechanistic_mind.physical_system.physical_resource_object_pair_contact",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "resource_object_pair_contact_overlay": __import__(
+                "mechanistic_mind.physical_system.physical_resource_object_pair_contact",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "resource_object_pair_contact_researcher_only": True,
+            "resource_object_pair_contact_banner": (
+                "OBJECT/OBJECT CONTACT FACT ONLY · NO IMPULSE · NO RESPONSE · NO SOUND"
+            ),
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "resource_object_pair_contact_state", None) is not None
+        ) else {}),
+
+        **({
+            "held_foreign_body_contact": __import__(
+                "mechanistic_mind.physical_system.held_resource_object_foreign_body_contact",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "held_foreign_body_contact_overlay": __import__(
+                "mechanistic_mind.physical_system.held_resource_object_foreign_body_contact",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "held_foreign_body_contact_researcher_only": True,
+            "held_foreign_body_contact_banner": (
+                "HELD OBJECT ↔ FOREIGN BODY CONTACT FACT · NO IMPULSE · NO DAMAGE · NO RELEASE · NO SOUND"
+            ),
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "held_foreign_body_contact_state", None) is not None
+        ) else {}),
+        **({
+            "held_resource_object_terrain_contact": __import__(
+                "mechanistic_mind.physical_system.held_resource_object_terrain_contact_geometry",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "held_resource_object_terrain_contact_overlay": __import__(
+                "mechanistic_mind.physical_system.held_resource_object_terrain_contact_geometry",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "held_resource_object_terrain_contact_researcher_only": True,
+            "held_resource_object_terrain_contact_banner": __import__(
+                "mechanistic_mind.physical_system.held_resource_object_terrain_contact_geometry",
+                fromlist=["BANNER"],
+            ).BANNER,
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "held_resource_object_terrain_contact_geometry_state", None) is not None
+        ) else {}),
+        **({
+            "held_resource_object_terrain_mechanical_transmission": __import__(
+                "mechanistic_mind.physical_system.held_resource_object_terrain_mechanical_transmission",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "held_resource_object_terrain_mechanical_transmission_overlay": __import__(
+                "mechanistic_mind.physical_system.held_resource_object_terrain_mechanical_transmission",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "held_resource_object_terrain_mechanical_transmission_researcher_only": True,
+            "held_resource_object_terrain_mechanical_transmission_banner": __import__(
+                "mechanistic_mind.physical_system.held_resource_object_terrain_mechanical_transmission",
+                fromlist=["BANNER"],
+            ).BANNER,
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "held_resource_object_terrain_mechanical_transmission_state", None) is not None
+        ) else {}),
+        **({
+            "held_mediated_surface_exertion_integration": __import__(
+                "mechanistic_mind.physical_system.held_mediated_surface_exertion_integration",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "held_mediated_surface_exertion_integration_overlay": __import__(
+                "mechanistic_mind.physical_system.held_mediated_surface_exertion_integration",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "held_mediated_surface_exertion_integration_researcher_only": True,
+            "held_mediated_surface_exertion_integration_banner": __import__(
+                "mechanistic_mind.physical_system.held_mediated_surface_exertion_integration",
+                fromlist=["BANNER"],
+            ).BANNER,
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "held_mediated_surface_exertion_integration_state", None) is not None
+        ) else {}),
+        **({
+            "detached_terrain_material_initial_placement": __import__(
+                "mechanistic_mind.physical_system.detached_terrain_material_initial_placement",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "detached_terrain_material_initial_placement_overlay": __import__(
+                "mechanistic_mind.physical_system.detached_terrain_material_initial_placement",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "detached_terrain_material_initial_placement_researcher_only": True,
+            "detached_terrain_material_initial_placement_banner": __import__(
+                "mechanistic_mind.physical_system.detached_terrain_material_initial_placement",
+                fromlist=["BANNER"],
+            ).BANNER,
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "detached_terrain_material_initial_placement_state", None) is not None
+        ) else {}),
+        **({
+            "bnlt_move_breakaway_locomotion_repair": __import__(
+                "mechanistic_mind.physical_system.bnlt_move_breakaway_locomotion_repair",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "bnlt_move_breakaway_locomotion_repair_researcher_only": True,
+            "bnlt_move_breakaway_locomotion_repair_banner": __import__(
+                "mechanistic_mind.physical_system.bnlt_move_breakaway_locomotion_repair",
+                fromlist=["BANNER"],
+            ).BANNER,
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "bnlt_move_breakaway_locomotion_repair_state", None) is not None
+        ) else {}),
+        **({
+            "active_locomotion_traction_vs_sliding_friction": __import__(
+                "mechanistic_mind.physical_system.active_locomotion_traction_vs_sliding_friction",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "active_locomotion_traction_vs_sliding_friction_researcher_only": True,
+            "active_locomotion_traction_vs_sliding_friction_banner": __import__(
+                "mechanistic_mind.physical_system.active_locomotion_traction_vs_sliding_friction",
+                fromlist=["BANNER"],
+            ).BANNER,
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(
+                w, "active_locomotion_traction_vs_sliding_friction_state", None
+            )
+            is not None
+        ) else {}),
+        **({
+            "event_driven_crowded_placement_retry_contract": __import__(
+                "mechanistic_mind.physical_system.event_driven_crowded_placement_retry_contract",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "event_driven_crowded_placement_retry_contract_researcher_only": True,
+            "event_driven_crowded_placement_retry_contract_banner": __import__(
+                "mechanistic_mind.physical_system.event_driven_crowded_placement_retry_contract",
+                fromlist=["BANNER"],
+            ).BANNER,
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(
+                w, "event_driven_crowded_placement_retry_contract_state", None
+            )
+            is not None
+        ) else {}),
+        **({
+            "detached_material_amount_scaled_collision_radius": __import__(
+                "mechanistic_mind.physical_system.detached_material_amount_scaled_collision_radius",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "detached_material_amount_scaled_collision_radius_researcher_only": True,
+            "detached_material_amount_scaled_collision_radius_banner": __import__(
+                "mechanistic_mind.physical_system.detached_material_amount_scaled_collision_radius",
+                fromlist=["BANNER"],
+            ).BANNER,
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(
+                w, "detached_material_amount_scaled_collision_radius_state", None
+            )
+            is not None
+        ) else {}),
+        **({
+            "held_combine_radius_resize_transaction": __import__(
+                "mechanistic_mind.physical_system.held_combine_radius_resize_transaction",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "held_combine_radius_resize_transaction_researcher_only": True,
+            "held_combine_radius_resize_transaction_banner": __import__(
+                "mechanistic_mind.physical_system.held_combine_radius_resize_transaction",
+                fromlist=["BANNER"],
+            ).BANNER,
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(
+                w, "held_combine_radius_resize_transaction_state", None
+            )
+            is not None
+        ) else {}),
+        **({
+            "held_deposition_radius_shrink_transaction": __import__(
+                "mechanistic_mind.physical_system.held_deposition_radius_shrink_transaction",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "held_deposition_radius_shrink_transaction_researcher_only": True,
+            "held_deposition_radius_shrink_transaction_banner": __import__(
+                "mechanistic_mind.physical_system.held_deposition_radius_shrink_transaction",
+                fromlist=["BANNER"],
+            ).BANNER,
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(
+                w, "held_deposition_radius_shrink_transaction_state", None
+            )
+            is not None
+        ) else {}),
+        **({
+            "free_space_state_and_pe_authority_contract": __import__(
+                "mechanistic_mind.physical_system.free_space_state_and_pe_authority_contract",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "free_space_state_and_pe_authority_contract_researcher_only": True,
+            "free_space_state_and_pe_authority_contract_banner": __import__(
+                "mechanistic_mind.physical_system.free_space_state_and_pe_authority_contract",
+                fromlist=["BANNER"],
+            ).BANNER,
+            "last_free_space_support_state": getattr(w, "last_free_space_support_state", None),
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(
+                w, "free_space_state_and_pe_authority_contract_state", None
+            )
+            is not None
+        ) else {}),
+        **({
+            "vertical_terrain_landing_contact_response": __import__(
+                "mechanistic_mind.physical_system.vertical_terrain_landing_contact_response",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "vertical_terrain_landing_contact_response_researcher_only": True,
+            "vertical_terrain_landing_contact_response_banner": __import__(
+                "mechanistic_mind.physical_system.vertical_terrain_landing_contact_response",
+                fromlist=["BANNER"],
+            ).BANNER,
+            "last_vertical_terrain_landing": getattr(w, "last_vertical_terrain_landing", None),
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(
+                w, "vertical_terrain_landing_contact_response_state", None
+            )
+            is not None
+        ) else {}),
+        **({
+            "vertical_impact_acoustic_emission": __import__(
+                "mechanistic_mind.physical_system.vertical_impact_acoustic_emission",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "vertical_impact_acoustic_emission_researcher_only": True,
+            "vertical_impact_acoustic_emission_banner": __import__(
+                "mechanistic_mind.physical_system.vertical_impact_acoustic_emission",
+                fromlist=["BANNER"],
+            ).BANNER,
+            "last_vertical_impact_acoustic_step": getattr(
+                w, "last_vertical_impact_acoustic_step", None
+            ),
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(
+                w, "vertical_impact_acoustic_emission_state", None
+            )
+            is not None
+        ) else {}),
+        **({
+            "authoritative_physical_acoustic_stream": __import__(
+                "mechanistic_mind.physical_system.authoritative_physical_acoustic_stream_contract",
+                fromlist=["observer_payload"],
+            ).observer_payload(w),
+            "authoritative_physical_acoustic_stream_researcher_only": True,
+            "authoritative_physical_acoustic_stream_banner": (
+                "PHYSICAL ACOUSTIC EVENTS · RESEARCHER-ONLY · NO AUDIO PLAYBACK · NO HZ CALIBRATION"
+            ),
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and (
+                getattr(w, "authoritative_physical_acoustic_stream_state", None) is not None
+                or getattr(w, "local_signal_transport", None) is not None
+            )
+        ) else {}),
+        **((lambda _oap: {
+            "observer_acoustic_probe": _oap.observer_payload(w),
+            "observer_acoustic_probe_researcher_only": True,
+            "observer_acoustic_probe_banner": _oap.BANNER,
+        })(
+            __import__(
+                "mechanistic_mind.physical_system.observer_acoustic_probe",
+                fromlist=["ensure_probe_state", "observer_payload", "BANNER"],
+            )
+        ) if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "local_signal_transport", None) is not None
+            and __import__(
+                "mechanistic_mind.physical_system.observer_acoustic_probe",
+                fromlist=["ensure_probe_state"],
+            ).ensure_probe_state(w) is not None
+        ) else {}),
+        **({
+            "acoustic_calibration": __import__(
+                "mechanistic_mind.physical_system.physical_frequency_amplitude_calibration_contract",
+                fromlist=["c0_calibration_reference"],
+            ).c0_calibration_reference(),
+            "acoustic_calibration_status": __import__(
+                "mechanistic_mind.physical_system.physical_frequency_amplitude_calibration_contract",
+                fromlist=["observer_calibration_status"],
+            ).observer_calibration_status(),
+            "acoustic_calibration_contract": __import__(
+                "mechanistic_mind.physical_system.physical_frequency_amplitude_calibration_contract",
+                fromlist=["c0_calibration_payload"],
+            ).c0_calibration_payload(),
+            "acoustic_calibration_researcher_only": True,
+            "canonical_physical_field_sonification": __import__(
+                "mechanistic_mind.physical_system.canonical_physical_field_sonification",
+                fromlist=["c1_profile_payload"],
+            ).c1_profile_payload(),
+            "canonical_physical_field_sonification_status": __import__(
+                "mechanistic_mind.physical_system.canonical_physical_field_sonification",
+                fromlist=["observer_c1_status"],
+            ).observer_c1_status(),
+            "canonical_physical_field_sonification_researcher_only": True,
+            "selected_organism_auditory_view": __import__(
+                "mechanistic_mind.physical_system.selected_organism_auditory_boundary_receipt",
+                fromlist=["observer_payload"],
+            ).observer_payload(w, selected_agent_id=observer_agent_id(runtime)),
+            "selected_organism_auditory_view_profile": __import__(
+                "mechanistic_mind.physical_system.selected_organism_auditory_boundary_receipt",
+                fromlist=["profile_reference"],
+            ).profile_reference(),
+            "selected_organism_auditory_view_researcher_only": True,
+            "selected_organism_auditory_view_banner": __import__(
+                "mechanistic_mind.physical_system.selected_organism_auditory_boundary_receipt",
+                fromlist=["WARNING_LABEL"],
+            ).WARNING_LABEL,
+            "selected_organism_volumetric_vision_view": __import__(
+                "mechanistic_mind.physical_system.selected_organism_volumetric_vision_view",
+                fromlist=["observer_payload"],
+            ).observer_payload(
+                w,
+                selected_agent_id=observer_agent_id(runtime),
+                runtime_generation=getattr(runtime, "runtime_generation", None),
+            ),
+            "selected_organism_volumetric_vision_view_profile": __import__(
+                "mechanistic_mind.physical_system.selected_organism_volumetric_vision_view",
+                fromlist=["profile_reference"],
+            ).profile_reference(),
+            "selected_organism_volumetric_vision_view_researcher_only": True,
+            "selected_organism_volumetric_vision_view_banner": __import__(
+                "mechanistic_mind.physical_system.selected_organism_volumetric_vision_view",
+                fromlist=["BANNER"],
+            ).BANNER,
+            "organism_receptor_grounded_3d_fpv": __import__(
+                "mechanistic_mind.physical_system.organism_receptor_grounded_3d_fpv",
+                fromlist=["observer_payload"],
+            ).observer_payload(
+                w,
+                selected_agent_id=observer_agent_id(runtime),
+                runtime_generation=getattr(runtime, "runtime_generation", None)
+                or getattr(runtime, "_observer_runtime_generation", None),
+                # Two-agent runtimes always publish the existing per-agent latest map.
+                # Interest remains a cache/delivery hint; it must not hide agent_1.
+                include_latest_by_agent=bool(
+                    len(getattr(runtime, "slots", None) or []) >= 2
+                    or (
+                        observer_interest is not None
+                        and getattr(observer_interest, "wants", lambda _p: False)(
+                            "eye_dock_dual_fpv"
+                        )
+                    )
+                ),
+            ),
+            "organism_receptor_grounded_3d_fpv_profile": __import__(
+                "mechanistic_mind.physical_system.organism_receptor_grounded_3d_fpv",
+                fromlist=["profile_reference"],
+            ).profile_reference(),
+            "organism_receptor_grounded_3d_fpv_researcher_only": True,
+            "selected_organism_auditory_sonification": __import__(
+                "mechanistic_mind.physical_system.selected_organism_auditory_sonification",
+                fromlist=["sav2_profile_payload"],
+            ).sav2_profile_payload(),
+            "selected_organism_auditory_sonification_status": __import__(
+                "mechanistic_mind.physical_system.selected_organism_auditory_sonification",
+                fromlist=["observer_sav2_status"],
+            ).observer_sav2_status(),
+            "selected_organism_auditory_sonification_researcher_only": True,
+            "selected_organism_auditory_sonification_banner": __import__(
+                "mechanistic_mind.physical_system.selected_organism_auditory_sonification",
+                fromlist=["WARNING_LABEL"],
+            ).WARNING_LABEL,
+            "organism_auditory_transformation_trace": __import__(
+                "mechanistic_mind.physical_system.organism_auditory_transformation_trace",
+                fromlist=["observer_compact_status"],
+            ).observer_compact_status(w),
+            "organism_auditory_transformation_trace_profile": __import__(
+                "mechanistic_mind.physical_system.organism_auditory_transformation_trace",
+                fromlist=["profile_reference"],
+            ).profile_reference(),
+            "organism_auditory_transformation_trace_researcher_only": True,
+            "selected_organism_physical_field_comparison": __import__(
+                "mechanistic_mind.physical_system.selected_organism_physical_field_comparison",
+                fromlist=["observer_comparison_payload"],
+            ).observer_comparison_payload(
+                w,
+                selected_agent_id=observer_agent_id(runtime),
+                selected_body_id=None,
+                run_id=str(
+                    getattr(runtime, "run_id", None)
+                    or getattr(runtime, "seed", None)
+                    or "live"
+                ),
+            ),
+            "selected_organism_physical_field_comparison_profile": __import__(
+                "mechanistic_mind.physical_system.selected_organism_physical_field_comparison",
+                fromlist=["profile_reference"],
+            ).profile_reference(),
+            "selected_organism_physical_field_comparison_researcher_only": True,
+            "selected_organism_physical_field_comparison_banner": __import__(
+                "mechanistic_mind.physical_system.selected_organism_physical_field_comparison",
+                fromlist=["WARNING"],
+            ).WARNING,
+            "selected_organism_auditory_offline_reconstruction": __import__(
+                "mechanistic_mind.physical_system.selected_organism_auditory_offline_reconstruction_sav4a",
+                fromlist=["observer_sav4a_payload"],
+            ).observer_sav4a_payload(
+                w,
+                selected_agent_id=observer_agent_id(runtime),
+                selected_body_id=None,
+                run_id=str(
+                    getattr(runtime, "run_id", None)
+                    or getattr(runtime, "seed", None)
+                    or "live"
+                ),
+                runtime_generation=getattr(runtime, "runtime_generation", None),
+            ),
+            "selected_organism_auditory_offline_reconstruction_profile": __import__(
+                "mechanistic_mind.physical_system.selected_organism_auditory_offline_reconstruction_sav4a",
+                fromlist=["profile_reference"],
+            ).profile_reference(),
+            "selected_organism_auditory_offline_reconstruction_researcher_only": True,
+            "selected_organism_auditory_offline_reconstruction_banner": __import__(
+                "mechanistic_mind.physical_system.selected_organism_auditory_offline_reconstruction_sav4a",
+                fromlist=["WARNING"],
+            ).WARNING,
+            "selected_organism_auditory_offline_player": __import__(
+                "mechanistic_mind.physical_system.selected_organism_auditory_offline_player_sav4b",
+                fromlist=["observer_banner"],
+            ).observer_banner(),
+            "selected_organism_auditory_offline_player_profile": __import__(
+                "mechanistic_mind.physical_system.selected_organism_auditory_offline_player_sav4b",
+                fromlist=["profile_reference"],
+            ).profile_reference(),
+            "selected_organism_auditory_offline_player_researcher_only": True,
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "local_signal_transport", None) is not None
+        ) else {}),
+        **({
+            "release_and_excavation_support_loss_integration": __import__(
+                "mechanistic_mind.physical_system.release_and_excavation_support_loss_integration",
+                fromlist=["inspector_summary"],
+            ).inspector_summary(w, runtime.config),
+            "release_and_excavation_support_loss_integration_researcher_only": True,
+            "release_and_excavation_support_loss_integration_banner": __import__(
+                "mechanistic_mind.physical_system.release_and_excavation_support_loss_integration",
+                fromlist=["BANNER"],
+            ).BANNER,
+            "last_release_excavation_support_loss": (
+                getattr(
+                    getattr(w, "release_and_excavation_support_loss_integration_state", None),
+                    "last_receipt",
+                    None,
+                )
+            ),
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(
+                w, "release_and_excavation_support_loss_integration_state", None
+            )
+            is not None
+        ) else {}),
+        # OBSERVER_VERTICAL_DISPLAY_CONTRACT_V1 — display-only; never physics / never cognition.
+        **(__import__(
+            "mechanistic_mind.ui.psy_observer_web.vertical_display_contract",
+            fromlist=["observer_vertical_display_payload"],
+        ).observer_vertical_display_payload(runtime)),
+        **({
+            "repeated_conservative_surface_column_separation": __import__(
+                "mechanistic_mind.physical_system.repeated_conservative_surface_column_separation",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "repeated_conservative_surface_column_separation_overlay": __import__(
+                "mechanistic_mind.physical_system.repeated_conservative_surface_column_separation",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "repeated_conservative_surface_column_separation_researcher_only": True,
+            "repeated_conservative_surface_column_separation_banner": __import__(
+                "mechanistic_mind.physical_system.repeated_conservative_surface_column_separation",
+                fromlist=["BANNER"],
+            ).BANNER,
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "repeated_conservative_surface_column_separation_state", None) is not None
+        ) else {}),
+        **({
+            "held_translational_impulse": __import__(
+                "mechanistic_mind.physical_system.held_resource_object_translational_impulse_mediation",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "held_translational_impulse_overlay": __import__(
+                "mechanistic_mind.physical_system.held_resource_object_translational_impulse_mediation",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "held_translational_impulse_researcher_only": True,
+            "held_translational_impulse_banner": (
+                "HELD OBJECT TRANSLATIONAL IMPULSE MEDIATION V1 · CONSTRAINED OBJECT → HOLDER BODY · NO SWING WORK · NO DAMAGE · NO RELEASE · NO SOUND"
+            ),
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "held_translational_impulse_state", None) is not None
+        ) else {}),
+        **({
+            "effector_work_held_load": __import__(
+                "mechanistic_mind.physical_system.effector_work_and_held_load_inertia_accounting",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "effector_work_held_load_overlay": __import__(
+                "mechanistic_mind.physical_system.effector_work_and_held_load_inertia_accounting",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "effector_work_held_load_researcher_only": True,
+            "effector_work_held_load_banner": (
+                "EFFECTOR WORK + HELD-LOAD INERTIA ACCOUNTING V1 · NO ARM MASS · NO SWING IMPULSE · NO DAMAGE"
+            ),
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "effector_work_held_load_state", None) is not None
+        ) else {}),
+        **({
+            "flat_ground_gravity": __import__(
+                "mechanistic_mind.physical_system.flat_ground_gravity",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "flat_ground_gravity_overlay": __import__(
+                "mechanistic_mind.physical_system.flat_ground_gravity",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "flat_ground_gravity_researcher_only": True,
+            "flat_ground_gravity_banner": (
+                "PHASE C · FLAT GROUND GRAVITY V1 · UNIFORM g · INELASTIC SUPPORT · "
+                "SURFACE ELEVATION NOT ACTIVE · NO SLOPES · NO STACKING"
+            ),
+            "vertical_state_researcher_only": True,
+            "no_agent_symbolic_z": True,
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "flat_ground_gravity_state", None) is not None
+        ) else {}),
+        **({
+            "free_resource_object_ground_friction": __import__(
+                "mechanistic_mind.physical_system.free_resource_object_ground_friction",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "free_resource_object_ground_friction_overlay": __import__(
+                "mechanistic_mind.physical_system.free_resource_object_ground_friction",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "free_resource_object_ground_friction_researcher_only": True,
+            "free_resource_object_ground_friction_banner": (
+                "FREE OBJECT FLAT-GROUND FRICTION V1 · F=μN · MATERIAL-DERIVED SURFACE COUPLING · "
+                "BODIES UNCHANGED · NO AIR DRAG · NO SLOPES"
+            ),
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "free_resource_object_ground_friction_state", None) is not None
+        ) else {}),
+        **({
+            "surface_elevation_support": __import__(
+                "mechanistic_mind.physical_system.surface_elevation_support",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "surface_elevation_support_overlay": __import__(
+                "mechanistic_mind.physical_system.surface_elevation_support",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "surface_elevation_support_researcher_only": True,
+            "surface_elevation_support_banner": __import__(
+                "mechanistic_mind.physical_system.surface_elevation_support",
+                fromlist=["BANNER"],
+            ).BANNER,
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "surface_elevation_support_state", None) is not None
+        ) else {}),
+        **({
+            "body_normal_load_traction": __import__(
+                "mechanistic_mind.physical_system.body_normal_load_traction",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "body_normal_load_traction_overlay": __import__(
+                "mechanistic_mind.physical_system.body_normal_load_traction",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "body_normal_load_traction_researcher_only": True,
+            "body_normal_load_traction_banner": __import__(
+                "mechanistic_mind.physical_system.body_normal_load_traction",
+                fromlist=["BANNER"],
+            ).BANNER,
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "body_normal_load_traction_state", None) is not None
+        ) else {}),
+        **({
+            "continuous_surface_geometry": __import__(
+                "mechanistic_mind.physical_system.continuous_surface_geometry",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "continuous_surface_geometry_overlay": __import__(
+                "mechanistic_mind.physical_system.continuous_surface_geometry",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "continuous_surface_geometry_researcher_only": True,
+            "continuous_surface_geometry_banner": __import__(
+                "mechanistic_mind.physical_system.continuous_surface_geometry",
+                fromlist=["BANNER"],
+            ).BANNER,
+            "continuous_surface_geometry_status_text": __import__(
+                "mechanistic_mind.physical_system.continuous_surface_geometry",
+                fromlist=["status_text"],
+            ).status_text(),
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "continuous_surface_geometry_state", None) is not None
+        ) else {}),
+        **({
+            "body_static_traction_threshold": __import__(
+                "mechanistic_mind.physical_system.body_static_traction_threshold",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "body_static_traction_threshold_overlay": __import__(
+                "mechanistic_mind.physical_system.body_static_traction_threshold",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "body_static_traction_threshold_researcher_only": True,
+            "body_static_traction_threshold_banner": __import__(
+                "mechanistic_mind.physical_system.body_static_traction_threshold",
+                fromlist=["BANNER"],
+            ).BANNER,
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "body_static_traction_threshold_state", None) is not None
+        ) else {}),
+        **({
+            "free_resource_object_static_traction_threshold": __import__(
+                "mechanistic_mind.physical_system.free_resource_object_static_traction_threshold",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "free_resource_object_static_traction_threshold_overlay": __import__(
+                "mechanistic_mind.physical_system.free_resource_object_static_traction_threshold",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "free_resource_object_static_traction_threshold_researcher_only": True,
+            "free_resource_object_static_traction_threshold_banner": __import__(
+                "mechanistic_mind.physical_system.free_resource_object_static_traction_threshold",
+                fromlist=["BANNER"],
+            ).BANNER,
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "free_resource_object_static_traction_threshold_state", None) is not None
+        ) else {}),
+        **({
+            "radius_aware_support_points": __import__(
+                "mechanistic_mind.physical_system.radius_aware_support_points",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "radius_aware_support_points_overlay": __import__(
+                "mechanistic_mind.physical_system.radius_aware_support_points",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "radius_aware_support_points_researcher_only": True,
+            "radius_aware_support_points_banner": __import__(
+                "mechanistic_mind.physical_system.radius_aware_support_points",
+                fromlist=["BANNER"],
+            ).BANNER,
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "radius_aware_support_points_state", None) is not None
+        ) else {}),
+        **({
+            # G2C1 SES decomposition contract: researcher-only metadata (never agent-visible).
+            "ses_decomposition_contract": __import__(
+                "mechanistic_mind.physical_system.ses_decomposition_contract",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "ses_decomposition_contract_overlay": __import__(
+                "mechanistic_mind.physical_system.ses_decomposition_contract",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "ses_decomposition_contract_researcher_only": True,
+            "ses_decomposition_contract_banner": __import__(
+                "mechanistic_mind.physical_system.ses_decomposition_contract",
+                fromlist=["status_text"],
+            ).status_text(),
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "ses_decomposition_contract_state", None) is not None
+        ) else {}),
+        **({
+            # G2C2 SES runtime transition classifier: researcher-only (never agent-visible).
+            "ses_runtime_transition_classifier": __import__(
+                "mechanistic_mind.physical_system.ses_runtime_transition_classifier",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "ses_runtime_transition_classifier_overlay": __import__(
+                "mechanistic_mind.physical_system.ses_runtime_transition_classifier",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "ses_runtime_transition_classifier_researcher_only": True,
+            "ses_runtime_transition_classifier_banner": __import__(
+                "mechanistic_mind.physical_system.ses_runtime_transition_classifier",
+                fromlist=["status_text"],
+            ).status_text(),
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "ses_runtime_transition_classifier_state", None) is not None
+        ) else {}),
+        **({
+            # Radius-aware face sweep: researcher-only SES plan evidence (never agent-visible).
+            "radius_aware_face_sweep": __import__(
+                "mechanistic_mind.physical_system.radius_aware_face_sweep",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "radius_aware_face_sweep_overlay": __import__(
+                "mechanistic_mind.physical_system.radius_aware_face_sweep",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "radius_aware_face_sweep_researcher_only": True,
+            "radius_aware_face_sweep_banner": __import__(
+                "mechanistic_mind.physical_system.radius_aware_face_sweep",
+                fromlist=["status_text"],
+            ).status_text(),
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "radius_aware_face_sweep_state", None) is not None
+        ) else {}),
+        **({
+            # G2D diagnostic normal-load shadow: researcher-only (never agent-visible).
+            "diagnostic_normal_load_shadow": __import__(
+                "mechanistic_mind.physical_system.diagnostic_normal_load_shadow",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "diagnostic_normal_load_shadow_overlay": __import__(
+                "mechanistic_mind.physical_system.diagnostic_normal_load_shadow",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "diagnostic_normal_load_shadow_researcher_only": True,
+            "diagnostic_normal_load_shadow_banner": __import__(
+                "mechanistic_mind.physical_system.diagnostic_normal_load_shadow",
+                fromlist=["status_text"],
+            ).status_text(w),
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "diagnostic_normal_load_shadow_state", None) is not None
+        ) else {}),
+
+        **({
+            "continuous_gravitational_pe_diagnostic_shadow": __import__(
+                "mechanistic_mind.physical_system.continuous_gravitational_pe_diagnostic_shadow",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "continuous_gravitational_pe_diagnostic_shadow_overlay": __import__(
+                "mechanistic_mind.physical_system.continuous_gravitational_pe_diagnostic_shadow",
+                fromlist=["overlay_payload"],
+            ).overlay_payload(w),
+            "continuous_gravitational_pe_diagnostic_shadow_researcher_only": True,
+            "continuous_gravitational_pe_diagnostic_shadow_banner": __import__(
+                "mechanistic_mind.physical_system.continuous_gravitational_pe_diagnostic_shadow",
+                fromlist=["status_text"],
+            ).status_text(w),
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "continuous_gravitational_pe_diagnostic_shadow_state", None) is not None
+        ) else {}),
+
+        **({
+            "continuous_gravitational_pe": True,
+            "continuous_gravitational_pe_banner": __import__(
+                "mechanistic_mind.physical_system.continuous_gravitational_pe",
+                fromlist=["observer_banner"],
+            ).observer_banner(runtime.config),
+            "continuous_gravitational_pe_authority": __import__(
+                "mechanistic_mind.physical_system.continuous_gravitational_pe",
+                fromlist=["active_gravitational_pe_authority"],
+            ).active_gravitational_pe_authority(runtime.config),
+            "continuous_gravitational_pe_researcher_only": True,
+            "projected_normal_load_active": False,
+            "tangent_gravity_active": False,
+            "passive_slope_sliding_active": False,
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and __import__(
+                "mechanistic_mind.physical_system.continuous_gravitational_pe",
+                fromlist=["endpoint_pe_physically_active"],
+            ).endpoint_pe_physically_active(runtime.config)
+        ) else {}),
+
+        **({
+            "tangent_gravity_diagnostic_shadow": __import__(
+                "mechanistic_mind.physical_system.tangent_gravity_diagnostic_shadow",
+                fromlist=["researcher_summary"],
+            ).researcher_summary(w),
+            "tangent_gravity_diagnostic_shadow_banner": __import__(
+                "mechanistic_mind.physical_system.tangent_gravity_diagnostic_shadow",
+                fromlist=["status_text"],
+            ).status_text(w),
+            "tangent_gravity_diagnostic_shadow_researcher_only": True,
+            "tangent_gravity_active": False,
+            "projected_normal_load_active": False,
+            "passive_slope_sliding_active": False,
+        } if (
+            getattr(runtime.config, "model_line", "") == "ACANTHOSTEGA"
+            and getattr(w, "tangent_gravity_diagnostic_shadow_state", None) is not None
+        ) else {}),
+        **({"surface_traction_receipts": _traction_history, "surface_traction_researcher_only": True} if _traction_on else {}),
+        **({
+            "traction_experience_receipts": _experience_history,
+            "traction_experience_researcher_only": True,
+            "traction_experience_not_agent_accessible": True,
+        } if _experience_on else {}),
+        **({
+            "traction_prediction_receipts": _prediction_history,
+            "traction_prediction_researcher_only": True,
+            "traction_prediction_not_agent_accessible": True,
+        } if _prediction_on else {}),
+        "manipulators": _researcher_manipulators(runtime),
+        "manipulators_researcher_only": True,
+        "observer_derived_payload_subscription": _derived.as_frame_meta(
+            runtime_generation=int(getattr(runtime, "_observer_runtime_generation", 0) or 0) or None,
+        ),
     }
 
 
@@ -1336,9 +3232,20 @@ def experiment_config_frame(runtime: PhysicalSystemRuntime, *, detail: str = "fu
             else ["agent_0"]
         ),
         "ecology_preset": eco.get("ecology_preset"),
+        "psc_off_ticks": getattr(cfg.cognition, "psc_off_ticks", None),
         "note": "Technical observer IDs. Not present in agent observation.",
         "pe_cold_history_eviction": False,
     }
+    try:
+        from mechanistic_mind.ui.psy_observer_web.tiktaalik_eye import psc_off_ticks_status
+
+        runtime_block["psc_schedule"] = psc_off_ticks_status(runtime)
+    except Exception:
+        runtime_block["psc_schedule"] = {
+            "psc": "—",
+            "schedule": getattr(cfg.cognition, "psc_off_ticks", None),
+            "armed": False,
+        }
     try:
         from mechanistic_mind.research import pe_cold_archive as cold
 
@@ -1514,6 +3421,7 @@ def _physical_bundle(
             body=runtime.body,
             cfg=nfe,
             foreign_bodies=foreign_bodies,
+            physical_config=runtime.config,
         )
         near_field_gt = {
             **near_field_gt,
@@ -1773,6 +3681,75 @@ def agents_views_frame(
     return out
 
 
+def _effector_relative_z_diagnostics(runtime: PhysicalSystemRuntime) -> dict[str, Any]:
+    """Researcher-only per-hand relative_z motor diagnostics (not cognition)."""
+    from mechanistic_mind.physical_system.manipulator_relative_world_actuation import (
+        manipulator_relative_world_actuation_is_active,
+        relative_z_of,
+    )
+    from mechanistic_mind.physical_system.effector_bounded_actuator_effort import (
+        effector_bounded_actuator_effort_is_active,
+    )
+
+    mo = getattr(runtime, "last_motor_output", None) or {}
+    avail = False
+    try:
+        avail = bool(
+            manipulator_relative_world_actuation_is_active(runtime.config)
+            and effector_bounded_actuator_effort_is_active(runtime.config)
+        )
+    except Exception:
+        avail = False
+    body_id = str(getattr(runtime, "technical_id", None) or "agent_0")
+    try:
+        from mechanistic_mind.physical_system.spatial_contents import body_refs_for_runtime
+
+        refs = body_refs_for_runtime(runtime)
+        if refs:
+            body_id = str(refs[0][0])
+    except Exception:
+        pass
+    act = getattr(runtime, "last_agent_effector_z_actuation", None)
+    if not isinstance(act, dict):
+        act = {}
+
+    def _hand(label: str, factor_key: str) -> dict[str, Any]:
+        factor = int(mo.get(factor_key) or 0)
+        if factor > 0:
+            selected = "UP"
+        elif factor < 0:
+            selected = "DOWN"
+        else:
+            selected = "NONE"
+        rz = 0.0
+        try:
+            if avail:
+                rz = float(relative_z_of(runtime.world, body_id, label, config=runtime.config))
+        except Exception:
+            rz = 0.0
+        rec = act.get(label.lower())
+        if not isinstance(rec, dict):
+            rec = {}
+        return {
+            "factor_available": bool(avail),
+            "selected": selected,
+            "relative_z": rz,
+            "requested_delta": rec.get("requested_relative_delta"),
+            "realized_delta": rec.get("achieved_relative_delta"),
+            "rate_clipped": rec.get("rate_clipped"),
+            "reach_clipped": rec.get("reach_clipped"),
+            "work_used": rec.get("work_used"),
+            "status": rec.get("status") or act.get("status"),
+        }
+
+    return {
+        "available": bool(avail),
+        "LEFT": _hand("LEFT", "effector_z_left"),
+        "RIGHT": _hand("RIGHT", "effector_z_right"),
+        "note": "Researcher diagnostics only — numeric relative_z not cognition-visible.",
+    }
+
+
 def motor_control_status_frame(runtime: PhysicalSystemRuntime) -> dict[str, Any]:
     """Observer: CURRENT MOTOR OUTPUT vs ACTIVE EFFECTORS vs PASSIVE INPUT."""
     mo = getattr(runtime, "last_motor_output", None) or {}
@@ -1801,9 +3778,12 @@ def motor_control_status_frame(runtime: PhysicalSystemRuntime) -> dict[str, Any]
                 "emit_trigger": bool(osc.get("emit_trigger")),
             },
             "push": bool(mo.get("push")),
+            "effector_z_left": int(mo.get("effector_z_left") or 0),
+            "effector_z_right": int(mo.get("effector_z_right") or 0),
             "display": mo.get("display") or runtime.last_selected_action,
             "note": "Structured motor output — not a Cartesian compound action token.",
         },
+        "effector_relative_z": _effector_relative_z_diagnostics(runtime),
         "active_effectors": {
             "body_locomotor_force": "ACTIVE"
             if str(mo.get("locomotion") or "").startswith("MOVE:")
@@ -2093,6 +4073,30 @@ def _physical_body_inventory_frame(runtime: PhysicalSystemRuntime) -> dict[str, 
     return inv
 
 
+def _stamp_live_psc_schedule_on_experiment(runtime: Any, experiment: Any) -> dict[str, Any]:
+    """Overlay live PSC schedule onto a possibly tick-stable experiment fragment.
+
+    FAMILY_EXPERIMENT_CONFIG is a stable cache family keyed without tick / PSC
+    activation. Reusing that fragment as Current-runtime readback hid the tick-1000
+    transition in the packaged Observer even when the runtime had already armed.
+    """
+    exp = dict(experiment) if isinstance(experiment, dict) else {}
+    rt_block = dict(exp.get("runtime") or {})
+    try:
+        from mechanistic_mind.ui.psy_observer_web.tiktaalik_eye import psc_off_ticks_status
+
+        rt_block["psc_schedule"] = psc_off_ticks_status(runtime)
+        rt_block["psc_off_ticks"] = getattr(
+            getattr(getattr(runtime, "config", None), "cognition", None),
+            "psc_off_ticks",
+            rt_block.get("psc_off_ticks"),
+        )
+    except Exception:
+        pass
+    exp["runtime"] = rt_block
+    return exp
+
+
 def live_frame(
     runtime: PhysicalSystemRuntime,
     *,
@@ -2106,11 +4110,30 @@ def live_frame(
     previous_bodies: dict[str, dict[str, Any]] | None = None,
     geometry_traversability: dict[str, Any] | None = None,
     include_cognition: bool = True,
+    observer_interest: Any | None = None,
 ) -> dict[str, Any]:
-    mechanisms = __import__(
-        "mechanistic_mind.physical_system.mechanism_registry",
-        fromlist=["mechanism_snapshot"],
-    ).mechanism_snapshot(runtime.config)
+    from mechanistic_mind.ui.psy_observer_web.observer_derived_payload_subscription import (
+        resolve_derived_subscription,
+    )
+    from mechanistic_mind.ui.psy_observer_web import observer_serialization_fragment_cache as _p4cache
+
+    _derived = resolve_derived_subscription(observer_interest)
+    _p4_run = _p4cache.run_id_for_runtime(runtime)
+    _p4_gen = int(getattr(runtime, "_observer_runtime_generation", 0) or 0)
+    _p4_cfg = _p4cache.config_authority_token(runtime)
+    mechanisms = _p4cache.get_or_build(
+        family=_p4cache.FAMILY_MECHANISM_SNAPSHOT,
+        authority_key={
+            "run_id": _p4_run,
+            "runtime_generation": _p4_gen,
+            "config": _p4_cfg,
+            "family": _p4cache.FAMILY_MECHANISM_SNAPSHOT,
+        },
+        builder=lambda: __import__(
+            "mechanistic_mind.physical_system.mechanism_registry",
+            fromlist=["mechanism_snapshot"],
+        ).mechanism_snapshot(runtime.config),
+    )
     physical = _physical_bundle(runtime)
     action_work = physical.get("action") or {}
     motor_work = physical.get("motor") or {}
@@ -2207,6 +4230,53 @@ def live_frame(
             "force_contributions": getattr(runtime, "last_force_contributions", None),
         }
         events_out = events
+    _want_eye_dock_dual_fpv = bool(len(getattr(runtime, "slots", None) or []) >= 2) or bool(
+        observer_interest is not None
+        and getattr(observer_interest, "wants", lambda _p: False)("eye_dock_dual_fpv")
+    )
+    _world_auth = {
+        "run_id": _p4_run,
+        "runtime_generation": _p4_gen,
+        "config": _p4_cfg,
+        "scientific_tick": int(runtime.tick),
+        "detail": detail,
+        "max_side": int(max_side),
+        "subscription": _p4cache.subscription_token(_derived),
+        # Dual FPV map is not part of P1 derived volume/surface token; include explicitly
+        # so Hearing/Vision interest toggles cannot reuse a stale world fragment.
+        "eye_dock_dual_fpv": _want_eye_dock_dual_fpv,
+        "vw1": _p4cache.vw1_digest_token(runtime),
+        "entities": _p4cache.entity_revision_token(runtime),
+        "volume_held": str(getattr(runtime, "_observer_volume_held_static_id", None) or ""),
+        "surface_held": str(getattr(runtime, "_observer_surface_held_static_id", None) or ""),
+        "family": _p4cache.FAMILY_WORLD_FRAME,
+    }
+    _world_was_cached = _p4cache.has_entry(family=_p4cache.FAMILY_WORLD_FRAME, authority_key=_world_auth)
+    _world = _p4cache.get_or_build(
+        family=_p4cache.FAMILY_WORLD_FRAME,
+        authority_key=_world_auth,
+        builder=lambda: world_frame(
+            runtime,
+            max_side=max_side,
+            detail=detail,
+            observer_interest=observer_interest,
+            derived_subscription=_derived,
+        ),
+    )
+    if _world_was_cached:
+        # Preserve O5 poll-skip accounting when WORLD fragment is reused (no rebuild side effects).
+        try:
+            from mechanistic_mind.physical_system.sensory_modality_temporal_alignment import (
+                note_observer_poll_skip,
+                sensory_modality_temporal_alignment_is_active,
+            )
+            if sensory_modality_temporal_alignment_is_active(runtime.config):
+                note_observer_poll_skip(runtime.world)
+        except Exception:
+            pass
+    _sub_meta = _derived.as_frame_meta(
+        runtime_generation=int(getattr(runtime, "_observer_runtime_generation", 0) or 0) or None,
+    )
     return {
         "header": header,
         "observer": {
@@ -2224,7 +4294,8 @@ def live_frame(
             "frame_detail": "compact" if compact else "full",
             "note": "Observer-only selection. Does not alter cognition, RNG, or physics.",
         },
-        "world": world_frame(runtime, max_side=max_side, detail=detail),
+        "world": _world,
+        "observer_derived_payload_subscription": _sub_meta,
         # Top-level fields are convenience projections of the SAME agents_views entry only.
         "perception": selected_view.get("perception"),
         "body": selected_view.get("body"),
@@ -2246,18 +4317,42 @@ def live_frame(
         "physical_body_inventory": _physical_body_inventory_frame(runtime),
         "contact": getattr(runtime, "last_contact", None),
         "physical_signal": getattr(runtime, "last_signal_receipt", None),
-        "experiment": experiment_config_frame(runtime, detail=detail),
-        "honesty": {
-            "unsupported_boundary_modes": ["CLOSED", "OPEN"],
-            "unavailable_perception": perception_frame(runtime)["unavailable"],
-            "replay_limit": "bounded recorded frames only",
-            "predicted_spatial_field": "NOT_AVAILABLE",
-            "physical_emit_bridge": "NOT_AVAILABLE",
-            "scientific_status_is_not_enabled_state": True,
-            "signal_is_not_communication": True,
-            "simulation_acceleration_only": True,
-            "frame_detail": "compact" if compact else "full",
-        },
+        "experiment": _stamp_live_psc_schedule_on_experiment(
+            runtime,
+            _p4cache.get_or_build(
+                family=_p4cache.FAMILY_EXPERIMENT_CONFIG,
+                authority_key={
+                    "run_id": _p4_run,
+                    "runtime_generation": _p4_gen,
+                    "config": _p4_cfg,
+                    "detail": detail,
+                    "selected_agent_id": agent_id,
+                    "family": _p4cache.FAMILY_EXPERIMENT_CONFIG,
+                },
+                builder=lambda: experiment_config_frame(runtime, detail=detail),
+            ),
+        ),
+        "honesty": _p4cache.get_or_build(
+            family=_p4cache.FAMILY_HONESTY,
+            authority_key={
+                "run_id": _p4_run,
+                "runtime_generation": _p4_gen,
+                "config": _p4_cfg,
+                "detail": "compact" if compact else "full",
+                "family": _p4cache.FAMILY_HONESTY,
+            },
+            builder=lambda: {
+                "unsupported_boundary_modes": ["CLOSED", "OPEN"],
+                "unavailable_perception": perception_frame(runtime)["unavailable"],
+                "replay_limit": "bounded recorded frames only",
+                "predicted_spatial_field": "NOT_AVAILABLE",
+                "physical_emit_bridge": "NOT_AVAILABLE",
+                "scientific_status_is_not_enabled_state": True,
+                "signal_is_not_communication": True,
+                "simulation_acceleration_only": True,
+                "frame_detail": "compact" if compact else "full",
+            },
+        ),
         "observer_perf": {
             "captured_tick": int(runtime.tick),
             "frame_detail": "compact" if compact else "full",
@@ -2270,6 +4365,11 @@ def live_frame(
             "note": (
                 "LIVE compact avoids FULL cognition_public_view. "
                 "FULL builds one canonical public view per agent/tick."
+            ),
+            **(
+                {"serialization_fragment_cache": _p4cache.stats()}
+                if _p4cache.telemetry_enabled()
+                else {}
             ),
         },
         "overview_facts": {

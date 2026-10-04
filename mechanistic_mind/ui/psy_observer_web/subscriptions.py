@@ -26,6 +26,11 @@ PRODUCT_GEOMETRY = "geometry"
 PRODUCT_SIGNALS = "signals"
 PRODUCT_EXPERIMENTER = "experimenter"
 PRODUCT_SIGNAL_SENSORIMOTOR = "signal_sensorimotor"
+# P1 derived viewport products (not in presets — explicit request only).
+PRODUCT_VOLUME_XRAY = "volume_xray"
+PRODUCT_SURFACE_LIGHT = "surface_light"
+# S7D: Eye dock dual-agent latest FPV map (researcher display; not cognition).
+PRODUCT_EYE_DOCK_DUAL_FPV = "eye_dock_dual_fpv"
 
 ALL_PRODUCTS: tuple[str, ...] = (
     PRODUCT_WORLD,
@@ -44,7 +49,17 @@ ALL_PRODUCTS: tuple[str, ...] = (
     PRODUCT_SIGNALS,
     PRODUCT_EXPERIMENTER,
     PRODUCT_SIGNAL_SENSORIMOTOR,
+    PRODUCT_VOLUME_XRAY,
+    PRODUCT_SURFACE_LIGHT,
+    PRODUCT_EYE_DOCK_DUAL_FPV,
 )
+
+# Viewport-derived products survive preset changes (UI mode ownership).
+DERIVED_VIEWPORT_PRODUCTS: frozenset[str] = frozenset({
+    PRODUCT_VOLUME_XRAY,
+    PRODUCT_SURFACE_LIGHT,
+    PRODUCT_EYE_DOCK_DUAL_FPV,
+})
 
 # Suggested display cadences (Hz). Simulation is independent.
 DEFAULT_CADENCE_HZ: dict[str, float] = {
@@ -64,6 +79,9 @@ DEFAULT_CADENCE_HZ: dict[str, float] = {
     PRODUCT_SIGNALS: 2.0,
     PRODUCT_EXPERIMENTER: 2.0,
     PRODUCT_SIGNAL_SENSORIMOTOR: 2.0,
+    PRODUCT_VOLUME_XRAY: 10.0,
+    PRODUCT_SURFACE_LIGHT: 10.0,
+    PRODUCT_EYE_DOCK_DUAL_FPV: 20.0,
 }
 
 # Presets are Observer/UI only — never mechanism activation.
@@ -83,7 +101,7 @@ PRESET_NORMAL: frozenset[str] = frozenset({
     PRODUCT_EXPERIMENTER,
     PRODUCT_SIGNAL_SENSORIMOTOR,
 })
-PRESET_FULL: frozenset[str] = frozenset(ALL_PRODUCTS)
+PRESET_FULL: frozenset[str] = frozenset(p for p in ALL_PRODUCTS if p not in DERIVED_VIEWPORT_PRODUCTS)
 
 PRESETS: dict[str, frozenset[str]] = {
     "MINIMAL": PRESET_MINIMAL,
@@ -126,7 +144,9 @@ class ObserverInterest:
         if key not in PRESETS:
             key = "NORMAL"
         self.preset = key
-        self.products = set(PRESETS[key])
+        # Preserve explicit MAP/VOLUME/SURFACE derived products across preset swaps.
+        preserved = self.products & DERIVED_VIEWPORT_PRODUCTS
+        self.products = set(PRESETS[key]) | preserved
         self.generation += 1
         return self.snapshot()
 

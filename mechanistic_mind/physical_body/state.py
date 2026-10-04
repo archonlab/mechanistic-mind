@@ -44,6 +44,11 @@ class PhysicalBodyState:
     core_exchange_cum: float = 0.0
     deformation: np.ndarray | None = None
     mechanical_work_reservoir: float = 0.0
+    # Acanthostega Phase C vertical (unused / grounded when flat_ground_gravity OFF).
+    z: float = 0.0
+    vz: float = 0.0
+    grounded: bool = True
+    vertical_half_extent: float | None = None
     deformation_env_force: np.ndarray | None = None
     R_site: np.ndarray | None = None
     R_A_site: np.ndarray | None = None
@@ -71,6 +76,10 @@ class PhysicalBodyState:
             react_consumed=self.react_consumed, core_exchange_cum=self.core_exchange_cum,
             deformation=None if getattr(self, "deformation", None) is None else np.asarray(self.deformation, dtype=np.float64).copy(),
             mechanical_work_reservoir=float(getattr(self, "mechanical_work_reservoir", 0.0) or 0.0),
+            z=float(getattr(self, "z", 0.0) or 0.0),
+            vz=float(getattr(self, "vz", 0.0) or 0.0),
+            grounded=bool(getattr(self, "grounded", True)),
+            vertical_half_extent=getattr(self, "vertical_half_extent", None),
             deformation_env_force=(
                 None if getattr(self, "deformation_env_force", None) is None
                 else np.asarray(self.deformation_env_force, dtype=np.float64).copy()
@@ -95,7 +104,8 @@ class PhysicalBodyState:
         return out
 
     def snapshot(self) -> dict[str, Any]:
-        return {
+        payload = {
+
             "tick": self.tick,
             "x": float(self.x), "y": float(self.y),
             "vx": float(self.vx), "vy": float(self.vy),
@@ -133,6 +143,18 @@ class PhysicalBodyState:
             "R_A_site": None if getattr(self, "R_A_site", None) is None else np.asarray(self.R_A_site, dtype=float).tolist(),
             "R_B_site": None if getattr(self, "R_B_site", None) is None else np.asarray(self.R_B_site, dtype=float).tolist(),
         }
+        z = float(getattr(self, "z", 0.0) or 0.0)
+        vz = float(getattr(self, "vz", 0.0) or 0.0)
+        grounded = bool(getattr(self, "grounded", True))
+        he = getattr(self, "vertical_half_extent", None)
+        # Preserve prior-preset snapshot hashes: omit defaults (2D / vertical OFF).
+        if abs(z) > 1e-15 or abs(vz) > 1e-15 or (not grounded) or he is not None:
+            payload["z"] = z
+            payload["vz"] = vz
+            payload["grounded"] = grounded
+            if he is not None:
+                payload["vertical_half_extent"] = he
+        return payload
 
 
 def initialize_physical_body(

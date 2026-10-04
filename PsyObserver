@@ -10,4 +10,4 @@ while [ -L "$SOURCE" ]; do
   esac
 done
 ROOT="$(cd "$(dirname "$SOURCE")" && pwd)"
-exec "$ROOT/launch_psy_observer.sh" "$@"
+exec "$ROOT/MM Observer" "$@"

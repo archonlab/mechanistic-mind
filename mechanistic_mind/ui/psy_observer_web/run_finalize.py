@@ -365,6 +365,18 @@ def project_root() -> Path:
 
 
 def default_results_root() -> Path:
+    """Saved-run root: XDG data when packaged; otherwise project ``results/``."""
+    from .xdg_paths import is_packaged_mode, results_root as xdg_results_root
+
+    env = os.environ.get("PSY_OBSERVER_RESULTS_ROOT") or os.environ.get("PSY_OBSERVER_DATA_DIR")
+    if env:
+        base = Path(env).expanduser().resolve()
+        # DATA_DIR is the app data root; RESULTS_ROOT may already be the results leaf.
+        if os.environ.get("PSY_OBSERVER_RESULTS_ROOT"):
+            return base
+        return base / "results"
+    if is_packaged_mode():
+        return xdg_results_root(project_root=project_root())
     return project_root() / "results"
 
 
@@ -690,7 +702,16 @@ def write_finalized_run(
         from .scientific_history import copy_scientific_into, read_jsonl_range
 
         sci_info = copy_scientific_into(tmp_dir, scientific_live_dir)
-        phases.append("scientific_history_copied" if sci_info.get("copied") else "scientific_history_absent")
+        mode = sci_info.get("promotion_mode") or ("scientific_history_copied" if sci_info.get("copied") else "scientific_history_absent")
+        phases.append(str(mode))
+        if sci_info.get("copied"):
+            phases.append("scientific_history_copied")
+        else:
+            phases.append("scientific_history_absent")
+        if sci_info.get("hardlinked"):
+            phases.append("scientific_history_hardlinked")
+        if sci_info.get("byte_copied"):
+            phases.append("scientific_history_byte_copied_fallback")
 
         phases.append("saving_results")
         model = {}

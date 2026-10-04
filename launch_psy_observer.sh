@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# Psy Observer Web — Beta 3.1 launcher (Linux / Unix).
-# Double-click or run from any working directory.
-# First launch may create .venv_psy_web and install requirements-observer.txt.
-# Starts mechanistic_mind.ui.psy_observer_web via the canonical Python launcher.
+# MM Observer — Acanthostega Beta 4.0 launcher (Linux / Unix).
+# Double-click `MM Observer` (or PsyObserver). The launcher owns the window and backend.
 
 set -euo pipefail
 
@@ -17,17 +15,61 @@ while [ -L "$SOURCE" ]; do
 done
 ROOT="$(cd "$(dirname "$SOURCE")" && pwd)"
 export PSY_OBSERVER_PROJECT_ROOT="$ROOT"
-export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
 
-LOG_DIR="$ROOT/.psy_observer"
+# Prefer bundled runtime; keep PYTHONPATH install-relative (relocatable).
+RUNTIME_PY=""
+for cand in \
+  "$ROOT/runtime/python/bin/python3.12" \
+  "$ROOT/runtime/python/bin/python3" \
+  "$ROOT/runtime/python/bin/python"
+do
+  if [ -x "$cand" ]; then
+    RUNTIME_PY="$cand"
+    break
+  fi
+done
+
+SITE_PACKAGES=""
+for sp in "$ROOT"/.venv_psy_web/lib/python*/site-packages; do
+  if [ -d "$sp" ]; then
+    SITE_PACKAGES="$sp"
+  fi
+done
+
+export PYTHONPATH="$ROOT${SITE_PACKAGES:+:$SITE_PACKAGES}"
+export PYTHONNOUSERSITE=1
+unset PYTHONHOME || true
+
+if [ -n "$RUNTIME_PY" ]; then
+  export PSY_OBSERVER_PACKAGED=1
+  export PSY_OBSERVER_PYTHON="$RUNTIME_PY"
+  export PSY_OBSERVER_SKIP_BOOTSTRAP=1
+fi
+
+# XDG defaults (Python launcher also enforces these).
+: "${XDG_CONFIG_HOME:=$HOME/.config}"
+: "${XDG_DATA_HOME:=$HOME/.local/share}"
+: "${XDG_CACHE_HOME:=$HOME/.cache}"
+: "${XDG_STATE_HOME:=$HOME/.local/state}"
+export PSY_OBSERVER_CONFIG_DIR="${PSY_OBSERVER_CONFIG_DIR:-$XDG_CONFIG_HOME/mm-observer}"
+export PSY_OBSERVER_DATA_DIR="${PSY_OBSERVER_DATA_DIR:-$XDG_DATA_HOME/mm-observer}"
+export PSY_OBSERVER_CACHE_DIR="${PSY_OBSERVER_CACHE_DIR:-$XDG_CACHE_HOME/mm-observer}"
+export PSY_OBSERVER_STATE_DIR="${PSY_OBSERVER_STATE_DIR:-$XDG_STATE_HOME/mm-observer}"
+export PSY_OBSERVER_RESULTS_ROOT="${PSY_OBSERVER_RESULTS_ROOT:-$PSY_OBSERVER_DATA_DIR/results}"
+
+LOG_DIR="$PSY_OBSERVER_STATE_DIR/launcher"
 LOG_FILE="$LOG_DIR/launcher.log"
 BOOTSTRAP="$ROOT/scripts/bootstrap_psy_observer_env.py"
 VENV_PY="$ROOT/.venv_psy_web/bin/python"
-mkdir -p "$LOG_DIR"
+mkdir -p "$LOG_DIR" \
+  "$PSY_OBSERVER_CONFIG_DIR" \
+  "$PSY_OBSERVER_DATA_DIR" \
+  "$PSY_OBSERVER_CACHE_DIR" \
+  "$PSY_OBSERVER_RESULTS_ROOT"
 
 fail() {
   msg="$1"
-  echo "Psy Observer Web could not start." >&2
+  echo "MM Observer could not start." >&2
   echo "" >&2
   echo "$msg" >&2
   echo "" >&2
@@ -37,13 +79,13 @@ fail() {
     echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") ERROR $msg"
   } >> "$LOG_FILE" 2>/dev/null || true
   if [ ! -t 0 ] && [ -n "${DISPLAY:-}" ]; then
-    (zenity --error --title "Psy Observer Web" --text "Psy Observer Web could not start.
+    (zenity --error --title "MM Observer" --text "MM Observer could not start.
 
 $msg" >/dev/null 2>&1 &) || true
-    (kdialog --error "Psy Observer Web could not start.
+    (kdialog --error "MM Observer could not start.
 
 $msg" >/dev/null 2>&1 &) || true
-    (notify-send "Psy Observer Web" "$msg" >/dev/null 2>&1 &) || true
+    (notify-send "MM Observer" "$msg" >/dev/null 2>&1 &) || true
   fi
   exit 1
 }
@@ -54,6 +96,7 @@ version_ok() {
 }
 
 find_system_python() {
+  # Only for non-packaged developer checkouts.
   local cand
   for cand in python3 python; do
     if command -v "$cand" >/dev/null 2>&1; then
@@ -69,10 +112,14 @@ find_system_python() {
 
 venv_ready() {
   [ -x "$VENV_PY" ] || return 1
+  [ -f "$BOOTSTRAP" ] || return 1
   "$VENV_PY" "$BOOTSTRAP" --root "$ROOT" --check-only >/dev/null 2>&1
 }
 
 ensure_environment() {
+  if [ -n "${PSY_OBSERVER_SKIP_BOOTSTRAP:-}" ]; then
+    return 0
+  fi
   if [ -n "${PSY_OBSERVER_PYTHON:-}" ] && [ -x "${PSY_OBSERVER_PYTHON}" ]; then
     return 0
   fi
@@ -80,7 +127,7 @@ ensure_environment() {
     return 0
   fi
 
-  echo "Preparing Psy Observer environment"
+  echo "Preparing MM Observer environment"
   echo "Creating Python environment and installing dependencies if needed."
   echo "This may take a few minutes on first launch (network required)."
   echo ""
@@ -88,8 +135,8 @@ ensure_environment() {
   local progress_pid=""
   if [ ! -t 1 ] && [ -n "${DISPLAY:-}" ] && command -v zenity >/dev/null 2>&1; then
     zenity --progress --pulsate --no-cancel --auto-close \
-      --title="Psy Observer" \
-      --text="Preparing Psy Observer for first launch.\nThis may take a few minutes." \
+      --title="MM Observer" \
+      --text="Preparing MM Observer for first launch.\nThis may take a few minutes." \
       >/dev/null 2>&1 &
     progress_pid=$!
   fi
@@ -97,13 +144,9 @@ ensure_environment() {
   local sys_py
   if ! sys_py="$(find_system_python)"; then
     [ -n "$progress_pid" ] && kill "$progress_pid" >/dev/null 2>&1 || true
-    fail "Python 3.11 or newer is required to prepare Psy Observer.
+    fail "Python 3.11 or newer is required to prepare MM Observer for a developer checkout.
 
-Install Python from:
-  • https://www.python.org/downloads/
-  • or your Linux distribution package manager (python3)
-
-Then double-click Psy Observer again. You do not need to create .venv_psy_web by hand."
+Packaged releases include a bundled runtime and do not need system Python."
   fi
 
   if ! "$sys_py" "$BOOTSTRAP" --root "$ROOT" 2>&1 | tee -a "$LOG_FILE"; then
@@ -111,10 +154,7 @@ Then double-click Psy Observer again. You do not need to create .venv_psy_web by
     fail "First-run setup failed while creating .venv_psy_web or installing dependencies.
 
 Details are in:
-  $LOG_FILE
-
-Typical causes: no network, blocked pip, or an incomplete Python install.
-Fix the cause and run Psy Observer again."
+  $LOG_FILE"
   fi
 
   [ -n "$progress_pid" ] && kill "$progress_pid" >/dev/null 2>&1 || true
@@ -124,6 +164,10 @@ Fix the cause and run Psy Observer again."
 pick_runtime_python() {
   if [ -n "${PSY_OBSERVER_PYTHON:-}" ] && [ -x "${PSY_OBSERVER_PYTHON}" ]; then
     printf '%s\n' "${PSY_OBSERVER_PYTHON}"
+    return 0
+  fi
+  if [ -n "$RUNTIME_PY" ] && [ -x "$RUNTIME_PY" ]; then
+    printf '%s\n' "$RUNTIME_PY"
     return 0
   fi
   if [ -x "$VENV_PY" ]; then
@@ -139,19 +183,21 @@ pick_runtime_python() {
 
 if [ ! -f "$ROOT/mechanistic_mind/ui/psy_observer_web/web_dist/index.html" ]; then
   fail "The Observer interface is not built yet (missing production web_dist files).
-This Beta 3.1 archive should already include web_dist. Re-download the release if it is missing."
+Re-extract the release archive if this is a packaged build."
 fi
 
-if [ ! -f "$BOOTSTRAP" ]; then
-  fail "Missing bootstrap script: scripts/bootstrap_psy_observer_env.py"
+# Packaged: never bootstrap. Developer: may bootstrap.
+if [ -z "$RUNTIME_PY" ]; then
+  if [ ! -f "$BOOTSTRAP" ]; then
+    fail "Missing bootstrap script: scripts/bootstrap_psy_observer_env.py"
+  fi
+  ensure_environment
 fi
-
-ensure_environment
 
 if ! PY="$(pick_runtime_python)"; then
-  fail "Python environment missing after bootstrap (.venv_psy_web)."
+  fail "Bundled Python runtime missing (runtime/python) and no .venv_psy_web available."
 fi
 
 cd "$ROOT"
-echo "Starting Psy Observer"
+echo "Starting MM Observer"
 exec "$PY" -m mechanistic_mind.ui.psy_observer_web.launcher "$@"

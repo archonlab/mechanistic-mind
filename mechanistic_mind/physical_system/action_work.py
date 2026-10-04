@@ -147,6 +147,38 @@ def request_discrete_action(
     }
 
 
+def scale_locomotor_request_before_vmax(
+    request: dict[str, Any],
+    *,
+    multiplier: float,
+    vx: float,
+    vy: float,
+    v_max: float,
+) -> dict[str, Any]:
+    """Scale the nominal MOVE Δv, then recompute the v_max clip and work request.
+
+    action_dv_requested stays the unscaled locomotor request. The returned
+    request carries no traction labels, so cognition ledgers stay numeric.
+    """
+    kind = str(request.get("selected_action") or "")
+    if kind not in ("MOVE:N", "MOVE:S", "MOVE:E", "MOVE:W"):
+        return dict(request)
+    nominal = np.asarray(request.get("action_dv_requested") or [0.0, 0.0], dtype=np.float64)
+    scaled = nominal * float(multiplier)
+    v0 = np.asarray([float(vx), float(vy)], dtype=np.float64)
+    v_try = np.clip(v0 + scaled, -float(v_max), float(v_max))
+    dv = v_try - v0
+    mass = float(request.get("mass") or 1.0)
+    signed = ke_increment(mass, float(vx), float(vy), float(dv[0]), float(dv[1]))
+    out = dict(request)
+    out["action_dv_requested_after_vmax"] = dv.astype(float).tolist()
+    out["action_impulse_requested"] = (float(mass) * dv).astype(float).tolist()
+    out["action_work_signed_requested"] = float(signed)
+    out["action_work_requested"] = float(max(0.0, signed))
+    out["action_negative_work_requested"] = float(max(0.0, -signed))
+    return out
+
+
 def realize_discrete_action(
     body,
     request: dict[str, Any],

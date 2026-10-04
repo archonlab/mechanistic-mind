@@ -355,6 +355,7 @@ def collect_canonical_fpv(
                 cfg=nfe,
                 foreign_bodies=_foreign_for_slot(runtime, i),
                 diagnostic=True,
+                physical_config=getattr(slot, "config", None) or getattr(runtime, "config", None),
             )
             receipts = compact_fpv_receipts(sample, prev_finals=prev_all.get(aid))
             agents[aid] = receipts
@@ -368,6 +369,7 @@ def collect_canonical_fpv(
         nfe = getattr(getattr(runtime, "config", None), "near_field_exteroception", None)
         sample = sample_near_field(
             world=runtime.world, body=runtime.body, cfg=nfe, diagnostic=True,
+            physical_config=getattr(runtime, "config", None),
         )
         receipts = compact_fpv_receipts(sample, prev_finals=prev_all.get("agent_0"))
         agents["agent_0"] = receipts
@@ -457,19 +459,39 @@ def build_tiktaalik_eye_payload(
     }
 
 
+def _psc_authority_runtime(runtime: Any) -> Any:
+    """Resolve the PhysicalSystemRuntime that owns PSC schedule receipts.
+
+    TwoAgentRuntime blocks underscore attribute delegation via ``__getattr__``,
+    so activation receipts live on slot runtimes, not the wrapper.
+    """
+    slots = getattr(runtime, "slots", None)
+    if isinstance(slots, (list, tuple)) and slots:
+        return slots[0]
+    return runtime
+
+
 def psc_off_ticks_status(runtime: Any) -> dict[str, Any]:
-    cog = getattr(getattr(runtime, "config", None), "cognition", None)
+    auth = _psc_authority_runtime(runtime)
+    cog = getattr(getattr(auth, "config", None), "cognition", None)
+    if cog is None:
+        cog = getattr(getattr(runtime, "config", None), "cognition", None)
     n = getattr(cog, "psc_off_ticks", None) if cog is not None else None
     psc_on = False
     try:
-        snap = runtime.mechanisms()
+        snap = runtime.mechanisms() if hasattr(runtime, "mechanisms") else auth.mechanisms()
         for m in snap.get("mechanisms") or []:
             if m.get("id") == "prospective_scenario_competition":
                 psc_on = bool(m.get("enabled"))
                 break
+        if not psc_on:
+            en = (snap.get("enabled") or {})
+            psc_on = bool(en.get("prospective_scenario_competition"))
     except Exception:
         psc_on = False
-    act = getattr(runtime, "_psc_activation", None)
+    act = getattr(auth, "_psc_activation", None)
+    auto = bool(getattr(auth, "_psc_auto_activated", False))
+    transition_count = 1 if (isinstance(act, dict) and auto) else (1 if isinstance(act, dict) else 0)
     if isinstance(act, dict):
         return {
             "psc": "ON" if psc_on else "OFF",
@@ -478,6 +500,10 @@ def psc_off_ticks_status(runtime: Any) -> dict[str, Any]:
             "activated_tick": act.get("tick"),
             "history_preserved": bool(act.get("history_preserved", True)),
             "mode": "ACTIVATED" if psc_on else "SCHEDULED",
+            "transition_count": transition_count,
+            "withhold_opened": bool(act.get("withhold_opened")),
+            "armed": False,
+            "authority_runtime": type(auth).__name__,
         }
     if n is None:
         return {
@@ -487,6 +513,10 @@ def psc_off_ticks_status(runtime: Any) -> dict[str, Any]:
             "activated_tick": None,
             "history_preserved": True,
             "mode": "MANUAL",
+            "transition_count": 0,
+            "withhold_opened": False,
+            "armed": False,
+            "authority_runtime": type(auth).__name__,
         }
     return {
         "psc": "ON" if psc_on else "OFF",
@@ -495,4 +525,8 @@ def psc_off_ticks_status(runtime: Any) -> dict[str, Any]:
         "activated_tick": None,
         "history_preserved": True,
         "mode": "SCHEDULED" if not psc_on else "ON",
+        "transition_count": 0,
+        "withhold_opened": False,
+        "armed": not psc_on,
+        "authority_runtime": type(auth).__name__,
     }

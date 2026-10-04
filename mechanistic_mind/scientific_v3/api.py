@@ -10,16 +10,25 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-def _iter_jsonl(path: Path) -> Iterator[dict[str, Any]]:
+def _iter_jsonl(path: Path, *, byte_limit: int | None = None) -> Iterator[dict[str, Any]]:
+    """Iterate complete JSONL objects. Optional byte_limit excludes appended/partial tails."""
     if not path.is_file():
         return
-    with path.open("r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
+    limit = None if byte_limit is None else max(0, int(byte_limit))
+    with path.open("rb") as f:
+        read = 0
+        while True:
+            if limit is not None and read >= limit:
+                break
+            raw = f.readline()
+            if not raw:
+                break
+            read += len(raw)
+            if limit is not None and read > limit:
+                # Line crossed the frozen boundary — exclude (would include appended/partial).
+                break
             try:
-                obj = json.loads(line)
+                obj = json.loads(raw)
             except json.JSONDecodeError:
                 continue
             if isinstance(obj, dict):
@@ -81,16 +90,28 @@ def _compact_consequence(r: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _scan_compact(path: Path, key_fn, compact_fn) -> tuple[dict[Any, int], dict[Any, dict[str, Any]]]:
+def _scan_compact(
+    path: Path,
+    key_fn,
+    compact_fn,
+    *,
+    byte_limit: int | None = None,
+) -> tuple[dict[Any, int], dict[Any, dict[str, Any]]]:
     idx: dict[Any, int] = {}
     compact: dict[Any, dict[str, Any]] = {}
     if not path.is_file():
         return idx, compact
+    limit = None if byte_limit is None else max(0, int(byte_limit))
     with path.open("rb") as f:
         while True:
             pos = f.tell()
+            if limit is not None and pos >= limit:
+                break
             raw = f.readline()
             if not raw:
+                break
+            end = pos + len(raw)
+            if limit is not None and end > limit:
                 break
             try:
                 obj = json.loads(raw)
@@ -109,39 +130,62 @@ def _scan_compact(path: Path, key_fn, compact_fn) -> tuple[dict[Any, int], dict[
 class RunEvidence:
     """Read a V3 CORE package without retaining all receipts in memory."""
 
-    def __init__(self, directory: str | Path, *, materialize: bool = False) -> None:
+    def __init__(
+        self,
+        directory: str | Path,
+        *,
+        materialize: bool = False,
+        snapshot: dict[str, Any] | None = None,
+    ) -> None:
         self.directory = Path(directory)
         self.meta = self._load_json(self.directory / "scientific_v3_meta.json")
         self.identity_map = self._load_json(self.directory / "identity_map.json")
         self._materialize = bool(materialize)
+        self._snapshot = snapshot if isinstance(snapshot, dict) else None
         self._obs_path = self.directory / "scientific_observations.jsonl"
         self._dec_path = self.directory / "scientific_decisions.jsonl"
         self._motor_path = self.directory / "scientific_motors.jsonl"
         self._cons_path = self.directory / "scientific_consequences.jsonl"
         self._spine_path = self.directory / "scientific_spine.jsonl"
         self._fh: dict[Path, Any] = {}
+
+        def _lim(name: str) -> int | None:
+            if not self._snapshot:
+                return None
+            row = (self._snapshot.get("files") or {}).get(name)
+            if not isinstance(row, dict):
+                return None
+            if not row.get("present"):
+                return 0
+            return int(row.get("byte_end") or 0)
+
+        lim_obs = _lim("scientific_observations.jsonl")
+        lim_dec = _lim("scientific_decisions.jsonl")
+        lim_mot = _lim("scientific_motors.jsonl")
+        lim_cons = _lim("scientific_consequences.jsonl")
+        lim_spine = _lim("scientific_spine.jsonl")
         if self._materialize:
             self._obs = {
                 (r.get("cognitive_agent_id"), int(r["tick"])): r
-                for r in _iter_jsonl(self._obs_path)
+                for r in _iter_jsonl(self._obs_path, byte_limit=lim_obs)
                 if "tick" in r
             }
             self._dec = {
                 (r.get("cognitive_agent_id"), int(r["tick"])): r
-                for r in _iter_jsonl(self._dec_path)
+                for r in _iter_jsonl(self._dec_path, byte_limit=lim_dec)
                 if "tick" in r
             }
             self._motor = {
                 (r.get("cognitive_agent_id"), int(r["tick"])): r
-                for r in _iter_jsonl(self._motor_path)
+                for r in _iter_jsonl(self._motor_path, byte_limit=lim_mot)
                 if "tick" in r
             }
             self._cons = {
                 (r.get("physical_body_id"), int(r["tick_from"])): r
-                for r in _iter_jsonl(self._cons_path)
+                for r in _iter_jsonl(self._cons_path, byte_limit=lim_cons)
                 if "tick_from" in r
             }
-            self._spine = list(_iter_jsonl(self._spine_path))
+            self._spine = list(_iter_jsonl(self._spine_path, byte_limit=lim_spine))
             self._obs_idx = self._dec_idx = self._motor_idx = self._cons_idx = None
         else:
             self._spine = None
@@ -149,22 +193,27 @@ class RunEvidence:
                 self._obs_path,
                 lambda r: (r.get("cognitive_agent_id"), int(r["tick"])) if "tick" in r else None,
                 _compact_observation,
+                byte_limit=lim_obs,
             )
             self._dec_idx, self._dec = _scan_compact(
                 self._dec_path,
                 lambda r: (r.get("cognitive_agent_id"), int(r["tick"])) if "tick" in r else None,
                 _compact_decision,
+                byte_limit=lim_dec,
             )
             self._motor_idx, self._motor = _scan_compact(
                 self._motor_path,
                 lambda r: (r.get("cognitive_agent_id"), int(r["tick"])) if "tick" in r else None,
                 _compact_motor,
+                byte_limit=lim_mot,
             )
             self._cons_idx, self._cons = _scan_compact(
                 self._cons_path,
                 lambda r: (r.get("physical_body_id"), int(r["tick_from"])) if "tick_from" in r else None,
                 _compact_consequence,
+                byte_limit=lim_cons,
             )
+        self._spine_byte_limit = lim_spine
 
     def close(self) -> None:
         for fh in self._fh.values():
@@ -214,7 +263,7 @@ class RunEvidence:
         if self._spine is not None:
             yield from self._spine
             return
-        yield from _iter_jsonl(self._spine_path)
+        yield from _iter_jsonl(self._spine_path, byte_limit=getattr(self, "_spine_byte_limit", None))
 
     def spine_max_tick(self) -> int | None:
         mx = None

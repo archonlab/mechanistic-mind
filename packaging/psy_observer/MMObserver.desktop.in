@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=MM Observer
+Comment=Mechanistic Mind Observer — Acanthostega Beta 4.0 (partially validated)
+Exec=env PSY_OBSERVER_PROJECT_ROOT="@INSTALL_ROOT@" "@INSTALL_ROOT@/PsyObserver"
+Icon=@ICON_PATH@
+Terminal=false
+Categories=Science;Education;
+StartupNotify=true
+StartupWMClass=MM Observer

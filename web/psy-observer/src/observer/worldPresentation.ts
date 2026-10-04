@@ -82,7 +82,9 @@ const LIGHT: WorldChrome = {
 };
 
 export function resolvedWorldTheme(root: { dataset?: DOMStringMap } | null | undefined): 'light' | 'dark' {
-  return root?.dataset?.theme === 'light' ? 'light' : 'dark';
+  const t = root?.dataset?.theme;
+  // Aquatic Glass styles application chrome only; scientific canvas uses light stage contrast.
+  return t === 'light' || t === 'aquatic' ? 'light' : 'dark';
 }
 
 export function worldChrome(theme: 'light' | 'dark' = 'dark'): WorldChrome {

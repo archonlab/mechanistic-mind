@@ -3,10 +3,12 @@ html{
   --font-mono:"SFMono-Regular",Consolas,"Liberation Mono",monospace;
   --control-h:30px;
   --radius:5px;
+  --shadow-panel:0 1px 2px rgba(0,0,0,.18);
+  --glass-blur:0px;
   font-family:var(--font-ui);
   letter-spacing:normal
 }
-html:not([data-theme="light"]){
+html[data-theme="dark"],html:not([data-theme]){
   color-scheme:dark;
   --bg-app:#080c12;--bg-panel:#111822;--bg-elevated:#172231;--bg-hover:#1c2a3c;--bg-selected:#174f86;--bg-chrome:#0a1018;
   --surface-subtle:#0e1620;
@@ -37,6 +39,28 @@ html[data-theme="light"]{
   --blue:var(--accent);--green:var(--status-live);--amber:var(--status-warning);--red:var(--status-error);
   --danger:var(--status-error);--success:var(--status-live);
   background:var(--bg-app);color:var(--text-primary)
+}
+/* Aquatic Glass — chrome only. Scientific viewport keeps map-stage contrast; no decorative water/photo textures. */
+html[data-theme="aquatic"]{
+  color-scheme:light;
+  --font-ui:"Segoe UI","Helvetica Neue",ui-sans-serif,system-ui,sans-serif;
+  --radius:12px;
+  --control-h:32px;
+  --glass-blur:14px;
+  --shadow-panel:0 8px 28px rgba(36,92,140,.12),0 1px 0 rgba(255,255,255,.55) inset;
+  --bg-app:#d7eaf6;--bg-panel:rgba(236,246,252,.82);--bg-elevated:rgba(248,252,255,.92);--bg-hover:rgba(186,222,242,.72);--bg-selected:#5ec8ef;--bg-chrome:rgba(220,238,248,.78);
+  --surface-subtle:rgba(210,232,246,.65);
+  --border-subtle:rgba(120,170,205,.45);--border-strong:rgba(70,140,185,.55);--border-faint:rgba(40,90,130,.08);
+  --text-primary:#143049;--text-secondary:#2f5570;--text-muted:#4a6f88;
+  --accent:#1aa7d6;--accent-hover:#0f8fbc;--accent-selected:#5ec8ef;--accent-soft:rgba(26,167,214,.18);
+  --status-live:#1a9a5c;--status-paused:#b36a12;--status-warning:#b36a12;--status-error:#c23045;
+  --semantic-agent:#1a9a5c;--semantic-observer:#4a6f88;--semantic-intervention:#b36a12;--semantic-experimental:#5b4aa8;--semantic-ground-truth:#7a5c1a;
+  --map-stage:#c5d5e4;
+  --bg:var(--bg-app);--surface:var(--bg-panel);--surface-raised:var(--bg-elevated);--panel:var(--bg-panel);--panel2:var(--bg-elevated);
+  --border:var(--border-subtle);--line:var(--border-subtle);--text:var(--text-primary);--muted:var(--text-muted);
+  --blue:var(--accent);--green:var(--status-live);--amber:var(--status-warning);--red:var(--status-error);
+  --danger:var(--status-error);--success:var(--status-live);
+  background:linear-gradient(165deg,#cfe6f5 0%,#e8f4fb 48%,#d5e8f4 100%);color:var(--text-primary)
 }
 *{box-sizing:border-box}html,body,#root{margin:0;height:100%;overflow:hidden;background:var(--bg-app);color:var(--text-primary);font-family:var(--font-ui)}
 button,input,select{font:inherit;font-family:var(--font-ui);color:inherit;background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:var(--radius);padding:4px 10px;min-height:var(--control-h);line-height:1.2}
@@ -81,16 +105,34 @@ button.danger:hover:not(:disabled){background:color-mix(in srgb,var(--danger) 12
 /* Map host must fill remaining height. Do NOT use flex align-items:center —
    that collapses in-flow children when the map wrapper is position:absolute. */
 .sim-map-host{flex:1;min-width:0;min-height:0;position:relative;overflow:hidden}
-.sim-map-host .world-click-wrapper,
-.sim-map-host .world-layout.map-only,
-.sim-map-host .world-center{
+/* VW7 mode-bar visibility repair: outer pane is a flex column; absolute fill is
+   confined to .world-viewport-content-host so MAP/VOLUME chrome cannot be covered. */
+.sim-map-host .world-click-wrapper{
+  position:absolute;inset:0;min-width:0;min-height:0;width:auto;height:auto;
+  display:flex;flex-direction:column;padding:0;margin:0;border:0;gap:0
+}
+.sim-map-host .world-viewport-mode-bar{
+  flex:0 0 auto;position:relative;z-index:2;
+  background:var(--bg-chrome);border-bottom:1px solid var(--line);
+  pointer-events:auto
+}
+.sim-map-host .world-viewport-content-host{
+  flex:1 1 auto;min-width:0;min-height:0;position:relative;overflow:hidden
+}
+.sim-map-host .world-viewport-content-host .world-layout.map-only,
+.sim-map-host .world-viewport-content-host .world-center{
   position:absolute;inset:0;min-width:0;min-height:0;width:auto;height:auto;
   display:block;padding:0;margin:0;border:0;gap:0;grid-template-columns:none;grid-template-rows:none
 }
 /* Single sizing box for WorldMap's own .canvas-wrap (do not nest another absolute wrap). */
-.sim-map-host .world-center > .canvas-wrap{
+.sim-map-host .world-viewport-content-host .world-center > .canvas-wrap{
   position:absolute;inset:8px;min-width:0;min-height:0;
   border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--map-stage)
+}
+/* OccupancyVolumeView root fills the content host without covering the mode bar. */
+.sim-map-host .world-viewport-content-host .occupancy-volume-view{
+  position:absolute;inset:8px;min-width:0;min-height:0;
+  display:flex;flex-direction:column;overflow:hidden
 }
 .sim-hud{flex:0 0 auto;padding:4px 10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--line);background:var(--bg-chrome);font-size:11px;min-height:28px}
 .sim-hud .agent-chip-stack{display:inline-flex;flex-direction:column;align-items:flex-start;gap:1px}
@@ -223,11 +265,14 @@ button.danger:hover:not(:disabled){background:color-mix(in srgb,var(--danger) 12
 .inspector-dock{flex:0 0 min(420px,44vw);min-width:240px;max-width:480px;display:flex;flex-direction:column;border-left:1px solid var(--line);background:var(--bg-chrome);min-height:0}
 .inspector-sticky{flex:0 0 auto;position:relative;z-index:2;background:var(--bg-chrome);border-bottom:1px solid var(--line);padding:6px 8px 0}
 .inspector-sticky-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-bottom:4px}
-.inspector-sticky-row strong{letter-spacing:.08em;font-size:11px}
+.inspector-apply-bar{flex:0 0 auto;border-top:1px solid var(--line);padding:8px;background:var(--bg-chrome);z-index:2}
+.inspector-apply-bar .toolbar-row{align-items:center}
 .inspector-tabs{display:flex;flex-wrap:wrap;gap:3px;padding:4px 0 6px;border-bottom:0;position:relative;pointer-events:auto}
 .inspector-tabs button{font-size:10px;letter-spacing:.04em;padding:4px 7px;min-height:28px}
 .inspector-body{flex:1;min-height:0;overflow:auto;padding:8px;display:flex;flex-direction:column;gap:8px;position:relative;z-index:0}
 .inspector-dock .panel,.inspector-dock .science-card,.inspector-dock .device-form{overflow:visible;height:auto;max-height:none;flex:0 0 auto}
+[data-testid="psc-runtime-panel"],[data-testid="psc-authority-strip"]{overflow:visible;max-height:none;flex:0 0 auto}
+[data-testid="psc-current-run-summary"] strong,[data-testid="psc-current-psc"]{font-size:13px;letter-spacing:.02em}
 .inspector-dock .dashboard-grid,.inspector-dock .timeline-layout{height:auto;max-height:none;overflow:visible;grid-template-columns:1fr}
 .inspector-dock .event-list,.inspector-dock .observe-v2-events{max-height:none !important;overflow:visible}
 .observe-v2-host{max-height:none;overflow:visible}
@@ -262,11 +307,46 @@ button.danger:hover:not(:disabled){background:color-mix(in srgb,var(--danger) 12
 .eye-side-dock{flex:0 0 auto;min-height:0;display:flex;flex-direction:column;position:relative;z-index:3;background:var(--bg-chrome);border-right:1px solid var(--line)}
 .eye-side-dock.closed{width:22px}
 .eye-side-dock-handle{writing-mode:vertical-rl;transform:rotate(180deg);height:100%;width:22px;border:0;background:transparent;letter-spacing:.14em;font-size:10px;color:var(--muted);cursor:pointer}
-.eye-side-dock-head{display:flex;flex-wrap:wrap;gap:4px;padding:6px 8px;border-bottom:1px solid var(--line);flex:0 0 auto}
+.eye-side-dock-head{display:flex;flex-wrap:wrap;gap:4px;padding:6px 8px;border-bottom:1px solid var(--line);flex:0 0 auto;align-items:center}
+.eye-sensory-tabs{display:inline-flex;gap:4px;margin-left:4px}
+.eye-sensory-tabs button.active,.eye-side-dock-head button.active{outline:1px solid var(--accent, #8af)}
+.hearing-active-indicator{font-size:10px;color:var(--muted);letter-spacing:.02em;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.eye-side-dock-closed-stack{display:flex;flex-direction:column;height:100%;width:22px}
+.hearing-workspace{min-width:0;max-width:100%;overflow-x:hidden;word-break:break-word}
+.hearing-section{min-width:0}
+.hearing-workspace .panel{max-width:100%}
+.sav3-comparison{min-width:0;max-width:100%}
+.sav3-matrix{min-width:0;max-width:100%}
+.sav3-band-row{min-width:0}
+.hearing-closed-indicator{color:var(--accent, #8af)}
 .eye-side-dock-body{flex:1;min-height:0;overflow:auto;padding:6px 8px 12px}
 .eye-side-dock-resizer{position:absolute;top:0;right:0;width:6px;bottom:0;cursor:ew-resize}
 .eye-dock-toolbar{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:0 0 6px}
 .eye-dock-toolbar button{font-size:10px;padding:3px 6px;min-height:26px}
+
+/* S7D dual FPV Eye dock */
+.eye-dual-fpv{display:flex;flex-direction:column;gap:8px;min-width:0}
+.eye-dual-fpv-head{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.eye-dual-fpv-grid{display:flex;flex-direction:column;gap:8px;min-width:0}
+.eye-dual-fpv.wide .eye-dual-fpv-grid[data-layout="side"]{flex-direction:row;align-items:stretch}
+.eye-dual-fpv.wide .eye-dual-fpv-grid[data-layout="side"] .eye-dual-fpv-card{flex:1 1 0;min-width:0}
+.eye-dual-fpv-card{border:1px solid var(--line, #445);border-radius:4px;padding:6px;background:var(--bg-panel, transparent);cursor:pointer;min-width:0}
+.eye-dual-fpv-card:focus-visible{outline:2px solid var(--accent, #8af);outline-offset:2px}
+.eye-dual-fpv-card.selected{border-color:var(--accent, #8af);box-shadow:inset 0 0 0 1px var(--accent, #8af)}
+.eye-dual-fpv-card-head{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:4px}
+.eye-dual-fpv-state{font-size:10px;letter-spacing:.04em;padding:1px 5px;border:1px solid var(--line);border-radius:3px}
+.eye-dual-fpv-state.state-live{color:#6c6}
+.eye-dual-fpv-state.state-zero{color:#9ab}
+.eye-dual-fpv-state.state-unavailable{color:#c9a227}
+.eye-dual-fpv-ticks{font-size:10px;margin-bottom:4px}
+.eye-dual-fpv-card-actions{margin-top:4px}
+.eye-dual-fpv-settings{border-top:1px solid var(--border-faint, var(--line));padding-top:6px}
+.o4-fpv-compact{min-width:0}
+.o4-fpv-compact canvas{max-width:100%}
+.hearing-workspace.compact .hearing-engine-deferred{display:none}
+.hearing-workspace.compact .hearing-primary{border:1px solid var(--border-faint, var(--line));padding:6px}
+.hearing-workspace.compact .hearing-compact-detail-host{margin-top:8px;border-top:1px solid var(--border-faint, var(--line));padding-top:6px}
+button.linkish{background:transparent;border:0;color:var(--accent, #8af);text-decoration:underline;cursor:pointer;padding:0;font:inherit}
 .eye-dock-note{font-size:10px;margin-bottom:6px}
 .eye-scopes.vertical{flex-direction:column;flex-wrap:nowrap}
 .eye-scopes.vertical .fpv-field,.eye-scopes.vertical .eye-scope{min-width:0;width:100%}
@@ -329,9 +409,283 @@ button.danger:hover:not(:disabled){background:color-mix(in srgb,var(--danger) 12
 .inspector-tabs button.active{background:var(--accent-soft);border-color:var(--accent);box-shadow:inset 0 -2px 0 var(--accent)}
 .metric span{color:var(--text-secondary)}
 html{scrollbar-color:var(--border-strong) var(--surface-subtle)}
-html[data-theme="light"] .fpv-cell{color:#1a2330}
-html:not([data-theme="light"]) .fpv-cell{color:#e2e8f0}
-html:not([data-theme="light"]) .fpv-cell.own{background:#111827}
-html[data-theme="light"] .lab-header button.danger{border-color:color-mix(in srgb,var(--danger) 40%,var(--border-subtle))}
+html[data-theme="light"] .fpv-cell,
+html[data-theme="aquatic"] .fpv-cell{color:#1a2330}
+html[data-theme="dark"] .fpv-cell,
+html:not([data-theme]) .fpv-cell{color:#e2e8f0}
+html[data-theme="dark"] .fpv-cell.own,
+html:not([data-theme]) .fpv-cell.own{background:#111827}
+html[data-theme="light"] .lab-header button.danger,
+html[data-theme="aquatic"] .lab-header button.danger{border-color:color-mix(in srgb,var(--danger) 40%,var(--border-subtle))}
 
+/* —— S7B Observer visual shell: top toolbar / left nav / center / right inspector / bottom drawer —— */
+.observation-nav-strip{display:none !important} /* legacy horizontal strip removed from composition */
+.app-toolbar{
+  flex:0 0 auto;display:grid;grid-template-columns:minmax(220px,1.1fr) minmax(280px,1.4fr) minmax(220px,1.1fr);
+  gap:10px;align-items:center;padding:8px 12px;min-height:52px;
+  background:var(--bg-chrome);border-bottom:1px solid var(--border-subtle);z-index:6;
+}
+.app-toolbar-left,.app-toolbar-center,.app-toolbar-right{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0}
+.app-toolbar-center{justify-content:center}
+.app-toolbar-right{justify-content:flex-end}
+.app-brand{display:flex;flex-direction:column;line-height:1.15;gap:1px}
+.app-brand strong{font-size:13px;letter-spacing:.02em}
+.app-brand-sub{font-size:10px;color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase}
+.app-toolbar-sep{width:1px;height:22px;background:var(--border-subtle)}
+.app-model-chip{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.app-model-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:12rem}
+.app-tick{font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);font-variant-numeric:tabular-nums;min-width:5.5rem}
+.app-meta{font-size:11px;color:var(--text-muted);font-variant-numeric:tabular-nums}
+.workspace-seg,.evidence-seg,.transport-group,.panel-toggles,.more-seg{display:inline-flex;gap:4px;align-items:center;flex-wrap:wrap}
+.transport-primary{background:var(--accent-soft);border-color:var(--accent);font-weight:600}
+.app-speed{min-width:5.5rem}
+.toolbar-transport-stack,.toolbar-speed-stack{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0}
+.toolbar-speed-label{display:inline-flex;align-items:center;gap:6px}
+.toolbar-metric{line-height:1.2;text-align:center;white-space:nowrap}
+.app-more{position:relative}
+.app-overflow-menu{
+  position:absolute;right:0;top:calc(100% + 4px);z-index:20;min-width:280px;max-width:min(92vw,360px);max-height:min(70vh,520px);overflow:auto;display:grid;gap:10px;padding:10px;
+  background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:var(--radius);box-shadow:var(--shadow-panel)
+}
+.app-overflow-row{display:flex;justify-content:space-between;gap:8px;font-size:11px}
+.more-group{display:grid;gap:6px;padding-bottom:8px;border-bottom:1px solid var(--border-faint)}
+.more-group:last-child{border-bottom:0;padding-bottom:0}
+.more-group-title{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-secondary)}
+.more-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px}
+.more-product-list{display:grid;gap:2px;max-height:160px;overflow:auto}
+.more-product-row{display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer}
+.s7e-toolbar .evidence-seg,.s7e-toolbar .observer-detail-topbar{display:none}
+
+.s7b-shell-body.observer-shell-body{flex:1;min-height:0;display:flex;flex-direction:row;gap:0}
+.left-sidebar{
+  flex:0 0 auto;min-height:0;display:flex;flex-direction:column;gap:8px;
+  border-right:1px solid var(--border-subtle);background:var(--bg-chrome);z-index:4;padding:8px 6px;
+}
+.left-sidebar.is-open{width:clamp(200px,18vw,248px)}
+.left-sidebar.is-collapsed{width:56px;align-items:center}
+.left-sidebar-chrome{display:flex;align-items:center;gap:8px;padding:2px 4px}
+.left-sidebar-collapse{min-width:36px;padding:0 8px;display:inline-flex;align-items:center;gap:6px}
+.left-sidebar.is-collapsed .left-sidebar-collapse-label{display:none}
+.left-sidebar-meta{display:flex;flex-direction:column;gap:2px;min-width:0;font-size:11px}
+.left-sidebar-meta strong{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-secondary)}
+.left-sidebar-nav{display:flex;flex-direction:column;gap:4px;flex:1;min-height:0;overflow:auto;padding:4px}
+.left-nav-item{
+  width:100%;display:flex;align-items:center;gap:10px;justify-content:flex-start;text-align:left;
+  min-height:36px;padding:8px 10px;border-radius:calc(var(--radius) - 2px);font-size:13px;
+}
+.left-sidebar.is-collapsed .left-nav-item{justify-content:center;padding:8px 0}
+.left-nav-item.active,.left-nav-item[aria-pressed="true"]{
+  background:linear-gradient(135deg,var(--accent) 0%,color-mix(in srgb,var(--accent) 70%,#7be7ff) 100%);
+  color:#fff;border-color:transparent;box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 35%,transparent);
+}
+.left-nav-glyph{width:1.25rem;text-align:center;font-weight:700;font-size:12px;opacity:.9}
+.left-nav-nested{display:grid;gap:2px;padding:4px 0 6px 28px}
+.left-nav-nested-item{text-align:left;font-size:12px;min-height:28px;padding:4px 8px;background:transparent}
+.left-sidebar-footnote{margin:auto 6px 4px;font-size:10px;color:var(--text-muted);line-height:1.35}
+
+.shell-center-column{
+  flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;position:relative;
+}
+.shell-center-column > .sim-workspace{flex:1 1 auto;min-height:160px}
+.shell-left-closed.shell-right-closed.shell-bottom-closed .shell-center-column > .sim-workspace{
+  min-height:min(70vh,720px);
+}
+
+.bottom-drawer,.bottom-evidence-panel{
+  flex:0 0 auto;max-height:min(28vh,240px);overflow:auto;border-top:1px solid var(--border-subtle);
+  background:var(--bg-chrome);z-index:4;
+}
+.bottom-drawer{display:flex;flex-direction:column;padding:0}
+.bottom-drawer-handle{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 10px;border-bottom:1px solid var(--border-faint)
+}
+.bottom-drawer-tabs{display:inline-flex;gap:4px;flex-wrap:wrap}
+.bottom-drawer-body{padding:8px 12px;font-size:12px}
+.bottom-drawer-status{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.bottom-event-list{margin:0;padding-left:1.1rem}
+.bottom-drawer-affordance{
+  flex:0 0 auto;display:flex;justify-content:center;padding:4px;border-top:1px solid var(--border-subtle);background:var(--bg-chrome)
+}
+.bottom-drawer-affordance button{min-height:28px;display:inline-flex;align-items:center;gap:6px}
+
+.shell-collapse-cluster{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.shell-collapse-toggle,.inspector-edge-toggle{
+  min-height:28px;min-width:36px;display:inline-flex;align-items:center;gap:6px;padding:0 8px;font-size:11px;
+}
+.shell-collapse-glyph{font-size:14px;line-height:1}
+.shell-collapse-text{letter-spacing:.02em}
+.observer-shell-body{flex:1;min-height:0;display:flex;flex-direction:row}
+.shell-rail-affordance{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:4px;background:var(--bg-chrome);border-left:1px solid var(--line)}
+.shell-rail-bottom{border-left:0;border-top:1px solid var(--line)}
+.inspect-workspace{height:100%;min-height:0;display:flex;flex-direction:row}
+.inspect-workspace .inspect-world{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column}
+.inspect-workspace.right-closed .inspect-world{flex:1;min-width:0}
+.inspect-workspace .inspect-right-host.is-closed{flex:0 0 0;width:0;min-width:0;overflow:hidden;border:0;padding:0}
+.inspect-workspace .inspect-right-host.is-open{
+  flex:0 0 min(380px,40vw);min-width:240px;max-width:440px;display:flex;flex-direction:column;
+  border-left:1px solid var(--border-subtle);min-height:0;background:var(--bg-chrome)
+}
+.inspect-right-body{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column}
+.inspect-right-body .inspector-dock{flex:1;min-height:0;max-width:none;width:100%;border-left:0}
+.shell-panel-chrome{flex:0 0 auto;padding:8px 10px;border-bottom:1px solid var(--border-subtle);display:flex;justify-content:flex-end;gap:8px;align-items:center}
+.shell-panel-chrome .shell-panel-title{font-size:11px;color:var(--muted);margin-right:auto;letter-spacing:.06em;text-transform:uppercase}
+.shell-bottom-closed .bottom-evidence-panel,.shell-bottom-closed .bottom-drawer{display:none}
+.world-viewport-mode-bar{position:relative;z-index:3;flex:0 0 auto;background:var(--bg-chrome)}
+.world-click-wrapper{display:flex;flex-direction:column;min-height:0;height:100%}
+.world-viewport-content-host{flex:1;min-height:0;position:relative;z-index:1}
+
+/* Aquatic Glass chrome surfaces — not applied as decorative overlays on scientific canvases */
+html[data-theme="aquatic"] .app-toolbar,
+html[data-theme="aquatic"] .left-sidebar,
+html[data-theme="aquatic"] .inspect-right-host.is-open,
+html[data-theme="aquatic"] .bottom-drawer,
+html[data-theme="aquatic"] .bottom-drawer-affordance,
+html[data-theme="aquatic"] .shell-rail-affordance,
+html[data-theme="aquatic"] .eye-side-dock,
+html[data-theme="aquatic"] .world-viewport-mode-bar{
+  background:color-mix(in srgb,var(--bg-chrome) 88%,transparent);
+  backdrop-filter:blur(var(--glass-blur));
+  -webkit-backdrop-filter:blur(var(--glass-blur));
+  box-shadow:var(--shadow-panel);
+}
+html[data-theme="aquatic"] .app-toolbar{border-radius:0 0 16px 16px;margin:0 8px;border:1px solid var(--border-subtle);border-top:0}
+html[data-theme="aquatic"] .left-sidebar{
+  margin:8px 0 8px 8px;border-radius:16px;border:1px solid var(--border-subtle);
+}
+html[data-theme="aquatic"] .inspect-right-host.is-open{
+  margin:8px 8px 8px 0;border-radius:16px;border:1px solid var(--border-subtle);
+}
+html[data-theme="aquatic"] .bottom-drawer,
+html[data-theme="aquatic"] .bottom-drawer-affordance{
+  margin:0 8px 8px;border-radius:16px;border:1px solid var(--border-subtle);
+}
+html[data-theme="aquatic"] .sim-map-host .world-viewport-content-host .world-center > .canvas-wrap,
+html[data-theme="aquatic"] .sim-map-host .world-viewport-content-host .occupancy-volume-view{
+  /* Scientific stage: solid map contrast, no glass decoration over content */
+  backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:none;
+}
+html[data-theme="aquatic"] button.active,
+html[data-theme="aquatic"] .workspace-seg button.active,
+html[data-theme="aquatic"] .evidence-seg button.active{
+  background:var(--accent);color:#fff;border-color:var(--accent);box-shadow:0 2px 10px color-mix(in srgb,var(--accent) 35%,transparent)
+}
+html[data-theme="aquatic"] .transport-primary{background:var(--status-live);border-color:var(--status-live);color:#fff}
+
+@media (prefers-reduced-motion: reduce){
+  .observer-app-shell *{transition:none !important;animation:none !important}
+  html[data-theme="aquatic"] .app-toolbar,
+  html[data-theme="aquatic"] .left-sidebar,
+  html[data-theme="aquatic"] .inspect-right-host.is-open,
+  html[data-theme="aquatic"] .bottom-drawer{
+    backdrop-filter:none;-webkit-backdrop-filter:none
+  }
+}
+@media (max-width:1100px){
+  .app-toolbar{grid-template-columns:1fr;padding:8px}
+  .app-toolbar-center,.app-toolbar-right{justify-content:flex-start}
+}
+@media (max-width:980px){
+  .s7b-shell-body.observer-shell-body{flex-direction:column}
+  .left-sidebar.is-open{width:100%;max-height:40vh}
+  .inspect-workspace{flex-direction:column}
+  .inspect-workspace .inspect-right-host.is-open{flex:0 0 min(42vh,360px);max-width:none;width:100%;margin:0 8px 8px}
+}
+
+/* S7C Phase B — phenomenon-first central observation */
+.sim-observation-host{
+  flex:1;min-height:0;min-width:0;overflow:auto;padding:8px 10px 16px;
+  display:flex;flex-direction:column;gap:8px;background:var(--map-stage);
+}
+.fpv-central-workspace,
+.hearing-central-workspace,
+.organism-central-workspace,
+.events-central-workspace{
+  display:flex;flex-direction:column;gap:10px;min-height:0;flex:1;
+}
+.fpv-central-header{
+  display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+  padding:6px 8px;border:1px solid var(--line);background:var(--bg-chrome);
+}
+.fpv-central-agents,.fpv-central-modes{display:flex;flex-wrap:wrap;gap:4px}
+.fpv-central-status{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-left:auto}
+.fpv-central-status [data-state="LIVE"]{color:var(--status-live,#3d9a5f);font-weight:600}
+.fpv-central-status [data-state="ZERO"]{color:#9ab;font-weight:600}
+.fpv-central-status [data-state="UNAVAILABLE"]{color:#c9a227;font-weight:600}
+.fpv-central-primary{
+  flex:1 1 auto;min-height:220px;display:flex;flex-direction:column;
+}
+.fpv-central-primary .o4-fpv-panel.o4-fpv-primary{
+  flex:1;border:0;background:transparent;padding:0;
+}
+.fpv-causal-split{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media (max-width:900px){
+  .fpv-causal-split{grid-template-columns:1fr}
+}
+.fpv-split-pane{min-width:0}
+.fpv-split-note{grid-column:1 / -1}
+.phenomenon-details{display:flex;flex-direction:column;gap:4px}
+.phenomenon-category{
+  border:1px solid var(--line);background:var(--panel,var(--bg-chrome));
+}
+.phenomenon-category-summary{
+  cursor:pointer;list-style:none;display:flex;flex-direction:column;gap:2px;
+  padding:8px 10px;
+}
+.phenomenon-category-summary::-webkit-details-marker{display:none}
+.phenomenon-category-title{font-weight:600;font-size:12px;letter-spacing:.02em;text-transform:uppercase}
+.phenomenon-category-line{font-size:11px}
+.phenomenon-category-body{padding:0 10px 10px}
+.phenomenon-compact-list{margin:0;padding-left:16px;font-size:11px}
+.setting-label-row{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
+.setting-info-help{position:relative;display:inline-flex;vertical-align:middle}
+.setting-info-btn{
+  width:22px;height:22px;padding:0;border-radius:50%;font-size:12px;line-height:1;
+  border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer;
+}
+.setting-info-btn:hover,.setting-info-btn:focus-visible{
+  color:var(--text);border-color:var(--accent,#8af);outline:2px solid color-mix(in srgb,var(--accent,#8af) 40%,transparent);
+}
+.setting-info-popover{
+  position:absolute;z-index:50;top:calc(100% + 6px);left:0;min-width:220px;max-width:min(360px,70vw);
+  padding:10px 12px;background:var(--panel-bg,var(--bg-chrome));border:1px solid var(--border,var(--line));
+  border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.35);font-size:12px;
+}
+.setting-info-popover-title{display:block;margin-bottom:4px}
+.setting-info-popover-brief{margin:0 0 6px}
+.setting-info-popover-detail{margin:0;color:var(--muted)}
+.hearing-central-primary,.organism-central-primary,.events-central-primary{min-height:160px}
+
+/* S7C destination-depth polish */
+.organism-state-card,.hearing-phenomenon-card,.siminfo-primary{
+  padding:12px 14px;border:1px solid var(--line);background:var(--panel,var(--bg-chrome));
+}
+.organism-state-title{margin:0 0 8px;font-size:16px;letter-spacing:.04em}
+.organism-state-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px 12px;margin-bottom:8px;
+}
+.organism-state-grid > div{display:flex;flex-direction:column;gap:2px}
+.events-filter-row{display:flex;flex-wrap:wrap;gap:4px;padding:0 2px}
+.events-stream-list{list-style:none;margin:0;padding:0;max-height:min(52vh,560px);overflow:auto;border:1px solid var(--line)}
+.events-stream-item{
+  width:100%;text-align:left;display:grid;
+  grid-template-columns:72px 110px minmax(100px,1.2fr) 88px minmax(120px,2fr);
+  gap:6px;padding:6px 8px;border:0;border-bottom:1px solid var(--line);background:transparent;font-size:11px;
+}
+.events-stream-item.active,.events-stream-item:focus-visible{outline:2px solid var(--accent,#8af);outline-offset:-2px}
+.events-stream-class{font-weight:600;letter-spacing:.02em}
+.tools-landing-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;padding:4px 0 12px;
+}
+.tools-landing-card{
+  display:flex;flex-direction:column;gap:6px;align-items:flex-start;text-align:left;
+  padding:12px;border:1px solid var(--line);background:var(--panel,var(--bg-chrome));cursor:pointer;
+}
+.tools-landing-card:hover,.tools-landing-card:focus-visible{border-color:var(--accent,#8af)}
+.tools-landing-title{font-weight:700;font-size:13px}
+.tools-landing-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.phenomenon-pre{white-space:pre-wrap;font-size:10px;max-height:220px;overflow:auto;margin:0}
+.scientific-tools-landing,.siminfo-central-workspace{display:flex;flex-direction:column;gap:10px;min-height:0;flex:1}
+@media (max-width:900px){
+  .events-stream-item{grid-template-columns:1fr;gap:2px}
+}
 

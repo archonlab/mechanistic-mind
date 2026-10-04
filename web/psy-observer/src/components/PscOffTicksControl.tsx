@@ -1,6 +1,7 @@
 /** PSC auto-ON schedule — Experiment / Predictive. Not Tiktaalik Eye. */
 
 import { useCallback, useEffect, useState } from 'react';
+import { SettingInfoHelp } from './SettingInfoHelp';
 
 const PRESETS = [
   { id: 'MANUAL', label: 'MANUAL' },
@@ -8,6 +9,7 @@ const PRESETS = [
   { id: '1000', label: '1000' },
   { id: '5000', label: '5000' },
 ] as const;
+
 
 type Status = {
   psc?: string;
@@ -48,9 +50,19 @@ export function PscOffTicksControl() {
   const sched = st.schedule;
   return (
     <div className="panel science-card">
-      <div className="section-label">PSC OFF TICKS</div>
-      <div className="subtle">
-        MANUAL = experimenter toggle. Numeric = deterministic ON at tick ≥ N without history reset.
+      <div className="section-label setting-label-row">
+        LIVE INTERVENTION · PSC Auto-enable Tick
+        <SettingInfoHelp
+          label="PSC Auto-enable Tick"
+          brief="Live schedule to turn PSC ON at tick ≥ N without history reset."
+          detail={
+            <p>
+              Intervention in the already-active run (receipted). Not part of APPLY EXPERIMENT.
+              MANUAL = experimenter toggle. Numeric = deterministic ON at tick ≥ N.
+            </p>
+          }
+          testId="info-psc-auto-enable"
+        />
       </div>
       <div className="metric">
         <span>PSC</span>
@@ -93,7 +105,7 @@ export function PscOffTicksControl() {
           value={custom}
           onChange={(e) => setCustom(e.target.value)}
         />
-        <button type="button" onClick={() => void apply(custom)}>APPLY</button>
+        <button type="button" onClick={() => void apply(custom)}>LIVE SCHEDULE</button>
       </div>
     </div>
   );

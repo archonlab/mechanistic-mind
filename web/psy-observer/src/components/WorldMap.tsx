@@ -1,6 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { occupancyCounts, periodicSegments, scalarGrid } from '../rendererMath';
 import { resolvedWorldTheme, worldChrome, type WorldChrome } from '../observer/worldPresentation';
+import {
+  clearanceStemPx,
+  DEFAULT_VERTICAL_EXAGGERATION,
+  deltaColor,
+  elevationColor,
+  elevationGridValid,
+  filterTrailSegments,
+  readVerticalDisplay,
+  sparseDeltasValid,
+  splitTrailOnWrap,
+  TRAIL_LENGTH_SAMPLES,
+  TRAIL_RESEARCHER_LABEL,
+  VERTICAL_EXAGGERATION_LABEL,
+  type TerrainDisplayMode,
+  type TrailDisplayMode,
+  type TrailLengthMode,
+  type VerticalDisplayContract,
+  type VerticalTrailSample,
+} from '../observer/verticalDisplay';
+
 
 type Props = {
   world: any;
@@ -28,6 +48,18 @@ type Props = {
   interactionTargetId?: string | null;
   nearFieldSensor?: any;
   followXY?: { x: number; y: number } | null;
+  showManipulatorReach?: boolean;
+  showObjectVelocity?: boolean;
+  /** RESEARCHER VIEW terrain display — never agent perception. */
+  terrainMode?: TerrainDisplayMode;
+  showClearanceStems?: boolean;
+  showEventMarkers?: boolean;
+  showElevationContours?: boolean;
+  verticalExaggeration?: number;
+  currentTick?: number;
+  trailMode?: TrailDisplayMode;
+  trailLengthMode?: TrailLengthMode;
+  selectedTrailEntityId?: string | null;
 };
 
 function clamp01(t: number) {
@@ -94,6 +126,17 @@ export function WorldMap({
   interactionTargetId = null,
   nearFieldSensor = null,
   followXY = null,
+  showManipulatorReach = true,
+  showObjectVelocity = false,
+  terrainMode = 'OPTICAL',
+  showClearanceStems = true,
+  showEventMarkers = true,
+  showElevationContours = false,
+  verticalExaggeration = DEFAULT_VERTICAL_EXAGGERATION,
+  currentTick = 0,
+  trailMode = 'OFF',
+  trailLengthMode = 'NORMAL',
+  selectedTrailEntityId = null,
 }: Props) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const heatCache = useRef<{
@@ -104,6 +147,45 @@ export function WorldMap({
   const drag = useRef<{ x: number; y: number; cx: number; cy: number } | null>(null);
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
   const [themeTick, setThemeTick] = useState(0);
+  const [objectTip, setObjectTip] = useState<{
+    x: number;
+    y: number;
+    object_id: string;
+    mass: number;
+    quantity: number;
+    composition: string;
+    physical_state: string;
+    holder_body_id?: string | null;
+    optical_radius: number;
+    collision_radius: number | null;
+    optical_c0: number;
+    optical_c1: number;
+    optical_c2: number;
+    agent_optics: boolean;
+    compliance: number | null;
+    surface_affinity: number | null;
+    derivation_version: string | null;
+    passive_status: string | null;
+  } | null>(null);
+  const [depositTip, setDepositTip] = useState<{
+    x: number;
+    y: number;
+    deposit_id: string;
+    cell: string;
+    mass: number;
+    quantity: number;
+    composition: string;
+    compliance: number;
+    surface_affinity: number;
+    derivation_version: string;
+    traction_multiplier: number | null;
+    traction_eligible: boolean | null;
+    optical_c0: number | null;
+    optical_c1: number | null;
+    optical_c2: number | null;
+    coverage: number | null;
+  } | null>(null);
+  const [contentsTip, setContentsTip] = useState<{ x: number; y: number; cell: string; lines: string[] } | null>(null);
   const boundary = world?.boundary;
   const topo = boundary?.spatial_topology || 'WRAP_PERIODIC';
 
@@ -221,6 +303,9 @@ export function WorldMap({
           drawBody(ctx, { ...body, x: b.x, y: b.y, theta: b.theta || 0 }, ox, oy, cell, { ...layers, sites: false, deformation: false }, '#f97316', null, `agent_${i}`, chrome);
         });
         drawMultiAgentFov(ctx, ox, oy, cell, { body, nearFieldSensor, agentsObserver, agentsViews, fovOverlay }, chrome);
+        drawResourceObjects(ctx, world, ox, oy, cell, chrome, showObjectVelocity);
+        drawSurfaceDeposits(ctx, world, ox, oy, cell);
+        drawManipulators(ctx, world, ox, oy, cell, chrome, showManipulatorReach);
       }
       return;
     }
@@ -355,6 +440,23 @@ export function WorldMap({
       drawAmbientForceArrows(ctx, world, ox, oy, cell, opacity);
     }
 
+    // OBSERVER_VERTICAL_DISPLAY_CONTRACT_V1 — researcher terrain overlays (display-only).
+    const vd = readVerticalDisplay(world);
+    const elevOk = elevationGridValid(vd);
+    const deltaOk = sparseDeltasValid(vd);
+    if (terrainMode === 'ELEVATION' && elevOk && vd) {
+      drawElevationOverlay(ctx, vd, ox, oy, cell, opacity);
+      if (showElevationContours) drawElevationContours(ctx, vd, ox, oy, cell);
+      drawVerticalLegend(ctx, W, H, 'ELEVATION', Number(vd.elev_min), Number(vd.elev_max), verticalExaggeration);
+    } else if (terrainMode === 'DELTA' && deltaOk && vd) {
+      drawDeltaOverlay(ctx, vd, ox, oy, cell, opacity);
+      drawVerticalLegend(ctx, W, H, 'DELTA', Number(vd.elev_min ?? 0), Number(vd.elev_max ?? 0), verticalExaggeration, vd);
+    } else if (terrainMode !== 'OPTICAL' && vd == null) {
+      ctx.fillStyle = chrome.annotateWarn;
+      ctx.font = chrome.fontUi;
+      ctx.fillText('ELEVATION VISUALIZATION NOT AVAILABLE FOR THIS FRAME', 12, 22);
+    }
+
     if (showGrid && cell > 6) {
       ctx.strokeStyle = chrome.grid;
       ctx.lineWidth = 1;
@@ -438,6 +540,30 @@ export function WorldMap({
     }
 
     drawBoundaryChrome(ctx, W, H, ox, oy, gw * cell, gh * cell, topo, chrome);
+
+    if (showClearanceStems && vd) {
+      drawClearanceStems(ctx, vd, ox, oy, cell, verticalExaggeration);
+    }
+    if (trailMode !== 'OFF' && vd) {
+      drawVerticalTrails(
+        ctx,
+        vd,
+        ox,
+        oy,
+        cell,
+        verticalExaggeration,
+        trailMode,
+        trailLengthMode,
+        selectedTrailEntityId,
+        Number(world?.width || gw),
+        Number(world?.height || gh),
+      );
+    }
+    if (showEventMarkers && vd) {
+      drawVerticalEventMarkers(ctx, vd, ox, oy, cell, Number(currentTick || world?.tick || 0));
+    }
+    drawObserverAcousticProbeGlyph(ctx, world, ox, oy, cell);
+
     if (layers.body) {
       drawBody(ctx, body, ox, oy, cell, layers, '#3b82f6', nearFieldSensor, 'agent_0', chrome);
       (world.entities?.bodies || []).forEach((b: any, i: number) => {
@@ -470,6 +596,9 @@ export function WorldMap({
         );
       }
       drawMultiAgentFov(ctx, ox, oy, cell, { body, nearFieldSensor, agentsObserver, agentsViews, fovOverlay }, chrome);
+      drawResourceObjects(ctx, world, ox, oy, cell, chrome, showObjectVelocity);
+      drawSurfaceDeposits(ctx, world, ox, oy, cell);
+      drawManipulators(ctx, world, ox, oy, cell, chrome, showManipulatorReach);
       if (interactionTargetId) {
         const t = agentsObserver.find(a => String(a.observer_id) === String(interactionTargetId));
         if (t) {
@@ -573,7 +702,22 @@ export function WorldMap({
     } else if (geo && typeof geo === 'object') {
       ctx.fillText('yellow=requested  green=realized  cyan=local/GT flow', 10, H - 24);
     }
-  }, [world, body, layer, viewMode, perception, renderMode, opacity, showGrid, vectorDensity, contourLevels, autoScale, scaleMin, scaleMax, scalarIds, cam, trajectory, topo, layers, geometryInterpretation, agentsObserver, agentsViews, fovOverlay, interactionTargetId, nearFieldSensor, viewport, themeTick]);
+    if (terrainMode !== 'OPTICAL') {
+      ctx.fillStyle = chrome.annotateWarn;
+      ctx.font = chrome.fontUi;
+      ctx.fillText('RESEARCHER VIEW · NOT AGENT PERCEPTION · TERRAIN:' + terrainMode, 10, 18);
+      if (showClearanceStems) {
+        ctx.fillStyle = chrome.annotateMuted;
+        ctx.fillText(`${VERTICAL_EXAGGERATION_LABEL} stems ×${verticalExaggeration} (display only)`, 10, 34);
+      }
+    }
+    if (trailMode !== 'OFF') {
+      ctx.fillStyle = chrome.annotateWarn;
+      ctx.font = chrome.fontUi;
+      const y0 = terrainMode !== 'OPTICAL' ? 50 : 18;
+      ctx.fillText(`${TRAIL_RESEARCHER_LABEL} · ${trailMode}/${trailLengthMode}`, 10, y0);
+    }
+  }, [world, body, layer, viewMode, perception, renderMode, opacity, showGrid, vectorDensity, contourLevels, autoScale, scaleMin, scaleMax, scalarIds, cam, trajectory, topo, layers, geometryInterpretation, agentsObserver, agentsViews, fovOverlay, interactionTargetId, nearFieldSensor, viewport, themeTick, terrainMode, showClearanceStems, showEventMarkers, showElevationContours, verticalExaggeration, currentTick, trailMode, trailLengthMode, selectedTrailEntityId]);
 
   function clientToCell(e: React.MouseEvent) {
     const canvas = ref.current;
@@ -617,13 +761,230 @@ export function WorldMap({
             y: drag.current!.cy + (e.clientY - drag.current!.y),
           }));
         }
-        onHoverCell?.(clientToCell(e));
+        const cellInfo = clientToCell(e);
+        onHoverCell?.(cellInfo);
+        const canvas = ref.current;
+        if (!canvas || !world) {
+          setObjectTip(null);
+          setDepositTip(null);
+          return;
+        }
+        const rect = canvas.getBoundingClientRect();
+        const trav = geometryInterpretation?.traversability;
+        const primary = getScalar(world, scalarIds[0] || 'T');
+        const gh = trav?.class_grid?.length || primary?.length || world.height || 32;
+        const gw = trav?.class_grid?.[0]?.length || primary?.[0]?.length || world.width || 32;
+        const W = rect.width;
+        const H = rect.height;
+        const cell = Math.min(W / gw, H / gh) * cam.zoom;
+        const ox = (W - gw * cell) / 2 + cam.x;
+        const oy = (H - gh * cell) / 2 + cam.y;
+        const wx = (e.clientX - rect.left - ox) / cell;
+        const wy = (e.clientY - rect.top - oy) / cell;
+        const objs = listResourceObjects(world);
+        const hit = objs.find((o) => {
+          const dx = wx - Number(o.x);
+          const dy = wy - Number(o.y);
+          return dx * dx + dy * dy <= 0.35 * 0.35;
+        });
+        if (hit) {
+          const comps = Array.isArray(hit.composition)
+            ? hit.composition.map((c: any) => `${c.component_id}:${Number(c.amount).toFixed(3)}`).join(', ')
+            : String(hit.composition || '');
+          const opt = hit.optical_response || {};
+          const props = hit.passive_material_properties || null;
+          setObjectTip({
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+            object_id: String(hit.object_id || ''),
+            mass: Number(hit.mass),
+            quantity: Number(hit.quantity),
+            composition: comps,
+            physical_state: String(hit.physical_state || ''),
+            holder_body_id: hit.holder_body_id ? String(hit.holder_body_id) : null,
+            optical_radius: Number(hit.optical_radius || 0),
+            collision_radius: Number.isFinite(Number(hit.collision_radius)) ? Number(hit.collision_radius) : null,
+            optical_c0: Number(opt.c0 ?? opt[0] ?? 0),
+            optical_c1: Number(opt.c1 ?? opt[1] ?? 0),
+            optical_c2: Number(opt.c2 ?? opt[2] ?? 0),
+            agent_optics: Boolean(hit.agent_optical_contribution_enabled),
+            compliance: props && Number.isFinite(Number(props.compliance)) ? Number(props.compliance) : null,
+            surface_affinity: props && Number.isFinite(Number(props.surface_affinity)) ? Number(props.surface_affinity) : null,
+            derivation_version: props ? String(props.derivation_version || props.derivation || '') : null,
+            passive_status: props ? 'passive — no consequence kernel' : null,
+          });
+          setDepositTip(null);
+          setContentsTip(null);
+        } else {
+          setObjectTip(null);
+          const deposits = listSurfaceDeposits(world);
+          const hitDeposit = deposits.find((d: any) => Math.floor(wx) === Number(d.cell_x) && Math.floor(wy) === Number(d.cell_y));
+          if (hitDeposit) {
+            const comps = Array.isArray(hitDeposit.composition)
+              ? hitDeposit.composition.map((c: any) => `${c.component_id}:${Number(c.amount).toFixed(3)}`).join(', ')
+              : '';
+            setDepositTip({
+              x: e.clientX - rect.left,
+              y: e.clientY - rect.top,
+              deposit_id: String(hitDeposit.deposit_id || ''),
+              cell: `${hitDeposit.cell_x},${hitDeposit.cell_y}`,
+              mass: Number(hitDeposit.mass),
+              quantity: Number(hitDeposit.quantity),
+              composition: comps,
+              compliance: Number(hitDeposit.compliance),
+              surface_affinity: Number(hitDeposit.surface_affinity),
+              derivation_version: String(hitDeposit.derivation_version || ''),
+              traction_multiplier: Number.isFinite(Number(hitDeposit.traction_multiplier)) ? Number(hitDeposit.traction_multiplier) : null,
+              traction_eligible: hitDeposit.traction_eligible == null ? null : Boolean(hitDeposit.traction_eligible),
+              optical_c0: Number.isFinite(Number(hitDeposit.optical_c0)) ? Number(hitDeposit.optical_c0) : null,
+              optical_c1: Number.isFinite(Number(hitDeposit.optical_c1)) ? Number(hitDeposit.optical_c1) : null,
+              optical_c2: Number.isFinite(Number(hitDeposit.optical_c2)) ? Number(hitDeposit.optical_c2) : null,
+              coverage: Number.isFinite(Number(hitDeposit.coverage)) ? Number(hitDeposit.coverage) : null,
+            });
+          } else {
+            setDepositTip(null);
+          }
+          const contents = Array.isArray(world?.spatial_cell_contents) ? world.spatial_cell_contents : [];
+          const hitContents = contents.find((row: any) => Number(row.cell_x) === Math.floor(wx) && Number(row.cell_y) === Math.floor(wy));
+          if (hitContents && Array.isArray(hitContents.refs)) {
+            setContentsTip({
+              x: e.clientX - rect.left,
+              y: e.clientY - rect.top,
+              cell: `${hitContents.cell_x}, ${hitContents.cell_y}`,
+              lines: hitContents.refs.map((ref: any) => `${ref.entity_kind} ${ref.entity_id}`),
+            });
+          } else {
+            setContentsTip(null);
+          }
+        }
       }}
       onMouseUp={() => { drag.current = null; }}
       onClick={(e) => onSelectCell?.(clientToCell(e))}
-      onMouseLeave={() => { drag.current = null; onHoverCell?.(null); }}
+      onMouseLeave={() => { drag.current = null; onHoverCell?.(null); setObjectTip(null); setDepositTip(null); setContentsTip(null); }}
     >
       <canvas className="map" ref={ref} />
+      {objectTip ? (
+        <div
+          className="resource-object-tooltip"
+          data-testid="resource-object-tooltip"
+          style={{
+            position: 'absolute',
+            left: objectTip.x + 10,
+            top: objectTip.y + 10,
+            pointerEvents: 'none',
+            background: 'rgba(15,23,42,0.92)',
+            color: '#e2e8f0',
+            padding: '6px 8px',
+            fontSize: 11,
+            borderRadius: 4,
+            zIndex: 4,
+            maxWidth: 240,
+          }}
+        >
+          <div><strong>{objectTip.object_id}</strong></div>
+          <div>mass {objectTip.mass.toFixed(3)} · quantity {objectTip.quantity.toFixed(3)}</div>
+          <div>{objectTip.composition}</div>
+          <div>{objectTip.physical_state}{objectTip.holder_body_id ? ` holder=${objectTip.holder_body_id}` : ''}</div>
+          <div>optical_radius {objectTip.optical_radius.toFixed(3)} (world cells, not collision, not glyph size)</div>
+          {objectTip.collision_radius != null ? (
+            <div>collision_radius {objectTip.collision_radius.toFixed(3)} (physical contact · not optical · not glyph)</div>
+          ) : null}
+          <div>c0 {objectTip.optical_c0.toFixed(3)} · c1 {objectTip.optical_c1.toFixed(3)} · c2 {objectTip.optical_c2.toFixed(3)}</div>
+          <div>agent optical contribution: {objectTip.agent_optics ? 'enabled (anonymous channels)' : 'off'}</div>
+          {objectTip.compliance != null && objectTip.surface_affinity != null ? (
+            <>
+              <div>compliance {objectTip.compliance.toFixed(3)}</div>
+              <div>surface_affinity {objectTip.surface_affinity.toFixed(3)}</div>
+              <div>derivation {objectTip.derivation_version}</div>
+              <div>researcher-only</div>
+              <div>not agent-accessible</div>
+              <div>{objectTip.passive_status}</div>
+            </>
+          ) : null}
+          <div>researcher-only overlay — not a recognition claim</div>
+        </div>
+      ) : null}
+      {contentsTip ? (
+        <div
+          className="spatial-contents-tooltip"
+          data-testid="spatial-contents-tooltip"
+          style={{
+            position: 'absolute',
+            left: contentsTip.x + 10,
+            top: contentsTip.y + 28,
+            pointerEvents: 'none',
+            background: 'rgba(15,23,42,0.92)',
+            color: '#e2e8f0',
+            padding: '6px 8px',
+            fontSize: 11,
+            borderRadius: 4,
+            zIndex: 5,
+            maxWidth: 280,
+          }}
+        >
+          <div>Cell ({contentsTip.cell})</div>
+          <div>Physical contents: {contentsTip.lines.length}</div>
+          {contentsTip.lines.map(line => <div key={line}>{line}</div>)}
+          <div>researcher-only</div>
+          <div>not agent-accessible</div>
+          <div>co-location is not collision</div>
+          <div>no vertical ordering</div>
+        </div>
+      ) : null}
+      {depositTip ? (
+        <div
+          className="surface-deposit-tooltip"
+          data-testid="surface-deposit-tooltip"
+          style={{
+            position: 'absolute',
+            left: depositTip.x + 10,
+            top: depositTip.y + 10,
+            pointerEvents: 'none',
+            background: 'rgba(15,23,42,0.92)',
+            color: '#e2e8f0',
+            padding: '6px 8px',
+            fontSize: 11,
+            borderRadius: 4,
+            zIndex: 4,
+            maxWidth: 260,
+          }}
+        >
+          <div><strong>{depositTip.deposit_id}</strong></div>
+          <div>cell {depositTip.cell}</div>
+          <div>mass {depositTip.mass.toFixed(3)} · quantity {depositTip.quantity.toFixed(3)}</div>
+          <div>{depositTip.composition}</div>
+          <div>compliance {depositTip.compliance.toFixed(3)}</div>
+          <div>surface_affinity {depositTip.surface_affinity.toFixed(3)}</div>
+          <div>derivation {depositTip.derivation_version}</div>
+          {depositTip.optical_c0 != null ? (
+            <>
+              <div>c0 {depositTip.optical_c0.toFixed(3)} · c1 {depositTip.optical_c1?.toFixed(3)} · c2 {depositTip.optical_c2?.toFixed(3)}</div>
+              <div>coverage {depositTip.coverage == null ? '—' : depositTip.coverage.toFixed(3)}</div>
+              <div>researcher-only</div>
+              <div>agent receives anonymous optical consequence</div>
+              <div>not a material identity</div>
+              <div>not a traction label</div>
+              <div>not a recipe</div>
+            </>
+          ) : null}
+          {depositTip.traction_multiplier != null ? (
+            <>
+              <div>traction_multiplier {depositTip.traction_multiplier.toFixed(3)}</div>
+              <div>eligible {depositTip.traction_eligible ? 'yes' : 'no'}</div>
+              <div>researcher-only</div>
+              <div>not agent-accessible</div>
+              <div>continuous physical law</div>
+              <div>not a recipe</div>
+            </>
+          ) : (
+            <>
+              <div>researcher-only</div>
+              <div>not agent-accessible</div>
+              <div>no terrain consequence yet</div>
+            </>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -839,6 +1200,276 @@ function drawMultiAgentFov(
     if (!b || !nf || Number(nf.fov_deg) <= 0) return;
     drawAgentFov(ctx, b, nf, ox, oy, cell, fovPalette(i, chrome), overlay.showCandidates, id, overlay.sectorAttribution, chrome);
   });
+}
+
+function listResourceObjects(world: any): any[] {
+  const a = world?.resource_objects;
+  const b = world?.entities?.resource_objects;
+  if (Array.isArray(a) && a.length) return a;
+  if (Array.isArray(b)) return b;
+  return [];
+}
+
+function listSurfaceDeposits(world: any): any[] {
+  const a = world?.surface_material_deposits;
+  const b = world?.entities?.surface_material_deposits;
+  if (Array.isArray(a) && a.length) return a;
+  if (Array.isArray(b)) return b;
+  return [];
+}
+
+function drawSurfaceDeposits(
+  ctx: CanvasRenderingContext2D,
+  world: any,
+  ox: number,
+  oy: number,
+  cell: number,
+) {
+  for (const deposit of listSurfaceDeposits(world)) {
+    const px = ox + (Number(deposit.cell_x) + 0.5) * cell;
+    const py = oy + (Number(deposit.cell_y) + 0.5) * cell;
+    const s = Math.max(3, cell * 0.28);
+    const multiplier = Number(deposit.traction_multiplier);
+    const c0 = Number(deposit.optical_c0);
+    const c1 = Number(deposit.optical_c1);
+    const c2 = Number(deposit.optical_c2);
+    let fill = 'rgba(100,116,139,0.55)';
+    if (Number.isFinite(c0) && Number.isFinite(c1) && Number.isFinite(c2)) {
+      const r = Math.round(Math.max(0, Math.min(1, c0)) * 255);
+      const g = Math.round(Math.max(0, Math.min(1, c1)) * 255);
+      const b = Math.round(Math.max(0, Math.min(1, c2)) * 255);
+      fill = `rgba(${r},${g},${b},0.85)`;
+    } else if (Number.isFinite(multiplier)) {
+      if (multiplier < 0.999) fill = 'rgba(71,85,105,0.75)';
+      else if (multiplier > 1.001) fill = 'rgba(148,163,184,0.88)';
+    }
+    ctx.fillStyle = fill;
+    ctx.strokeStyle = 'rgba(51,65,85,0.9)';
+    ctx.lineWidth = 1;
+    ctx.fillRect(px - s / 2, py - s / 2, s, s);
+    ctx.strokeRect(px - s / 2, py - s / 2, s, s);
+  }
+}
+
+function drawResourceObjects(
+  ctx: CanvasRenderingContext2D,
+  world: any,
+  ox: number,
+  oy: number,
+  cell: number,
+  chrome: WorldChrome,
+  showObjectVelocity = false,
+) {
+  void chrome;
+  const objs = listResourceObjects(world);
+  for (const o of objs) {
+    const bx = ox + Number(o.x) * cell;
+    const by = oy + Number(o.y) * cell;
+    const s = Math.max(3.5, cell * 0.22);
+    ctx.beginPath();
+    ctx.moveTo(bx, by - s);
+    ctx.lineTo(bx + s, by);
+    ctx.lineTo(bx, by + s);
+    ctx.lineTo(bx - s, by);
+    ctx.closePath();
+    const held = String(o.physical_state || '') === 'HELD';
+    const moving = String(o.motion_status || '') === 'MOVING';
+    ctx.fillStyle = held ? 'rgba(245,158,11,0.92)' : (moving ? 'rgba(96,165,250,0.92)' : 'rgba(148,163,184,0.92)');
+    ctx.strokeStyle = held ? 'rgba(146,64,14,0.95)' : 'rgba(51,65,85,0.95)';
+    ctx.lineWidth = 1.25;
+    ctx.fill();
+    ctx.stroke();
+    const pairOn = listManipulators(world).some((m: any) => m && m.kind === 'pair_state');
+    const ir = Number(o.interaction_radius);
+    if (pairOn && Number.isFinite(ir) && ir > 0) {
+      ctx.beginPath();
+      ctx.arc(bx, by, Math.max(2, ir * cell), 0, Math.PI * 2);
+      ctx.setLineDash([2, 2]);
+      ctx.strokeStyle = 'rgba(34,197,94,0.7)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // Researcher-only physical collision circle (not glyph size, not optical_radius).
+    const boc = world?.body_object_contact_overlay || world?.body_object_contact;
+    const vdOn = !!world?.vertical_display;
+    if (boc || vdOn) {
+      const cr = Number(o.collision_radius);
+      if (Number.isFinite(cr) && cr > 0) {
+        ctx.beginPath();
+        ctx.arc(bx, by, Math.max(1.5, cr * cell), 0, Math.PI * 2);
+        ctx.setLineDash([3, 2]);
+        ctx.strokeStyle = 'rgba(244,63,94,0.85)';
+        ctx.lineWidth = 1.25;
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+    // Researcher velocity vector: drawn from the authoritative object velocity (display only, never fed back).
+    const vx = Number(o.vx);
+    const vy = Number(o.vy);
+    if (showObjectVelocity && o.motion_status && Number.isFinite(vx) && Number.isFinite(vy) && (vx !== 0 || vy !== 0)) {
+      const ex = bx + vx * 3 * cell;
+      const ey = by + vy * 3 * cell;
+      ctx.beginPath();
+      ctx.moveTo(bx, by);
+      ctx.lineTo(ex, ey);
+      const ang = Math.atan2(ey - by, ex - bx);
+      ctx.lineTo(ex - 5 * Math.cos(ang - 0.4), ey - 5 * Math.sin(ang - 0.4));
+      ctx.moveTo(ex, ey);
+      ctx.lineTo(ex - 5 * Math.cos(ang + 0.4), ey - 5 * Math.sin(ang + 0.4));
+      ctx.strokeStyle = 'rgba(37,99,235,0.95)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+    const label = String(o.held_overlay_label || o.object_id || '');
+    if (label) {
+      ctx.fillStyle = 'rgba(15,23,42,0.85)';
+      ctx.font = `${Math.max(8, cell * 0.22)}px sans-serif`;
+      ctx.fillText(label, bx + s + 2, by);
+    }
+  }
+  // Debug overlay: body contact geometry (same physical radius as body/object contact fact).
+  const boc = world?.body_object_contact_overlay || world?.body_object_contact;
+  if (boc) {
+    const br = Number(boc.body_contact_radius ?? boc.active?.body_contact_radius ?? 0.575);
+    const bodies = Array.isArray(world?.bodies) ? world.bodies
+      : (Array.isArray(world?.agents) ? world.agents.map((a: any) => a.body || a).filter(Boolean) : []);
+    // Prefer researcher agents_observer / entities when present
+    const agentBodies: any[] = [];
+    const ao = world?.agents_observer || world?.observer_agents;
+    if (Array.isArray(ao)) {
+      for (const a of ao) {
+        const b = a?.body || a;
+        if (b && Number.isFinite(Number(b.x)) && Number.isFinite(Number(b.y))) agentBodies.push(b);
+      }
+    }
+    const list = agentBodies.length ? agentBodies : bodies;
+    if (Number.isFinite(br) && br > 0) {
+      for (const b of list) {
+        const bx = ox + Number(b.x) * cell;
+        const by = oy + Number(b.y) * cell;
+        ctx.beginPath();
+        ctx.arc(bx, by, Math.max(2, br * cell), 0, Math.PI * 2);
+        ctx.setLineDash([4, 3]);
+        ctx.strokeStyle = 'rgba(56,189,248,0.55)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+    // Active contact pairs highlight
+    const active = boc.active?.active_episodes || boc.active_episodes || [];
+    if (Array.isArray(active)) {
+      for (const ep of active) {
+        const oid = String(ep.object_id || '');
+        const obj = listResourceObjects(world).find((o: any) => String(o.object_id) === oid);
+        if (!obj) continue;
+        const oxp = ox + Number(obj.x) * cell;
+        const oyp = oy + Number(obj.y) * cell;
+        ctx.beginPath();
+        ctx.arc(oxp, oyp, Math.max(4, cell * 0.12), 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(244,63,94,0.95)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    }
+  }
+  // Researcher-only impulse vectors (response overlay; display only).
+  const bio = world?.body_object_impulse_overlay || world?.body_object_impulse;
+  if (bio) {
+    const responses = bio.summary?.last_step?.responses
+      || bio.last_step?.responses
+      || bio.last_step?.applied
+      || [];
+    if (Array.isArray(responses)) {
+      for (const r of responses) {
+        if (!r || !(Number(r.clamped_impulse ?? r.impulse) > 0)) continue;
+        const n = r.normal || r.contact_normal;
+        const bx = Number((r.body_pose || r.corrected_body_pose || [])[0]);
+        const by = Number((r.body_pose || r.corrected_body_pose || [])[1]);
+        if (!Array.isArray(n) || !Number.isFinite(bx) || !Number.isFinite(by)) continue;
+        const scale = cell * 2.5 * Math.min(1.5, Math.abs(Number(r.clamped_impulse ?? r.impulse) || 0));
+        const x0 = ox + bx * cell;
+        const y0 = oy + by * cell;
+        // normal
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x0 + Number(n[0]) * cell * 1.2, y0 + Number(n[1]) * cell * 1.2);
+        ctx.strokeStyle = 'rgba(14,165,233,0.85)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        // impulse on body (−n direction of j on body)
+        const jv = r.impulse_on_body || (Array.isArray(n) ? [-Number(n[0]) * Number(r.clamped_impulse || 0), -Number(n[1]) * Number(r.clamped_impulse || 0)] : null);
+        if (jv) {
+          ctx.beginPath();
+          ctx.moveTo(x0, y0);
+          ctx.lineTo(x0 + Number(jv[0]) * scale, y0 + Number(jv[1]) * scale);
+          ctx.strokeStyle = 'rgba(34,197,94,0.9)';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+      }
+    }
+  }
+}
+
+function listManipulators(world: any): any[] {
+  const a = world?.manipulators;
+  const b = world?.entities?.manipulators;
+  if (Array.isArray(a) && a.length) return a;
+  if (Array.isArray(b)) return b;
+  return [];
+}
+
+function drawManipulators(
+  ctx: CanvasRenderingContext2D,
+  world: any,
+  ox: number,
+  oy: number,
+  cell: number,
+  chrome: WorldChrome,
+  showReach: boolean,
+) {
+  void chrome;
+  const rows = listManipulators(world);
+  for (const m of rows) {
+    const bx = ox + Number(m.effector_x) * cell;
+    const by = oy + Number(m.effector_y) * cell;
+    const mid = String(m.manipulator_id || '');
+    const left = mid === 'LEFT';
+    const right = mid === 'RIGHT';
+    if (m.kind === 'pair_state') continue;
+    if (showReach) {
+      const r = Math.max(2, Number(m.grasp_radius || 0.4) * cell);
+      ctx.beginPath();
+      ctx.arc(bx, by, r, 0, Math.PI * 2);
+      ctx.strokeStyle = left ? 'rgba(56,189,248,0.55)' : right ? 'rgba(244,114,182,0.55)' : 'rgba(14,165,233,0.55)';
+      ctx.setLineDash([4, 3]);
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    const mark = Math.max(2.5, cell * 0.12);
+    ctx.beginPath();
+    if (right) {
+      ctx.rect(bx - mark, by - mark, mark * 2, mark * 2);
+    } else {
+      ctx.arc(bx, by, mark, 0, Math.PI * 2);
+    }
+    ctx.fillStyle = m.occupied
+      ? 'rgba(245,158,11,0.95)'
+      : (left ? 'rgba(56,189,248,0.95)' : right ? 'rgba(244,114,182,0.95)' : 'rgba(56,189,248,0.95)');
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(15,23,42,0.9)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    if (left || right) {
+      ctx.fillStyle = 'rgba(15,23,42,0.9)';
+      ctx.font = `${Math.max(8, cell * 0.2)}px sans-serif`;
+      ctx.fillText(mid, bx + mark + 2, by);
+    }
+  }
 }
 
 function drawAgentFov(
@@ -1071,5 +1702,402 @@ function drawBoundaryChrome(
     ctx.fillStyle = chrome.annotateMuted;
     ctx.font = chrome.fontUi;
     ctx.fillText('OPEN edges', ox + 6, oy + 12);
+  }
+}
+
+function drawElevationOverlay(
+  ctx: CanvasRenderingContext2D,
+  vd: VerticalDisplayContract,
+  ox: number,
+  oy: number,
+  cell: number,
+  opacity: number,
+) {
+  const grid = vd.cell_centre_elevation?.data;
+  if (!grid) return;
+  const lo = Number(vd.elev_min ?? vd.cell_centre_elevation?.elev_min ?? 0);
+  const hi = Number(vd.elev_max ?? vd.cell_centre_elevation?.elev_max ?? 1);
+  const gh = grid.length;
+  const gw = grid[0]?.length || 0;
+  for (let y = 0; y < gh; y++) {
+    for (let x = 0; x < gw; x++) {
+      const v = Number(grid[y][x]);
+      if (!Number.isFinite(v)) continue;
+      ctx.fillStyle = elevationColor(v, lo, hi, Math.min(0.85, 0.35 + opacity * 0.5));
+      ctx.fillRect(ox + x * cell, oy + y * cell, cell + 0.5, cell + 0.5);
+    }
+  }
+}
+
+function drawDeltaOverlay(
+  ctx: CanvasRenderingContext2D,
+  vd: VerticalDisplayContract,
+  ox: number,
+  oy: number,
+  cell: number,
+  opacity: number,
+) {
+  const deltas = vd.sparse_deltas || [];
+  let maxAbs = 1e-6;
+  for (const d of deltas) {
+    const a = Math.abs(Number(d.signed_delta) || 0);
+    if (a > maxAbs) maxAbs = a;
+  }
+  for (const d of deltas) {
+    const x = Number(d.cell_x);
+    const y = Number(d.cell_y);
+    const signed = Number(d.signed_delta);
+    if (!Number.isFinite(signed)) continue;
+    ctx.fillStyle = deltaColor(signed, maxAbs, Math.min(0.9, 0.4 + opacity * 0.5));
+    ctx.fillRect(ox + x * cell, oy + y * cell, cell + 0.5, cell + 0.5);
+    // Stronger indication for deeper revisions (display only).
+    const rev = Math.max(1, Number(d.revision) || 1);
+    if (rev > 1) {
+      ctx.strokeStyle = `rgba(15,23,42,${Math.min(0.85, 0.25 + 0.12 * rev)})`;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(ox + x * cell + 1, oy + y * cell + 1, cell - 2, cell - 2);
+    }
+  }
+}
+
+function drawElevationContours(
+  ctx: CanvasRenderingContext2D,
+  vd: VerticalDisplayContract,
+  ox: number,
+  oy: number,
+  cell: number,
+) {
+  // RENDER_DERIVED_NON_AUTHORITATIVE — optional; never used for support/collision.
+  const grid = vd.cell_centre_elevation?.data;
+  if (!grid) return;
+  const lo = Number(vd.elev_min ?? 0);
+  const hi = Number(vd.elev_max ?? 1);
+  if (!(hi > lo)) return;
+  const levels = 6;
+  ctx.strokeStyle = 'rgba(15,23,42,0.35)';
+  ctx.lineWidth = 1;
+  const gh = grid.length;
+  const gw = grid[0]?.length || 0;
+  for (let li = 1; li < levels; li++) {
+    const level = lo + (hi - lo) * (li / levels);
+    for (let y = 0; y < gh - 1; y++) {
+      for (let x = 0; x < gw - 1; x++) {
+        const v00 = Number(grid[y][x]);
+        const v10 = Number(grid[y][x + 1]);
+        const v01 = Number(grid[y + 1][x]);
+        const crossH = (v00 - level) * (v10 - level) < 0;
+        const crossV = (v00 - level) * (v01 - level) < 0;
+        if (crossH) {
+          const t = (level - v00) / ((v10 - v00) || 1e-12);
+          ctx.beginPath();
+          ctx.moveTo(ox + (x + t) * cell, oy + (y + 0.5) * cell);
+          ctx.lineTo(ox + (x + t) * cell, oy + (y + 0.5) * cell + 0.01);
+          ctx.stroke();
+        }
+        if (crossV) {
+          const t = (level - v00) / ((v01 - v00) || 1e-12);
+          ctx.beginPath();
+          ctx.moveTo(ox + (x + 0.5) * cell, oy + (y + t) * cell);
+          ctx.lineTo(ox + (x + 0.5) * cell + 0.01, oy + (y + t) * cell);
+          ctx.stroke();
+        }
+      }
+    }
+  }
+}
+
+function drawVerticalLegend(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  mode: 'ELEVATION' | 'DELTA',
+  lo: number,
+  hi: number,
+  exaggeration: number,
+  vd?: VerticalDisplayContract | null,
+) {
+  const x0 = W - 148;
+  const y0 = 48;
+  ctx.fillStyle = 'rgba(15,23,42,0.72)';
+  ctx.fillRect(x0 - 8, y0 - 14, 140, mode === 'DELTA' ? 78 : 64);
+  ctx.fillStyle = '#e2e8f0';
+  ctx.font = '11px ui-monospace, monospace';
+  ctx.fillText(mode === 'ELEVATION' ? 'ELEVATION (world z)' : 'TERRAIN Δ (world z)', x0, y0);
+  if (mode === 'ELEVATION') {
+    for (let i = 0; i < 48; i++) {
+      const t = i / 47;
+      const v = lo + (hi - lo) * t;
+      ctx.fillStyle = elevationColor(v, lo, hi, 1);
+      ctx.fillRect(x0 + i * 2, y0 + 8, 2, 10);
+    }
+    ctx.fillStyle = '#cbd5e1';
+    ctx.fillText(`${lo.toFixed(3)} … ${hi.toFixed(3)}`, x0, y0 + 34);
+    ctx.fillText('1× physical elev · false color', x0, y0 + 48);
+  } else {
+    const deltas = vd?.sparse_deltas || [];
+    let maxAbs = 0;
+    for (const d of deltas) maxAbs = Math.max(maxAbs, Math.abs(Number(d.signed_delta) || 0));
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText(`unchanged = transparent`, x0, y0 + 16);
+    ctx.fillText(`excavated Δ min ${(-maxAbs).toFixed(3)}`, x0, y0 + 30);
+    ctx.fillText(`raised Δ max ${maxAbs.toFixed(3)}`, x0, y0 + 44);
+    ctx.fillText(`n=${deltas.length} · rev in tooltip`, x0, y0 + 58);
+  }
+  void exaggeration;
+  void H;
+}
+
+function drawClearanceStems(
+  ctx: CanvasRenderingContext2D,
+  vd: VerticalDisplayContract,
+  ox: number,
+  oy: number,
+  cell: number,
+  exaggeration: number,
+) {
+  for (const e of vd.entities_vertical || []) {
+    if (!e || e.z_available === false) continue;
+    const clearance = Number(e.clearance);
+    const bx = ox + Number(e.x) * cell;
+    const by = oy + Number(e.y) * cell;
+    // Ground-projection anchor at authoritative x/y (always).
+    ctx.fillStyle = 'rgba(226,232,240,0.85)';
+    ctx.beginPath();
+    ctx.arc(bx, by, Math.max(1.5, cell * 0.06), 0, Math.PI * 2);
+    ctx.fill();
+    // Honest MAP diagnostic: feet below finite support (not an on-surface glyph).
+    if (e.below_support === true || e.vertical_out_of_slice === true || (Number.isFinite(clearance) && clearance < -1e-9)) {
+      ctx.strokeStyle = 'rgba(244,63,94,0.95)';
+      ctx.lineWidth = 2;
+      const r = Math.max(3, cell * 0.22);
+      ctx.beginPath();
+      ctx.arc(bx, by, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(bx - r * 0.6, by - r * 0.6);
+      ctx.lineTo(bx + r * 0.6, by + r * 0.6);
+      ctx.moveTo(bx + r * 0.6, by - r * 0.6);
+      ctx.lineTo(bx - r * 0.6, by + r * 0.6);
+      ctx.stroke();
+    }
+    const stem = clearanceStemPx(clearance, cell, exaggeration);
+    if (stem <= 0.5) continue;
+    const held = !!e.held_constrained || String(e.physical_state || '') === 'HELD';
+    const unsupported = String(e.support_state || '') === 'UNSUPPORTED' || e.grounded === false;
+    ctx.strokeStyle = held
+      ? 'rgba(245,158,11,0.9)'
+      : unsupported
+        ? 'rgba(56,189,248,0.95)'
+        : 'rgba(148,163,184,0.75)';
+    ctx.lineWidth = held ? 2 : 1.5;
+    ctx.beginPath();
+    ctx.moveTo(bx, by);
+    // Screen-space stem upward (display convention; not physical displacement of glyph).
+    ctx.lineTo(bx, by - stem);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(bx, by - stem, Math.max(2, cell * 0.08), 0, Math.PI * 2);
+    ctx.fillStyle = ctx.strokeStyle;
+    ctx.fill();
+    const vz = Number(e.vz);
+    if (Number.isFinite(vz) && Math.abs(vz) > 1e-6) {
+      const dir = vz < 0 ? 1 : -1; // falling → tip toward support
+      ctx.strokeStyle = 'rgba(244,63,94,0.9)';
+      ctx.beginPath();
+      ctx.moveTo(bx + cell * 0.18, by - stem * 0.5);
+      ctx.lineTo(bx + cell * 0.18, by - stem * 0.5 + dir * Math.min(cell * 0.35, 8 + Math.abs(vz) * cell * 2));
+      ctx.stroke();
+    }
+  }
+}
+
+function drawObserverAcousticProbeGlyph(
+  ctx: CanvasRenderingContext2D,
+  world: any,
+  ox: number,
+  oy: number,
+  cell: number,
+) {
+  const probe = world?.observer_acoustic_probe;
+  if (!probe || !probe.enabled) return;
+  const glyph = probe.map_glyph || probe;
+  const x = Number(glyph.x ?? probe.x);
+  const y = Number(glyph.y ?? probe.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+  const px = ox + x * cell;
+  const py = oy + y * cell;
+  const r = Math.max(4, cell * 0.28);
+  // Researcher-only listener marker — NOT an entity, source, or hearing radius.
+  ctx.save();
+  ctx.strokeStyle = 'rgba(244,114,182,0.95)';
+  ctx.fillStyle = 'rgba(244,114,182,0.25)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(px, py - r);
+  ctx.lineTo(px + r, py);
+  ctx.lineTo(px, py + r);
+  ctx.lineTo(px - r, py);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(px, py, 1.5, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(244,114,182,0.95)';
+  ctx.fill();
+  ctx.font = '9px sans-serif';
+  ctx.fillStyle = 'rgba(244,114,182,0.9)';
+  ctx.fillText('PROBE', px + r + 2, py - 2);
+  ctx.restore();
+}
+
+function drawVerticalEventMarkers(
+  ctx: CanvasRenderingContext2D,
+  vd: VerticalDisplayContract,
+  ox: number,
+  oy: number,
+  cell: number,
+  tick: number,
+) {
+  const life = Number(vd.event_display_lifetime_ticks || 32);
+  for (const ev of vd.events_recent || []) {
+    const et = Number(ev.tick || 0);
+    if (tick > 0 && et < tick - life) continue;
+    const x = Number(ev.x);
+    const y = Number(ev.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    const px = ox + x * cell;
+    const py = oy + y * cell;
+    const age = tick > 0 ? Math.max(0, tick - et) : 0;
+    const fade = Math.max(0.25, 1 - age / Math.max(1, life));
+    const cls = String(ev.event_class || '');
+    let stroke = 'rgba(148,163,184,0.8)';
+    let shape: 'diamond' | 'square' | 'triangle' | 'ring' = 'diamond';
+    if (cls === 'RELEASE') {
+      stroke = `rgba(251,191,36,${fade})`;
+      shape = 'diamond';
+    } else if (cls === 'SUPPORT_LOSS') {
+      stroke = `rgba(168,85,247,${fade})`;
+      shape = 'square';
+    } else if (cls === 'LANDING_RESPONSE') {
+      stroke = `rgba(34,197,94,${fade})`;
+      shape = 'triangle';
+    } else if (cls === 'ACOUSTIC_EMISSION') {
+      stroke = `rgba(56,189,248,${fade})`;
+      shape = 'ring';
+    }
+    const r = Math.max(3, cell * 0.22);
+    ctx.strokeStyle = stroke;
+    ctx.fillStyle = stroke;
+    ctx.lineWidth = 1.5;
+    if (shape === 'ring') {
+      // Display-only pulse — NOT audio playback.
+      ctx.beginPath();
+      ctx.arc(px, py, r * (1.2 + 0.4 * fade), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(px, py, r * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (shape === 'square') {
+      ctx.strokeRect(px - r, py - r, r * 2, r * 2);
+    } else if (shape === 'triangle') {
+      ctx.beginPath();
+      ctx.moveTo(px, py - r);
+      ctx.lineTo(px + r, py + r);
+      ctx.lineTo(px - r, py + r);
+      ctx.closePath();
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(px, py - r);
+      ctx.lineTo(px + r, py);
+      ctx.lineTo(px, py + r);
+      ctx.lineTo(px - r, py);
+      ctx.closePath();
+      ctx.stroke();
+    }
+  }
+}
+
+function trailSampleScreen(
+  s: VerticalTrailSample,
+  ox: number,
+  oy: number,
+  cell: number,
+  exaggeration: number,
+): { gx: number; gy: number; dx: number; dy: number } {
+  const gx = ox + Number(s.x) * cell;
+  const gy = oy + Number(s.y) * cell;
+  const stem = clearanceStemPx(s.clearance, cell, exaggeration);
+  return { gx, gy, dx: gx, dy: gy - stem };
+}
+
+function drawVerticalTrails(
+  ctx: CanvasRenderingContext2D,
+  vd: VerticalDisplayContract,
+  ox: number,
+  oy: number,
+  cell: number,
+  exaggeration: number,
+  mode: TrailDisplayMode,
+  lengthMode: TrailLengthMode,
+  selectedEntityId: string | null,
+  worldW: number,
+  worldH: number,
+) {
+  const maxSamples = TRAIL_LENGTH_SAMPLES[lengthMode] || 32;
+  const segments = filterTrailSegments(vd.trail_segments, mode, selectedEntityId, maxSamples);
+  for (const seg of segments) {
+    const samples = seg.samples || [];
+    if (samples.length < 1) continue;
+    const pieces = splitTrailOnWrap(samples, worldW, worldH);
+    const n = Math.max(1, samples.length - 1);
+    for (const piece of pieces) {
+      if (piece.length < 1) continue;
+      ctx.lineWidth = 1.5;
+      ctx.lineJoin = 'round';
+      for (let i = 1; i < piece.length; i++) {
+        const a = piece[i - 1];
+        const b = piece[i];
+        const pa = trailSampleScreen(a, ox, oy, cell, exaggeration);
+        const pb = trailSampleScreen(b, ox, oy, cell, exaggeration);
+        const age = i / n;
+        const alpha = 0.25 + 0.7 * age;
+        const descending = (Number(b.clearance) || 0) > (Number(a.clearance) || 0) + 1e-9
+          || (Number(b.vz) || 0) < -1e-6;
+        ctx.strokeStyle = descending
+          ? `rgba(56,189,248,${alpha})`
+          : `rgba(148,163,184,${alpha})`;
+        if (seg.start_reason === 'RELEASE' && i === 1) ctx.strokeStyle = `rgba(251,191,36,${alpha})`;
+        if (seg.start_reason === 'SUPPORT_LOSS' && i === 1) ctx.strokeStyle = `rgba(168,85,247,${alpha})`;
+        ctx.beginPath();
+        ctx.moveTo(pa.dx, pa.dy);
+        ctx.lineTo(pb.dx, pb.dy);
+        ctx.stroke();
+      }
+      // Authoritative sample points (exact ticks) — not interpolated.
+      for (let i = 0; i < piece.length; i++) {
+        const s = piece[i];
+        const p = trailSampleScreen(s, ox, oy, cell, exaggeration);
+        // Ground projection marker at authoritative x/y.
+        ctx.fillStyle = 'rgba(226,232,240,0.55)';
+        ctx.beginPath();
+        ctx.arc(p.gx, p.gy, Math.max(1.2, cell * 0.04), 0, Math.PI * 2);
+        ctx.fill();
+        const isStart = i === 0;
+        const isEnd = i === piece.length - 1;
+        const clearance = Number(s.clearance);
+        const atSupport = !Number.isFinite(clearance) || clearance <= 1e-9;
+        ctx.fillStyle = isStart && seg.start_reason === 'RELEASE'
+          ? 'rgba(251,191,36,0.95)'
+          : isStart && seg.start_reason === 'SUPPORT_LOSS'
+            ? 'rgba(168,85,247,0.95)'
+            : isEnd && atSupport
+              ? 'rgba(34,197,94,0.95)'
+              : 'rgba(125,211,252,0.9)';
+        ctx.beginPath();
+        ctx.arc(p.dx, p.dy, Math.max(1.8, cell * 0.07), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
   }
 }

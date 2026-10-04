@@ -60,7 +60,7 @@ def _store_snapshot(store: dict[str, Any]) -> dict[str, Any]:
 
 
 def parse_motor_signature(sig: str) -> dict[str, Any] | None:
-    """Parse L:…|N:…|E:…|F:…|A:…|P:… into COMPOSITE_MOTOR_V1-like dict."""
+    """Parse L:…|N:…|E:…|F:…|A:…|P:…(|ZL:…|ZR:…) into COMPOSITE_MOTOR_V1-like dict."""
     if not sig or sig.startswith("SHUF:"):
         return None
     parts = {}
@@ -80,6 +80,8 @@ def parse_motor_signature(sig: str) -> dict[str, Any] | None:
             "amplitude_delta": int(parts.get("A", "0") or 0),
         },
         "push": bool(int(parts.get("P", "0") or 0)),
+        "effector_z_left": int(parts.get("ZL", "0") or 0),
+        "effector_z_right": int(parts.get("ZR", "0") or 0),
         "motor_signature": sig,
     }
 

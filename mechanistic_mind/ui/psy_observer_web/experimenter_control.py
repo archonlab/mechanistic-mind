@@ -306,6 +306,10 @@ def spawn_experimenter_body(
     exp.body.theta = float(theta)
     # Mark observer-only (never put in observation)
     exp._experimenter_controlled = True  # type: ignore[attr-defined]
+    # Shared-world local physical signal step runs once in the container (as for every other slot and as
+    # TwoAgentRuntime.restore already marks it); otherwise this slot's finish_tick would advance the shared
+    # transport clock before the container's contact/signal pass.
+    exp._lps_parent_managed = True  # type: ignore[attr-defined]
     rt.slots.append(exp)
     rt.experimenter_slot = slot_i
     if len(rt._agent_stats) < len(rt.slots):
@@ -336,6 +340,19 @@ def spawn_experimenter_body(
         int(rt.tick),
         x=float(x), y=float(y), theta=float(theta), slot=slot_i,
         note="Intervention active — run is no longer untouched baseline.",
+    )
+    # Lifecycle seam: new authoritative body exists; derived index must match before success returns.
+    from mechanistic_mind.physical_system.spatial_contents import (
+        body_refs_for_runtime,
+        rebuild_after_authoritative_entity_change,
+    )
+    rebuild_after_authoritative_entity_change(
+        rt.world,
+        body_refs_for_runtime(rt),
+        tick=int(rt.tick),
+        config=rt.config,
+        reason="experimenter_spawn",
+        generation_policy="bump",
     )
     return {
         "accepted": True,
@@ -418,6 +435,19 @@ def remove_experimenter_body(
     controller.log("EXPERIMENTER_BODY_REMOVED", int(rt.tick), slot=slot)
     controller.active = False
     controller.slot_index = None
+    # Lifecycle seam: authoritative body removed; drop stale derived refs before success returns.
+    from mechanistic_mind.physical_system.spatial_contents import (
+        body_refs_for_runtime,
+        rebuild_after_authoritative_entity_change,
+    )
+    rebuild_after_authoritative_entity_change(
+        rt.world,
+        body_refs_for_runtime(rt),
+        tick=int(rt.tick),
+        config=rt.config,
+        reason="experimenter_despawn",
+        generation_policy="bump",
+    )
     # Keep intervention_active True for provenance
     return {"accepted": True, "intervention_active": True, "status": controller.status()}
 

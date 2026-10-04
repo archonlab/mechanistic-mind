@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { WorldPane } from '../chrome/WorldPane';
+import { WorldPane, type VolumeWorkspaceMode } from '../chrome/WorldPane';
 import { observerHudActionLabel } from '../observerHudAction';
 import { useFrameStore, useStatusStore } from '../observer/useExternalStore';
 import { recentHudApi } from '../recentSidechannelHud';
@@ -19,10 +19,14 @@ type Props = {
   onSelectCell?: (info: any) => void;
   onSelectAgent?: (index: number) => void;
   mapKey?: number;
+  volumeWorkspace?: VolumeWorkspaceMode;
+  onVolumeWorkspaceChange?: (mode: VolumeWorkspaceMode) => void;
 };
 
 export const RunWorkspace = memo(function RunWorkspace({
   prefs, onSelectCell, onSelectAgent, mapKey,
+  volumeWorkspace = 'MAP',
+  onVolumeWorkspaceChange,
 }: Props) {
   'use no memo';
   const status = useStatusStore();
@@ -60,7 +64,7 @@ export const RunWorkspace = memo(function RunWorkspace({
   return (
     <div className="run-workspace" data-testid="workspace-run" data-workspace="RUN">
       <div className="sim-map-host">
-        <WorldPane prefs={prefs} onSelectCell={onSelectCell} mapKey={mapKey} />
+        <WorldPane prefs={prefs} onSelectCell={onSelectCell} mapKey={mapKey} volumeWorkspace={volumeWorkspace} onVolumeWorkspaceChange={onVolumeWorkspaceChange} />
       </div>
       <footer className="sim-hud">
         {labeled.map((row, i) => {

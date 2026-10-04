@@ -1,7 +1,7 @@
 """PlanetState — full-grid toroidal physical substrate (no organism)."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
@@ -58,9 +58,14 @@ class PlanetState:
     # Multi-channel optical appearance (WORLD GT; FOV-gated surface_c* only).
     surface_optical: np.ndarray | None = None  # (3, H, W) when discrimination LOW/RICH
     surface_optical_meta: dict | None = None
+    # Acanthostega-only passive physical objects (empty on Tiktaalik / legacy).
+    resource_objects: list = field(default_factory=list)
+    resource_object_next_id: int = 1
+    # Acanthostega-only surface deposits. Absent/empty on Tiktaalik and legacy snapshots.
+    surface_material_deposits: dict = field(default_factory=dict)
 
     def copy(self) -> "PlanetState":
-        return PlanetState(
+        copied = PlanetState(
             tick=self.tick,
             T=self.T.copy(),
             M=self.M.copy(),
@@ -142,7 +147,104 @@ class PlanetState:
                 None if getattr(self, "surface_optical_meta", None) is None
                 else dict(self.surface_optical_meta)
             ),
+            resource_objects=[
+                obj.copy() if hasattr(obj, "copy") else obj
+                for obj in (getattr(self, "resource_objects", None) or [])
+            ],
+            resource_object_next_id=int(getattr(self, "resource_object_next_id", 1) or 1),
+            surface_material_deposits={
+                key: (value.copy() if hasattr(value, "copy") else value)
+                for key, value in (getattr(self, "surface_material_deposits", None) or {}).items()
+            },
         )
+        sequence = int(getattr(self, "material_transaction_sequence", 0) or 0)
+        if sequence:
+            copied.material_transaction_sequence = sequence
+        committed = list(getattr(self, "material_transaction_committed_ids", None) or [])
+        if committed:
+            copied.material_transaction_committed_ids = committed[-64:]
+        history = list(getattr(self, "material_transaction_history", None) or [])
+        if history:
+            copied.material_transaction_history = history[-16:]
+        generation = int(getattr(self, "spatial_index_generation", 0) or 0)
+        if generation:
+            copied.spatial_index_generation = generation
+            copied.spatial_index_schema = str(getattr(self, "spatial_index_schema", "") or "")
+            copied.spatial_index_checksum = str(getattr(self, "spatial_index_checksum", "") or "")
+        if getattr(self, "surface_columns", None) is not None:
+            from mechanistic_mind.physical_system.procedural_surface_columns import copy_state
+
+            copy_state(self, copied)
+        if getattr(self, "volumetric_occupancy", None) is not None:
+            from mechanistic_mind.physical_system.volumetric_world_material_occupancy import (
+                copy_state as vo_copy,
+            )
+
+            vo_copy(self, copied)
+        if getattr(self, "local_signal_transport", None) is not None:
+            from mechanistic_mind.physical_system.local_physical_signal_transport import copy_state as lps_copy
+
+            copied.local_signal_transport = lps_copy(self.local_signal_transport)
+        if getattr(self, "contact_acoustic_state", None) is not None:
+            from mechanistic_mind.physical_system.physical_contact_acoustic_emission import (
+                copy_state as pca_copy,
+            )
+
+            copied.contact_acoustic_state = pca_copy(self.contact_acoustic_state)
+        if getattr(self, "free_object_kinematics_state", None) is not None:
+            from mechanistic_mind.physical_system.free_resource_object_kinematics import (
+                copy_state as fok_copy,
+            )
+
+            copied.free_object_kinematics_state = fok_copy(self.free_object_kinematics_state)
+        if getattr(self, "body_object_contact_state", None) is not None:
+            from mechanistic_mind.physical_system.physical_body_resource_object_contact import (
+                copy_state as boc_copy,
+            )
+
+            copied.body_object_contact_state = boc_copy(self.body_object_contact_state)
+        if getattr(self, "body_object_contact_impulse_state", None) is not None:
+            from mechanistic_mind.physical_system.body_resource_object_contact_impulse import (
+                copy_state as boi_copy,
+            )
+
+            copied.body_object_contact_impulse_state = boi_copy(self.body_object_contact_impulse_state)
+        if getattr(self, "body_object_impact_acoustic_state", None) is not None:
+            from mechanistic_mind.physical_system.body_resource_object_impact_acoustic_emission import (
+                copy_state as oia_copy,
+            )
+
+            copied.body_object_impact_acoustic_state = oia_copy(self.body_object_impact_acoustic_state)
+        if getattr(self, "resource_object_pair_contact_state", None) is not None:
+            from mechanistic_mind.physical_system.physical_resource_object_pair_contact import (
+                copy_state as ooc_copy,
+            )
+
+            copied.resource_object_pair_contact_state = ooc_copy(self.resource_object_pair_contact_state)
+        if getattr(self, "resource_object_pair_contact_impulse_state", None) is not None:
+            from mechanistic_mind.physical_system.resource_object_pair_contact_impulse import (
+                copy_state as ooi_copy,
+            )
+
+            copied.resource_object_pair_contact_impulse_state = ooi_copy(
+                self.resource_object_pair_contact_impulse_state
+            )
+        if getattr(self, "resource_object_pair_impact_acoustic_state", None) is not None:
+            from mechanistic_mind.physical_system.resource_object_pair_impact_acoustic_emission import (
+                copy_state as ooia_copy,
+            )
+
+            copied.resource_object_pair_impact_acoustic_state = ooia_copy(
+                self.resource_object_pair_impact_acoustic_state
+            )
+
+        if getattr(self, "held_foreign_body_contact_state", None) is not None:
+            from mechanistic_mind.physical_system.held_resource_object_foreign_body_contact import (
+                copy_state as hfc_copy,
+            )
+
+            copied.held_foreign_body_contact_state = hfc_copy(self.held_foreign_body_contact_state)
+        return copied
 
 
 def _hetero(h: int, w: int, seed: int, amp: float) -> np.ndarray:

@@ -348,7 +348,13 @@ def motor_signature_from_composite(motor: dict[str, Any] | None, *, shuffle_salt
     else:
         emit, fd, ad = 0, 0, 0
     push = 1 if m.get("push") else 0
-    sig = f"L:{loco}|N:{neck}|E:{emit}|F:{fd}|A:{ad}|P:{push}"
+    zl = int(m.get("effector_z_left") or 0)
+    zr = int(m.get("effector_z_right") or 0)
+    if zl not in (-1, 0, 1):
+        zl = 0
+    if zr not in (-1, 0, 1):
+        zr = 0
+    sig = f"L:{loco}|N:{neck}|E:{emit}|F:{fd}|A:{ad}|P:{push}|ZL:{zl}|ZR:{zr}"
     if shuffle_salt is not None:
         # Deterministic permutation of signature string for control experiments
         # (breaks action conditioning while preserving update rate / capacity).

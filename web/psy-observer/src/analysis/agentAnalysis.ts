@@ -143,9 +143,11 @@ export function buildAgentAnalyses(state: AnalysisState): AgentAnalysis[] {
           move_count: hasTickOccupancy ? move : naNum(null),
           move_pct: hasTickOccupancy ? pct(move, occupancyTotal) : naNum(null),
           move_distribution: Object.keys(moveDist).length ? moveDist : 'NOT AVAILABLE',
-          action_transitions: Object.keys(agg.action_transitions).length
-            ? { ...agg.action_transitions }
-            : 'NOT AVAILABLE',
+          action_transitions: (agg as any).action_transition_count != null
+            ? Number((agg as any).action_transition_count)
+            : (Object.keys(agg.action_transitions).length
+              ? { ...agg.action_transitions }
+              : 'NOT AVAILABLE'),
           longest_wait_streak: waitStreak.observed,
           longest_move_streak: moveStreak.observed,
           true_longest_wait_streak: waitStreak.true,

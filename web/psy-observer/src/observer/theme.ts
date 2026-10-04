@@ -1,19 +1,19 @@
-export type ThemePref = 'system' | 'light' | 'dark';
+export type ThemePref = 'system' | 'light' | 'dark' | 'aquatic';
 
 export const THEME_STORAGE_KEY = 'mm.observer.theme';
 
 export function readThemePref(): ThemePref {
   try {
     const v = localStorage.getItem(THEME_STORAGE_KEY);
-    if (v === 'light' || v === 'dark' || v === 'system') return v;
+    if (v === 'light' || v === 'dark' || v === 'system' || v === 'aquatic') return v;
   } catch {
     /* ignore */
   }
   return 'system';
 }
 
-export function resolvedTheme(pref: ThemePref): 'light' | 'dark' {
-  if (pref === 'light' || pref === 'dark') return pref;
+export function resolvedTheme(pref: ThemePref): 'light' | 'dark' | 'aquatic' {
+  if (pref === 'light' || pref === 'dark' || pref === 'aquatic') return pref;
   if (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: light)').matches) {
     return 'light';
   }
@@ -26,7 +26,7 @@ export function applyTheme(pref: ThemePref = readThemePref()) {
   const root = document.documentElement;
   root.dataset.theme = resolved;
   root.dataset.themePref = pref;
-  root.style.colorScheme = resolved;
+  root.style.colorScheme = resolved === 'dark' ? 'dark' : 'light';
   window.dispatchEvent(new Event('mm-theme-change'));
 }
 

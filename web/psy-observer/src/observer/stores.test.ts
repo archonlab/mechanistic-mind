@@ -62,6 +62,15 @@ describe('store isolation', () => {
     assert.equal(s.displayTick, 12);
     assert.equal(s.simTick, 99);
     assert.equal(s.executionMode, 'HEADLESS');
+    assert.equal(s.modelName, 'Tiktaalik');
+  });
+  it('modelName follows header identity, not a second selector', () => {
+    const a = slimStatusFromFrame({
+      header: { model_display_name: 'MM 1.0 — Acanthostega Phase 0', model_line: 'ACANTHOSTEGA' },
+    });
+    assert.equal(a.modelName, 'MM 1.0 — Acanthostega Phase 0');
+    const b = slimStatusFromFrame({ header: {} });
+    assert.equal(b.modelName, 'Tiktaalik');
   });
   it('workspace switch is not a science field', () => {
     workspaceStore.set({ workspace: 'INSPECT', inspector: 'PREDICTIVE', inspectorOpen: true });

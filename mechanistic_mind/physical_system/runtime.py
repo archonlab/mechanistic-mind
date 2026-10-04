@@ -58,6 +58,74 @@ from .articulated_head import ArticulatedHeadConfig, step_articulated_head
 from .physical_push import PhysicalPushConfig
 from .vestibular_proprioception import VestibularConfig, NeckProprioceptionConfig
 from .oscillatory_signaling import OscillatorySignalingConfig
+from .locomotion_profile import (
+    LocomotionPhysicsProfile,
+    apply_ground_rest_after_self_drive,
+    profile_is_active,
+    tiktaalik_locomotion_profile,
+)
+from .resource_objects import (
+    PhysicalResourceObjectsConfig,
+    PhysicalResourceObjectVisionConfig,
+    object_vision_is_active,
+    spawn_preset_resource_objects,
+)
+from .material_composition import (
+    MaterialCompositionMergeConfig,
+    material_composition_merge_is_active,
+)
+from .passive_material_properties import PassiveMaterialPropertiesConfig
+from .physical_optical_material_profile import PhysicalOpticalMaterialProfileConfig
+from .exposed_surface_optical_interaction_authority import (
+    ExposedSurfaceOpticalInteractionAuthorityConfig,
+)
+from .abstract_spectral_light_source_and_direct_transport import (
+    AbstractSpectralLightSourceAndDirectTransportConfig,
+)
+from .object_body_held_optical_surfaces import (
+    ObjectBodyHeldOpticalSurfacesConfig,
+)
+from .organism_physical_optical_reception import (
+    OrganismPhysicalOpticalReceptionConfig,
+)
+from .sensory_modality_temporal_alignment import (
+    SensoryModalityTemporalAlignmentConfig,
+)
+from .explicit_surface_deposition import (
+    ExplicitSurfaceDepositionConfig,
+    explicit_surface_deposition_is_active,
+)
+from .surface_affinity_traction import (
+    SurfaceAffinityTractionConfig,
+    surface_affinity_traction_is_active,
+)
+from .surface_traction_experience import (
+    SurfaceTractionExperienceConfig,
+    surface_traction_experience_is_active,
+)
+from .surface_traction_prediction import (
+    SurfaceTractionPredictionConfig,
+    surface_traction_prediction_is_active,
+)
+from .physical_surface_optical_coating import (
+    PhysicalSurfaceOpticalCoatingConfig,
+    physical_surface_optical_coating_is_active,
+)
+from .world_material_transaction import WorldMaterialTransactionsConfig
+from .physical_manipulator import (
+    BilateralBringTogetherConfig,
+    BilateralGraspReleaseConfig,
+    BilateralPhysicalManipulatorsConfig,
+    PhysicalGraspReleaseConfig,
+    SinglePhysicalManipulatorConfig,
+    bilateral_grasp_release_is_active,
+    bring_together_is_active,
+    grasp_release_is_active,
+    manipulator_is_active,
+    open_pair_aperture,
+    resolve_shared_world_manipulators,
+    world_manipulators_active,
+)
 from .mechanism_registry import RUNTIME_VERSION, mechanism_snapshot, set_mechanism
 from .actions import OSC_ACTIONS, PUSH_ACTIONS, available_actions
 from .structured_events import StructuredEventBuffer
@@ -95,6 +163,8 @@ class PhysicalSystemConfig:
     Historical manifests: from_dict missing keys → those mechanisms OFF.
     """
     runtime_version: str = RUNTIME_VERSION
+    model_line: str = "TIKTAALIK"
+    public_preset: str | None = None
     ecology_preset: str = "CURRENT"  # CURRENT | GENTLE_FREE_MOVEMENT — Observer/runtime GT only
     planet: PlanetConfig = field(default_factory=default_planet_config)
     body: PhysicalBodyConfig = field(default_factory=default_physical_body2_config)
@@ -120,6 +190,167 @@ class PhysicalSystemConfig:
     oscillatory_signaling: OscillatorySignalingConfig = field(
         default_factory=OscillatorySignalingConfig
     )
+    locomotion_profile: LocomotionPhysicsProfile = field(
+        default_factory=tiktaalik_locomotion_profile
+    )
+    physical_resource_objects: PhysicalResourceObjectsConfig = field(
+        default_factory=PhysicalResourceObjectsConfig
+    )
+    physical_resource_object_vision: PhysicalResourceObjectVisionConfig = field(
+        default_factory=PhysicalResourceObjectVisionConfig
+    )
+    single_physical_manipulator: SinglePhysicalManipulatorConfig = field(
+        default_factory=SinglePhysicalManipulatorConfig
+    )
+    physical_grasp_release: PhysicalGraspReleaseConfig = field(
+        default_factory=PhysicalGraspReleaseConfig
+    )
+    bilateral_physical_manipulators: BilateralPhysicalManipulatorsConfig = field(
+        default_factory=BilateralPhysicalManipulatorsConfig
+    )
+    bilateral_grasp_release: BilateralGraspReleaseConfig = field(
+        default_factory=BilateralGraspReleaseConfig
+    )
+    bilateral_bring_together: BilateralBringTogetherConfig = field(
+        default_factory=BilateralBringTogetherConfig
+    )
+    material_composition_merge: MaterialCompositionMergeConfig = field(
+        default_factory=MaterialCompositionMergeConfig
+    )
+    passive_material_properties: PassiveMaterialPropertiesConfig = field(
+        default_factory=PassiveMaterialPropertiesConfig
+    )
+    physical_optical_material_profile: PhysicalOpticalMaterialProfileConfig = field(
+        default_factory=PhysicalOpticalMaterialProfileConfig
+    )
+    exposed_surface_optical_interaction_authority: ExposedSurfaceOpticalInteractionAuthorityConfig = field(
+        default_factory=ExposedSurfaceOpticalInteractionAuthorityConfig
+    )
+    abstract_spectral_light_source_and_direct_transport: AbstractSpectralLightSourceAndDirectTransportConfig = field(
+        default_factory=AbstractSpectralLightSourceAndDirectTransportConfig
+    )
+    object_body_held_optical_surfaces: ObjectBodyHeldOpticalSurfacesConfig = field(
+        default_factory=ObjectBodyHeldOpticalSurfacesConfig
+    )
+    organism_physical_optical_reception: OrganismPhysicalOpticalReceptionConfig = field(
+        default_factory=OrganismPhysicalOpticalReceptionConfig
+    )
+    sensory_modality_temporal_alignment: SensoryModalityTemporalAlignmentConfig = field(
+        default_factory=SensoryModalityTemporalAlignmentConfig
+    )
+    explicit_surface_deposition: ExplicitSurfaceDepositionConfig = field(
+        default_factory=ExplicitSurfaceDepositionConfig
+    )
+    surface_affinity_traction: SurfaceAffinityTractionConfig = field(
+        default_factory=SurfaceAffinityTractionConfig
+    )
+    surface_traction_experience: SurfaceTractionExperienceConfig = field(
+        default_factory=SurfaceTractionExperienceConfig
+    )
+    surface_traction_prediction: SurfaceTractionPredictionConfig = field(
+        default_factory=SurfaceTractionPredictionConfig
+    )
+    physical_surface_optical_coating: PhysicalSurfaceOpticalCoatingConfig = field(
+        default_factory=PhysicalSurfaceOpticalCoatingConfig
+    )
+    world_material_transactions: WorldMaterialTransactionsConfig = field(
+        default_factory=WorldMaterialTransactionsConfig
+    )
+    multi_content_spatial_index: Any = None
+    procedural_surface_columns: Any = None
+    # Researcher-only conservative surface column transfer; absent (None) = OFF.
+    conservative_surface_column_transfer: Any = None
+    # Acanthostega local physical signal transport (UNIFORM_SIGNAL_MEDIUM_V1); absent (None) = OFF.
+    local_physical_signal_transport: Any = None
+    # Acanthostega physical contact acoustic emission (Audio B); absent (None) = OFF.
+    physical_contact_acoustic_emission: Any = None
+    # Acanthostega free ResourceObject kinematics; absent (None) = OFF.
+    free_resource_object_kinematics: Any = None
+    # Acanthostega body↔ResourceObject contact FACT; absent (None) = OFF.
+    physical_body_resource_object_contact: Any = None
+    # Acanthostega body↔ResourceObject contact RESPONSE (mass+compliance impulse); absent (None) = OFF.
+    body_resource_object_contact_impulse: Any = None
+    # Acanthostega body/ResourceObject impact acoustic emission; absent (None) = OFF.
+    body_resource_object_impact_acoustic_emission: Any = None
+    # Acanthostega FREE ResourceObject↔ResourceObject contact FACT; absent (None) = OFF.
+    physical_resource_object_pair_contact: Any = None
+    # Acanthostega FREE ResourceObject↔ResourceObject contact RESPONSE; absent (None) = OFF.
+    resource_object_pair_contact_impulse: Any = None
+    # Acanthostega FREE ResourceObject↔ResourceObject impact acoustic emission; absent (None) = OFF.
+    resource_object_pair_impact_acoustic_emission: Any = None
+    # Acanthostega HELD ResourceObject↔foreign body contact FACT; absent (None) = OFF.
+    held_resource_object_foreign_body_contact: Any = None
+    # Acanthostega HELD translational impulse mediation RESPONSE; absent (None) = OFF.
+    held_resource_object_translational_impulse_mediation: Any = None
+    # Acanthostega effector work + held-load inertia accounting; absent (None) = OFF.
+    effector_work_and_held_load_inertia_accounting: Any = None
+    # Acanthostega Phase C flat ground gravity / vertical state; absent (None) = OFF.
+    flat_ground_gravity: Any = None
+    free_resource_object_ground_friction: Any = None
+    # Acanthostega Phase C energy-accounted surface elevation support; absent (None) = OFF.
+    surface_elevation_support: Any = None
+    # Acanthostega Phase C body normal-load traction + passive sliding; absent (None) = OFF.
+    body_normal_load_traction: Any = None
+    # Acanthostega Phase C continuous surface geometry (bilinear h + analytic n̂); absent (None) = OFF.
+    continuous_surface_geometry: Any = None
+    # Acanthostega Phase C G2A body static traction threshold; absent (None) = OFF.
+    body_static_traction_threshold: Any = None
+    free_resource_object_static_traction_threshold: Any = None
+    radius_aware_support_points: Any = None
+    # Acanthostega Phase C G2C1 SES decomposition contract (metadata only); absent (None) = OFF.
+    ses_decomposition_contract: Any = None
+    # Acanthostega Phase C G2C2 SES runtime transition classifier (classification only); absent (None) = OFF.
+    ses_runtime_transition_classifier: Any = None
+    # Acanthostega Phase C radius-aware face sweep SES plan evidence; absent (None) = OFF.
+    radius_aware_face_sweep: Any = None
+    # Acanthostega Phase C G2D diagnostic normal-load shadow; absent (None) = OFF.
+    diagnostic_normal_load_shadow: Any = None
+    # Acanthostega Phase C continuous gravitational PE diagnostic shadow; absent (None) = OFF.
+    continuous_gravitational_pe_diagnostic_shadow: Any = None
+    # Acanthostega Phase C Policy C continuous gravitational PE (physical); absent (None) = OFF.
+    continuous_gravitational_pe: Any = None
+    # Acanthostega Phase C tangent-gravity diagnostic shadow; absent (None) = OFF.
+    tangent_gravity_diagnostic_shadow: Any = None
+    coherent_slope_dynamics: Any = None
+    # Beta 4 conservative surface material separation (column→ResourceObject); absent (None) = OFF.
+    conservative_surface_material_separation: Any = None
+    # Beta 4 effector↔terrain contact geometry (fact only); absent (None) = OFF.
+    effector_terrain_contact_geometry: Any = None
+    # Researcher-only passive effector↔occupancy reachability trace; absent (None) = OFF.
+    effector_occupancy_reachability_trace: Any = None
+    # Beta 4 manipulator relative world actuation (kinematic DOF); absent (None) = OFF.
+    manipulator_relative_world_actuation: Any = None
+    # Beta 4 effector bounded actuator effort along relative_z; absent (None) = OFF.
+    effector_bounded_actuator_effort: Any = None
+    # Beta 4 surface exertion / terrain material resistance; absent (None) = OFF.
+    surface_exertion_terrain_material_resistance: Any = None
+    # Beta 4 held ResourceObject ↔ terrain contact geometry (fact only); absent (None) = OFF.
+    held_resource_object_terrain_contact_geometry: Any = None
+    # Beta 4 held ResourceObject ↔ terrain mechanical transmission; absent (None) = OFF.
+    held_resource_object_terrain_mechanical_transmission: Any = None
+    # Beta 4 held-mediated surface exertion → SETMR integration; absent (None) = OFF.
+    held_mediated_surface_exertion_integration: Any = None
+    # Beta 4 detached terrain material initial placement; absent (None) = OFF.
+    detached_terrain_material_initial_placement: Any = None
+    # Beta 4 BNLT MOVE breakaway locomotion repair; absent (None) = OFF.
+    bnlt_move_breakaway_locomotion_repair: Any = None
+    repeated_conservative_surface_column_separation: Any = None
+    # Beta 4 event-driven crowded placement retry contract; absent (None) = OFF.
+    event_driven_crowded_placement_retry_contract: Any = None
+    # Beta 4 detached material amount-scaled collision radius; absent (None) = OFF.
+    detached_material_amount_scaled_collision_radius: Any = None
+    # Beta 4 held COMBINE radius resize transaction; absent (None) = OFF.
+    held_combine_radius_resize_transaction: Any = None
+    # Beta 4 held deposition radius shrink transaction; absent (None) = OFF.
+    held_deposition_radius_shrink_transaction: Any = None
+    # Free-Space V1A support/PE authority contract; absent (None) = OFF.
+    free_space_state_and_pe_authority_contract: Any = None
+    # Free-Space V1B vertical terrain landing contact response; absent (None) = OFF.
+    vertical_terrain_landing_contact_response: Any = None
+    # Free-Space V1C vertical impact acoustic emission; absent (None) = OFF.
+    vertical_impact_acoustic_emission: Any = None
+    # Free-Space V1D RELEASE/excavation support-loss integration; absent (None) = OFF.
+    release_and_excavation_support_loss_integration: Any = None
 
     def copy(self) -> "PhysicalSystemConfig":
         return deepcopy(self)
@@ -134,6 +365,639 @@ def _config_from_dict(cls: type, values: dict[str, Any]) -> Any:
         if "footprint" in data:
             data["footprint"] = tuple(tuple(point) for point in data["footprint"])
     return cls(**data)
+
+
+def _lps_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field (Tiktaalik / every earlier Acanthostega snapshot) -> None -> mechanism OFF."""
+    raw = configs.get("local_physical_signal_transport")
+    if not raw:
+        return None
+    from mechanistic_mind.physical_system.local_physical_signal_transport import UniformSignalMediumConfig
+
+    return UniformSignalMediumConfig.from_dict(raw)
+
+
+def _pca_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field (Tiktaalik / every earlier Acanthostega snapshot) -> None -> mechanism OFF."""
+    raw = configs.get("physical_contact_acoustic_emission")
+    if not raw:
+        return None
+    from mechanistic_mind.physical_system.physical_contact_acoustic_emission import ContactAcousticConfig
+
+    return ContactAcousticConfig.from_dict(raw)
+
+
+def _boc_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> mechanism OFF."""
+    raw = configs.get("physical_body_resource_object_contact")
+    if not raw:
+        return None
+    from mechanistic_mind.physical_system.physical_body_resource_object_contact import BodyObjectContactConfig
+    return BodyObjectContactConfig.from_dict(raw)
+
+def _boi_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    raw = configs.get("body_resource_object_contact_impulse")
+    if not raw:
+        return None
+    from mechanistic_mind.physical_system.body_resource_object_contact_impulse import (
+        BodyObjectContactImpulseConfig,
+    )
+    return BodyObjectContactImpulseConfig.from_dict(raw)
+
+
+def _ooi_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> mechanism OFF."""
+    raw = configs.get("resource_object_pair_contact_impulse")
+    if not raw:
+        return None
+    from mechanistic_mind.physical_system.resource_object_pair_contact_impulse import (
+        ResourceObjectPairContactImpulseConfig,
+    )
+    return ResourceObjectPairContactImpulseConfig.from_dict(raw)
+
+
+def _ooia_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> mechanism OFF."""
+    raw = configs.get("resource_object_pair_impact_acoustic_emission")
+    if not raw:
+        return None
+    from mechanistic_mind.physical_system.resource_object_pair_impact_acoustic_emission import (
+        ResourceObjectPairImpactAcousticConfig,
+    )
+    return ResourceObjectPairImpactAcousticConfig.from_dict(raw)
+
+
+
+
+def _ehl_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> mechanism OFF."""
+    raw = configs.get("effector_work_and_held_load_inertia_accounting")
+    if not raw:
+        return None
+    from mechanistic_mind.physical_system.effector_work_and_held_load_inertia_accounting import (
+        EffectorWorkHeldLoadConfig,
+    )
+    return EffectorWorkHeldLoadConfig.from_dict(raw)
+
+
+def _fgg_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> mechanism OFF."""
+    raw = configs.get("flat_ground_gravity")
+    if not raw:
+        return None
+    from mechanistic_mind.physical_system.flat_ground_gravity import FlatGroundGravityConfig
+    return FlatGroundGravityConfig.from_dict(raw)
+
+
+
+
+def _ses_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> mechanism OFF."""
+    raw = configs.get("surface_elevation_support")
+    if not raw:
+        return None
+    from mechanistic_mind.physical_system.surface_elevation_support import (
+        SurfaceElevationSupportConfig,
+    )
+    return SurfaceElevationSupportConfig.from_dict(raw)
+
+def _bnlt_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> mechanism OFF."""
+    raw = configs.get("body_normal_load_traction")
+    if not raw:
+        return None
+    from mechanistic_mind.physical_system.body_normal_load_traction import (
+        BodyNormalLoadTractionConfig,
+    )
+    return BodyNormalLoadTractionConfig.from_dict(raw)
+
+
+def _csg_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> mechanism OFF."""
+    raw = configs.get("continuous_surface_geometry")
+    if not raw:
+        return None
+    from mechanistic_mind.physical_system.continuous_surface_geometry import (
+        ContinuousSurfaceGeometryConfig,
+    )
+    return ContinuousSurfaceGeometryConfig.from_dict(raw)
+
+
+def _bst_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> mechanism OFF."""
+    raw = configs.get("body_static_traction_threshold")
+    if not raw:
+        return None
+    from mechanistic_mind.physical_system.body_static_traction_threshold import (
+        BodyStaticTractionThresholdConfig,
+    )
+    return BodyStaticTractionThresholdConfig.from_dict(raw)
+
+def _fost_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> mechanism OFF."""
+    raw = configs.get("free_resource_object_static_traction_threshold")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.free_resource_object_static_traction_threshold import (
+        FreeResourceObjectStaticTractionThresholdConfig,
+    )
+    return FreeResourceObjectStaticTractionThresholdConfig.from_dict(raw)
+
+
+def _rasp_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    raw = configs.get("radius_aware_support_points")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.radius_aware_support_points import (
+        RadiusAwareSupportPointsConfig,
+    )
+    return RadiusAwareSupportPointsConfig.from_dict(raw if isinstance(raw, dict) else None)
+
+
+def _sdc_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> G2C1 OFF (old parent snapshots stay OFF)."""
+    raw = configs.get("ses_decomposition_contract")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.ses_decomposition_contract import (
+        SesDecompositionContractConfig,
+        validate_config,
+    )
+    cfg = SesDecompositionContractConfig.from_dict(raw if isinstance(raw, dict) else None)
+    validate_config(cfg)
+    return cfg
+
+
+def _srtc_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> G2C2 OFF (old parent snapshots stay OFF)."""
+    raw = configs.get("ses_runtime_transition_classifier")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.ses_runtime_transition_classifier import (
+        SesRuntimeTransitionClassifierConfig,
+        validate_config,
+    )
+    cfg = SesRuntimeTransitionClassifierConfig.from_dict(raw if isinstance(raw, dict) else None)
+    validate_config(cfg)
+    return cfg
+
+
+def _rafs_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> face-sweep OFF (old parent snapshots stay OFF)."""
+    raw = configs.get("radius_aware_face_sweep")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.radius_aware_face_sweep import (
+        RadiusAwareFaceSweepConfig,
+        validate_config,
+    )
+    cfg = RadiusAwareFaceSweepConfig.from_dict(raw if isinstance(raw, dict) else None)
+    validate_config(cfg)
+    return cfg
+
+
+
+def _csd_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> coherent slope dynamics OFF."""
+    raw = configs.get("coherent_slope_dynamics")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.coherent_slope_dynamics import (
+        CoherentSlopeDynamicsConfig,
+        validate_config,
+    )
+    cfg = CoherentSlopeDynamicsConfig.from_dict(raw if isinstance(raw, dict) else None)
+    validate_config(cfg)
+    return cfg
+
+
+def _csms_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> surface material separation OFF."""
+    raw = configs.get("conservative_surface_material_separation")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.conservative_surface_material_separation import (
+        ConservativeSurfaceMaterialSeparationConfig,
+        validate_config,
+    )
+    cfg = ConservativeSurfaceMaterialSeparationConfig.from_dict(raw if isinstance(raw, dict) else None)
+    validate_config(cfg)
+    return cfg
+
+
+def _etc_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> effector terrain contact geometry OFF."""
+    raw = configs.get("effector_terrain_contact_geometry")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.effector_terrain_contact_geometry import (
+        EffectorTerrainContactGeometryConfig,
+        validate_config,
+    )
+    cfg = EffectorTerrainContactGeometryConfig.from_dict(raw if isinstance(raw, dict) else None)
+    validate_config(cfg)
+    return cfg
+
+
+def _eort_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> effector occupancy reachability trace OFF."""
+    raw = configs.get("effector_occupancy_reachability_trace")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.effector_occupancy_reachability_trace import (
+        EffectorOccupancyReachabilityTraceConfig,
+    )
+    return EffectorOccupancyReachabilityTraceConfig.from_dict(
+        raw if isinstance(raw, dict) else None
+    )
+
+
+def _mrwa_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> manipulator relative world actuation OFF."""
+    raw = configs.get("manipulator_relative_world_actuation")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.manipulator_relative_world_actuation import (
+        ManipulatorRelativeWorldActuationConfig,
+        validate_config,
+    )
+    cfg = ManipulatorRelativeWorldActuationConfig.from_dict(raw if isinstance(raw, dict) else None)
+    validate_config(cfg)
+    return cfg
+
+
+def _ebae_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> effector bounded actuator effort OFF."""
+    raw = configs.get("effector_bounded_actuator_effort")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.effector_bounded_actuator_effort import (
+        EffectorBoundedActuatorEffortConfig,
+        validate_config,
+    )
+    cfg = EffectorBoundedActuatorEffortConfig.from_dict(raw if isinstance(raw, dict) else None)
+    validate_config(cfg)
+    return cfg
+
+
+def _setmr_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> surface exertion terrain material resistance OFF."""
+    raw = configs.get("surface_exertion_terrain_material_resistance")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.surface_exertion_terrain_material_resistance import (
+        SurfaceExertionTerrainMaterialResistanceConfig,
+        validate_config,
+    )
+    cfg = SurfaceExertionTerrainMaterialResistanceConfig.from_dict(
+        raw if isinstance(raw, dict) else None
+    )
+    validate_config(cfg)
+    return cfg
+
+
+def _hotc_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> held object terrain contact geometry OFF."""
+    raw = configs.get("held_resource_object_terrain_contact_geometry")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.held_resource_object_terrain_contact_geometry import (
+        HeldResourceObjectTerrainContactGeometryConfig,
+        validate_config,
+    )
+    cfg = HeldResourceObjectTerrainContactGeometryConfig.from_dict(
+        raw if isinstance(raw, dict) else None
+    )
+    validate_config(cfg)
+    return cfg
+
+
+def _hotmt_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> held object terrain mechanical transmission OFF."""
+    raw = configs.get("held_resource_object_terrain_mechanical_transmission")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.held_resource_object_terrain_mechanical_transmission import (
+        HeldResourceObjectTerrainMechanicalTransmissionConfig,
+        validate_config,
+    )
+    cfg = HeldResourceObjectTerrainMechanicalTransmissionConfig.from_dict(
+        raw if isinstance(raw, dict) else None
+    )
+    validate_config(cfg)
+    return cfg
+
+
+def _hmsi_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> held-mediated surface exertion integration OFF."""
+    raw = configs.get("held_mediated_surface_exertion_integration")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.held_mediated_surface_exertion_integration import (
+        HeldMediatedSurfaceExertionIntegrationConfig,
+        validate_config,
+    )
+    cfg = HeldMediatedSurfaceExertionIntegrationConfig.from_dict(
+        raw if isinstance(raw, dict) else None
+    )
+    validate_config(cfg)
+    return cfg
+
+
+def _dtip_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> detached terrain material initial placement OFF."""
+    raw = configs.get("detached_terrain_material_initial_placement")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.detached_terrain_material_initial_placement import (
+        DetachedTerrainMaterialInitialPlacementConfig,
+        validate_config,
+    )
+    cfg = DetachedTerrainMaterialInitialPlacementConfig.from_dict(
+        raw if isinstance(raw, dict) else None
+    )
+    validate_config(cfg)
+    return cfg
+
+
+def _rcss_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> repeated conservative surface-column separation OFF."""
+    raw = configs.get("repeated_conservative_surface_column_separation")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.repeated_conservative_surface_column_separation import (
+        RepeatedConservativeSurfaceColumnSeparationConfig,
+        validate_config,
+    )
+    cfg = RepeatedConservativeSurfaceColumnSeparationConfig.from_dict(
+        raw if isinstance(raw, dict) else None
+    )
+    validate_config(cfg)
+    return cfg
+
+
+def _crowded_retry_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> event-driven crowded placement retry contract OFF."""
+    raw = configs.get("event_driven_crowded_placement_retry_contract")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.event_driven_crowded_placement_retry_contract import (
+        EventDrivenCrowdedPlacementRetryContractConfig,
+        validate_config,
+    )
+    cfg = EventDrivenCrowdedPlacementRetryContractConfig.from_dict(
+        raw if isinstance(raw, dict) else None
+    )
+    validate_config(cfg)
+    return cfg
+
+
+def _detached_material_size_geometry_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> detached material amount-scaled collision radius OFF."""
+    raw = configs.get("detached_material_amount_scaled_collision_radius")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.detached_material_amount_scaled_collision_radius import (
+        DetachedMaterialAmountScaledCollisionRadiusConfig,
+        validate_config,
+    )
+    cfg = DetachedMaterialAmountScaledCollisionRadiusConfig.from_dict(
+        raw if isinstance(raw, dict) else None
+    )
+    validate_config(cfg)
+    return cfg
+
+
+def _held_combine_radius_resize_transaction_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> held COMBINE radius resize transaction OFF."""
+    raw = configs.get("held_combine_radius_resize_transaction")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.held_combine_radius_resize_transaction import (
+        HeldCombineRadiusResizeTransactionConfig,
+        validate_config,
+    )
+    cfg = HeldCombineRadiusResizeTransactionConfig.from_dict(
+        raw if isinstance(raw, dict) else None
+    )
+    validate_config(cfg)
+    return cfg
+
+
+def _held_deposition_radius_shrink_transaction_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> held deposition radius shrink transaction OFF."""
+    raw = configs.get("held_deposition_radius_shrink_transaction")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.held_deposition_radius_shrink_transaction import (
+        HeldDepositionRadiusShrinkTransactionConfig,
+        validate_config,
+    )
+    cfg = HeldDepositionRadiusShrinkTransactionConfig.from_dict(
+        raw if isinstance(raw, dict) else None
+    )
+    validate_config(cfg)
+    return cfg
+
+
+def _free_space_state_and_pe_authority_contract_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> Free-Space V1A contract OFF."""
+    raw = configs.get("free_space_state_and_pe_authority_contract")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.free_space_state_and_pe_authority_contract import (
+        FreeSpaceStateAndPeAuthorityContractConfig,
+        validate_config,
+    )
+    cfg = FreeSpaceStateAndPeAuthorityContractConfig.from_dict(
+        raw if isinstance(raw, dict) else None
+    )
+    validate_config(cfg)
+    return cfg
+
+
+def _vertical_terrain_landing_contact_response_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> Free-Space V1B landing OFF."""
+    raw = configs.get("vertical_terrain_landing_contact_response")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.vertical_terrain_landing_contact_response import (
+        VerticalTerrainLandingContactResponseConfig,
+        validate_config,
+    )
+    cfg = VerticalTerrainLandingContactResponseConfig.from_dict(
+        raw if isinstance(raw, dict) else None
+    )
+    validate_config(cfg)
+    return cfg
+
+
+def _vertical_impact_acoustic_emission_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> Free-Space V1C acoustics OFF."""
+    raw = configs.get("vertical_impact_acoustic_emission")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.vertical_impact_acoustic_emission import (
+        VerticalImpactAcousticEmissionConfig,
+        validate_config,
+    )
+    cfg = VerticalImpactAcousticEmissionConfig.from_dict(
+        raw if isinstance(raw, dict) else None
+    )
+    validate_config(cfg)
+    return cfg
+
+
+def _release_and_excavation_support_loss_integration_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> Free-Space V1D integration OFF."""
+    raw = configs.get("release_and_excavation_support_loss_integration")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.release_and_excavation_support_loss_integration import (
+        ReleaseAndExcavationSupportLossIntegrationConfig,
+        validate_config,
+    )
+    cfg = ReleaseAndExcavationSupportLossIntegrationConfig.from_dict(
+        raw if isinstance(raw, dict) else None
+    )
+    validate_config(cfg)
+    return cfg
+
+
+def _bnlt_repair_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> BNLT MOVE breakaway repair OFF."""
+    raw = configs.get("bnlt_move_breakaway_locomotion_repair")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.bnlt_move_breakaway_locomotion_repair import (
+        BnltMoveBreakawayLocomotionRepairConfig,
+        validate_config,
+    )
+    cfg = BnltMoveBreakawayLocomotionRepairConfig.from_dict(
+        raw if isinstance(raw, dict) else None
+    )
+    validate_config(cfg)
+    return cfg
+
+
+def _tgds_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> tangent gravity diagnostic shadow OFF."""
+    raw = configs.get("tangent_gravity_diagnostic_shadow")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.tangent_gravity_diagnostic_shadow import (
+        TangentGravityDiagnosticShadowConfig,
+        validate_config,
+    )
+    cfg = TangentGravityDiagnosticShadowConfig.from_dict(raw if isinstance(raw, dict) else None)
+    validate_config(cfg)
+    return cfg
+
+
+def _cgp_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> Policy C continuous gravitational PE OFF."""
+    raw = configs.get("continuous_gravitational_pe")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.continuous_gravitational_pe import (
+        ContinuousGravitationalPeConfig,
+        validate_config,
+    )
+    cfg = ContinuousGravitationalPeConfig.from_dict(raw if isinstance(raw, dict) else None)
+    validate_config(cfg)
+    return cfg
+
+
+def _cgpe_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> continuous gravitational PE diagnostic shadow OFF."""
+    raw = configs.get("continuous_gravitational_pe_diagnostic_shadow")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.continuous_gravitational_pe_diagnostic_shadow import (
+        ContinuousGravitationalPeDiagnosticShadowConfig,
+        validate_config,
+    )
+    cfg = ContinuousGravitationalPeDiagnosticShadowConfig.from_dict(raw if isinstance(raw, dict) else None)
+    validate_config(cfg)
+    return cfg
+
+def _dnls_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> diagnostic shadow OFF (old parent snapshots stay OFF)."""
+    raw = configs.get("diagnostic_normal_load_shadow")
+    if raw is None:
+        return None
+    from mechanistic_mind.physical_system.diagnostic_normal_load_shadow import (
+        DiagnosticNormalLoadShadowConfig,
+        validate_config,
+    )
+    cfg = DiagnosticNormalLoadShadowConfig.from_dict(raw if isinstance(raw, dict) else None)
+    validate_config(cfg)
+    return cfg
+
+
+def _fogf_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> mechanism OFF."""
+    raw = configs.get("free_resource_object_ground_friction")
+    if not raw:
+        return None
+    from mechanistic_mind.physical_system.free_resource_object_ground_friction import (
+        FreeObjectGroundFrictionConfig,
+    )
+    return FreeObjectGroundFrictionConfig.from_dict(raw)
+
+
+def _hti_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> mechanism OFF."""
+    raw = configs.get("held_resource_object_translational_impulse_mediation")
+    if not raw:
+        return None
+    from mechanistic_mind.physical_system.held_resource_object_translational_impulse_mediation import (
+        HeldTranslationalImpulseConfig,
+    )
+    return HeldTranslationalImpulseConfig.from_dict(raw)
+
+
+def _hfc_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> mechanism OFF."""
+    raw = configs.get("held_resource_object_foreign_body_contact")
+    if not raw:
+        return None
+    from mechanistic_mind.physical_system.held_resource_object_foreign_body_contact import (
+        HeldForeignBodyContactConfig,
+    )
+    return HeldForeignBodyContactConfig.from_dict(raw)
+
+
+def _ooc_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> mechanism OFF."""
+    raw = configs.get("physical_resource_object_pair_contact")
+    if not raw:
+        return None
+    from mechanistic_mind.physical_system.physical_resource_object_pair_contact import (
+        ResourceObjectPairContactConfig,
+    )
+    return ResourceObjectPairContactConfig.from_dict(raw)
+
+
+def _oia_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field -> None -> mechanism OFF."""
+    raw = configs.get("body_resource_object_impact_acoustic_emission")
+    if not raw:
+        return None
+    from mechanistic_mind.physical_system.body_resource_object_impact_acoustic_emission import (
+        BodyObjectImpactAcousticConfig,
+    )
+    return BodyObjectImpactAcousticConfig.from_dict(raw)
+
+
+def _fok_config_from_snapshot(configs: dict[str, Any]) -> Any:
+    """Missing field (Tiktaalik / every earlier Acanthostega snapshot) -> None -> mechanism OFF."""
+    raw = configs.get("free_resource_object_kinematics")
+    if not raw:
+        return None
+    from mechanistic_mind.physical_system.free_resource_object_kinematics import FreeObjectKinematicsConfig
+
+    return FreeObjectKinematicsConfig.from_dict(raw)
 
 
 def _rng_unit(seed: int, tick: int) -> float:
@@ -156,6 +1020,10 @@ class PhysicalSystemRuntime:
             from mechanistic_mind.model.tiktaalik import tiktaalik_config
 
             config = tiktaalik_config()
+        elif model == "acanthostega" and config is None:
+            from mechanistic_mind.model.acanthostega import acanthostega_config
+
+            config = acanthostega_config()
         self.seed = int(seed)
         self.config = (config or PhysicalSystemConfig()).copy()
         self.tick = 0
@@ -192,6 +1060,31 @@ class PhysicalSystemRuntime:
         self.last_head_meta: dict[str, Any] | None = None
         self.last_push_meta: dict[str, Any] | None = None
         self.last_osc_meta: dict[str, Any] | None = None
+        self.last_manipulator_receipt: dict[str, Any] | None = None
+        self.last_pair_receipt: dict[str, Any] | None = None
+        self.last_material_transformation_receipt: dict[str, Any] | None = None
+        self.last_surface_deposition_receipt: dict[str, Any] | None = None
+        self.last_surface_traction_receipt: dict[str, Any] | None = None
+        self.surface_traction_history: list[dict[str, Any]] = []
+        self._surface_traction_pending: dict[str, Any] | None = None
+        self.last_traction_experience_receipt: dict[str, Any] | None = None
+        self.traction_experience_history: list[dict[str, Any]] = []
+        self._traction_experience_pending: dict[str, Any] | None = None
+        self._traction_experience_physical: dict[str, Any] | None = None
+        self._traction_experience_closed_tick: int | None = None
+        self.last_traction_prediction_receipt: dict[str, Any] | None = None
+        self.traction_prediction_history: list[dict[str, Any]] = []
+        self._traction_prediction_pending: dict[str, Any] | None = None
+        self._traction_prediction_closed_tick: int | None = None
+        self._traction_prediction_episode_index: int = 0
+        self.traction_adaptation_phase: str = "UNSPECIFIED"
+        self.last_surface_optical_coating_receipt: dict[str, Any] | None = None
+        self.surface_optical_coating_history: list[dict[str, Any]] = []
+        self.pair_aperture: float = 0.84
+        self.pair_state: str = "OPEN"
+        self.pair_contact: bool = False
+        self.technical_id: str = "agent_0"
+        self._defer_manipulator_world: bool = False
         self._prev_body_omega: float = 0.0
         self.structured_events = StructuredEventBuffer()
         self.action_trace_enabled: bool = False
@@ -229,14 +1122,347 @@ class PhysicalSystemRuntime:
                 "note": "Observational only — does not drive forces/work/resources",
             }
         osc = getattr(self.config, "oscillatory_signaling", None)
-        if osc is not None and osc.enabled:
+        from mechanistic_mind.physical_system.local_physical_signal_transport import (
+            local_physical_signal_transport_is_active as _lps_active,
+        )
+        if osc is not None and osc.enabled and not _lps_active(self.config):
             from mechanistic_mind.physical_system.oscillatory_signaling import ensure_osc_fields
             ensure_osc_fields(self.world, osc)
+        spawn_preset_resource_objects(self.world, self.config, seed=self.seed, tick=0)
         self.body = initialize_physical_body(
             self.config.body,
             width=self.config.planet.width,
             height=self.config.planet.height,
         )
+        from mechanistic_mind.physical_system.spatial_contents import (
+            body_refs_for_runtime,
+            multi_content_spatial_index_is_active,
+            rebuild_from_world,
+        )
+        if multi_content_spatial_index_is_active(self.config):
+            rebuild_from_world(
+                self.world,
+                body_refs_for_runtime(self),
+                tick=0,
+                reason="initialization",
+                config=self.config,
+            )
+        from mechanistic_mind.physical_system.procedural_surface_columns import (
+            ensure_surface_columns_for_runtime,
+        )
+        ensure_surface_columns_for_runtime(self.world, self.config, experiment_seed=self.seed)
+        from mechanistic_mind.physical_system.volumetric_world_material_occupancy import (
+            ensure_state as ensure_volumetric_occupancy_for_runtime,
+        )
+        ensure_volumetric_occupancy_for_runtime(self.world, self.config)
+        from mechanistic_mind.physical_system.occupancy_support_and_contact_queries import (
+            ensure_state as ensure_occupancy_support_contact_for_runtime,
+        )
+        ensure_occupancy_support_contact_for_runtime(self.world, self.config)
+        from mechanistic_mind.physical_system.volumetric_world_material_separation import (
+            ensure_state as ensure_volumetric_separation_for_runtime,
+        )
+        ensure_volumetric_separation_for_runtime(self.world, self.config)
+        from mechanistic_mind.physical_system.volumetric_world_material_reintegration import (
+            ensure_state as ensure_volumetric_reintegration_for_runtime,
+        )
+        ensure_volumetric_reintegration_for_runtime(self.world, self.config)
+        from mechanistic_mind.physical_system.effector_held_occupancy_exertion_bridge import (
+            ensure_state as ensure_vw5_bridge_for_runtime,
+        )
+        ensure_vw5_bridge_for_runtime(self.world, self.config)
+        from mechanistic_mind.physical_system.minimal_vision_3d_geometric_interface import (
+            ensure_state as ensure_vw6_vision_for_runtime,
+        )
+        ensure_vw6_vision_for_runtime(self.world, self.config)
+        setattr(self.world, "_physical_system_config", self.config)
+        if _lps_active(self.config):
+            from mechanistic_mind.physical_system.local_physical_signal_transport import (
+                bind_body_ids,
+                ensure_local_signal_for_runtime,
+            )
+            ensure_local_signal_for_runtime(self.world, self.config)
+            bind_body_ids(body_refs_for_runtime(self))
+            from mechanistic_mind.physical_system.physical_contact_acoustic_emission import (
+                ensure_contact_acoustics_for_runtime,
+            )
+            ensure_contact_acoustics_for_runtime(self.world, self.config)
+            from mechanistic_mind.physical_system.body_resource_object_impact_acoustic_emission import (
+                ensure_body_object_impact_acoustics_for_runtime,
+            )
+            ensure_body_object_impact_acoustics_for_runtime(self.world, self.config)
+        if getattr(self.config, "free_resource_object_kinematics", None) is not None:
+            from mechanistic_mind.physical_system.free_resource_object_kinematics import (
+                ensure_free_object_kinematics_for_runtime,
+            )
+            # Canonical passive objects are spawned FREE_STATIC with v = 0; empty effector history.
+            ensure_free_object_kinematics_for_runtime(self.world, self.config)
+        if getattr(self.config, "physical_body_resource_object_contact", None) is not None:
+            from mechanistic_mind.physical_system.physical_body_resource_object_contact import (
+                ensure_body_object_contact_for_runtime,
+            )
+            ensure_body_object_contact_for_runtime(self.world, self.config)
+        if getattr(self.config, "body_resource_object_contact_impulse", None) is not None:
+            from mechanistic_mind.physical_system.body_resource_object_contact_impulse import (
+                ensure_body_object_impulse_for_runtime,
+            )
+            ensure_body_object_impulse_for_runtime(self.world, self.config)
+        if getattr(self.config, "body_resource_object_impact_acoustic_emission", None) is not None:
+            from mechanistic_mind.physical_system.body_resource_object_impact_acoustic_emission import (
+                ensure_body_object_impact_acoustics_for_runtime,
+            )
+            ensure_body_object_impact_acoustics_for_runtime(self.world, self.config)
+        if getattr(self.config, "physical_resource_object_pair_contact", None) is not None:
+            from mechanistic_mind.physical_system.physical_resource_object_pair_contact import (
+                ensure_resource_object_pair_contact_for_runtime,
+            )
+            ensure_resource_object_pair_contact_for_runtime(self.world, self.config)
+        if getattr(self.config, "resource_object_pair_contact_impulse", None) is not None:
+            from mechanistic_mind.physical_system.resource_object_pair_contact_impulse import (
+                ensure_resource_object_pair_impulse_for_runtime,
+            )
+            ensure_resource_object_pair_impulse_for_runtime(self.world, self.config)
+        if getattr(self.config, "resource_object_pair_impact_acoustic_emission", None) is not None:
+            from mechanistic_mind.physical_system.resource_object_pair_impact_acoustic_emission import (
+                ensure_resource_object_pair_impact_acoustics_for_runtime,
+            )
+            ensure_resource_object_pair_impact_acoustics_for_runtime(self.world, self.config)
+        if getattr(self.config, "held_resource_object_foreign_body_contact", None) is not None:
+            from mechanistic_mind.physical_system.held_resource_object_foreign_body_contact import (
+                ensure_held_foreign_body_contact_for_runtime,
+            )
+            ensure_held_foreign_body_contact_for_runtime(self.world, self.config)
+        if getattr(self.config, "held_resource_object_translational_impulse_mediation", None) is not None:
+            from mechanistic_mind.physical_system.held_resource_object_translational_impulse_mediation import (
+                ensure_held_translational_impulse_for_runtime,
+            )
+            ensure_held_translational_impulse_for_runtime(self.world, self.config)
+        if getattr(self.config, "effector_work_and_held_load_inertia_accounting", None) is not None:
+            from mechanistic_mind.physical_system.effector_work_and_held_load_inertia_accounting import (
+                ensure_effector_work_held_load_for_runtime,
+            )
+            ensure_effector_work_held_load_for_runtime(self.world, self.config)
+        if getattr(self.config, "flat_ground_gravity", None) is not None:
+            from mechanistic_mind.physical_system.flat_ground_gravity import (
+                ensure_flat_ground_gravity_for_runtime,
+                ensure_body_vertical,
+            )
+            ensure_flat_ground_gravity_for_runtime(self.world, self.config)
+            ensure_body_vertical(self.body, self.config)
+            self.body.z = 0.0
+            self.body.vz = 0.0
+            self.body.grounded = True
+        if getattr(self.config, "free_resource_object_ground_friction", None) is not None:
+            from mechanistic_mind.physical_system.free_resource_object_ground_friction import (
+                ensure_free_object_ground_friction_for_runtime,
+            )
+            ensure_free_object_ground_friction_for_runtime(self.world, self.config)
+        if getattr(self.config, "surface_elevation_support", None) is not None:
+            from mechanistic_mind.physical_system.surface_elevation_support import (
+                ensure_surface_elevation_support_for_runtime,
+                apply_initial_support_placement,
+                surface_elevation_support_is_active,
+            )
+            ensure_surface_elevation_support_for_runtime(self.world, self.config)
+            if surface_elevation_support_is_active(self.config):
+                apply_initial_support_placement(self.world, self.config, bodies=[self.body])
+        if getattr(self.config, "body_normal_load_traction", None) is not None:
+            from mechanistic_mind.physical_system.body_normal_load_traction import (
+                ensure_body_normal_load_traction_for_runtime,
+            )
+            ensure_body_normal_load_traction_for_runtime(self.world, self.config)
+        if getattr(self.config, "continuous_surface_geometry", None) is not None:
+            from mechanistic_mind.physical_system.continuous_surface_geometry import (
+                ensure_continuous_surface_geometry_for_runtime,
+            )
+            ensure_continuous_surface_geometry_for_runtime(self.world, self.config)
+        if getattr(self.config, "body_static_traction_threshold", None) is not None:
+            from mechanistic_mind.physical_system.body_static_traction_threshold import (
+                ensure_body_static_traction_threshold_for_runtime,
+            )
+            ensure_body_static_traction_threshold_for_runtime(self.world, self.config)
+        if getattr(self.config, "free_resource_object_static_traction_threshold", None) is not None:
+            from mechanistic_mind.physical_system.free_resource_object_static_traction_threshold import (
+                ensure_free_resource_object_static_traction_threshold_for_runtime,
+            )
+            ensure_free_resource_object_static_traction_threshold_for_runtime(self.world, self.config)
+        if getattr(self.config, "radius_aware_support_points", None) is not None:
+            from mechanistic_mind.physical_system.radius_aware_support_points import (
+                ensure_radius_aware_support_points_for_runtime,
+            )
+            ensure_radius_aware_support_points_for_runtime(self.world, self.config)
+        if getattr(self.config, "ses_decomposition_contract", None) is not None:
+            from mechanistic_mind.physical_system.ses_decomposition_contract import (
+                ensure_ses_decomposition_contract_for_runtime,
+            )
+            ensure_ses_decomposition_contract_for_runtime(self.world, self.config)
+        if getattr(self.config, "ses_runtime_transition_classifier", None) is not None:
+            from mechanistic_mind.physical_system.ses_runtime_transition_classifier import (
+                ensure_ses_runtime_transition_classifier_for_runtime,
+            )
+            ensure_ses_runtime_transition_classifier_for_runtime(self.world, self.config)
+        if getattr(self.config, "radius_aware_face_sweep", None) is not None:
+            from mechanistic_mind.physical_system.radius_aware_face_sweep import (
+                ensure_radius_aware_face_sweep_for_runtime,
+            )
+            ensure_radius_aware_face_sweep_for_runtime(self.world, self.config)
+        if getattr(self.config, "diagnostic_normal_load_shadow", None) is not None:
+            from mechanistic_mind.physical_system.diagnostic_normal_load_shadow import (
+                ensure_diagnostic_normal_load_shadow_for_runtime,
+            )
+            ensure_diagnostic_normal_load_shadow_for_runtime(self.world, self.config)
+        if getattr(self.config, "continuous_gravitational_pe_diagnostic_shadow", None) is not None:
+            from mechanistic_mind.physical_system.continuous_gravitational_pe_diagnostic_shadow import (
+                ensure_continuous_gravitational_pe_diagnostic_shadow_for_runtime,
+            )
+            ensure_continuous_gravitational_pe_diagnostic_shadow_for_runtime(self.world, self.config)
+        if getattr(self.config, "continuous_gravitational_pe", None) is not None:
+            from mechanistic_mind.physical_system.continuous_gravitational_pe import (
+                ensure_continuous_gravitational_pe_for_runtime,
+            )
+            ensure_continuous_gravitational_pe_for_runtime(self.world, self.config)
+        if getattr(self.config, "tangent_gravity_diagnostic_shadow", None) is not None:
+            from mechanistic_mind.physical_system.tangent_gravity_diagnostic_shadow import (
+                ensure_tangent_gravity_diagnostic_shadow_for_runtime,
+            )
+            ensure_tangent_gravity_diagnostic_shadow_for_runtime(self.world, self.config)
+        if getattr(self.config, "coherent_slope_dynamics", None) is not None:
+            from mechanistic_mind.physical_system.coherent_slope_dynamics import (
+                ensure_coherent_slope_dynamics_for_runtime,
+            )
+            ensure_coherent_slope_dynamics_for_runtime(self.world, self.config)
+        if getattr(self.config, "conservative_surface_material_separation", None) is not None:
+            from mechanistic_mind.physical_system.conservative_surface_material_separation import (
+                ensure_surface_material_separation_for_runtime,
+            )
+            ensure_surface_material_separation_for_runtime(self.world, self.config)
+        if getattr(self.config, "effector_terrain_contact_geometry", None) is not None:
+            from mechanistic_mind.physical_system.effector_terrain_contact_geometry import (
+                ensure_effector_terrain_contact_geometry_for_runtime,
+            )
+            ensure_effector_terrain_contact_geometry_for_runtime(self.world, self.config)
+        if getattr(self.config, "manipulator_relative_world_actuation", None) is not None:
+            from mechanistic_mind.physical_system.manipulator_relative_world_actuation import (
+                ensure_manipulator_relative_world_actuation_for_runtime,
+            )
+            ensure_manipulator_relative_world_actuation_for_runtime(self.world, self.config)
+        if getattr(self.config, "effector_bounded_actuator_effort", None) is not None:
+            from mechanistic_mind.physical_system.effector_bounded_actuator_effort import (
+                ensure_effector_bounded_actuator_effort_for_runtime,
+            )
+            ensure_effector_bounded_actuator_effort_for_runtime(self.world, self.config)
+        if getattr(self.config, "surface_exertion_terrain_material_resistance", None) is not None:
+            from mechanistic_mind.physical_system.surface_exertion_terrain_material_resistance import (
+                ensure_surface_exertion_terrain_material_resistance_for_runtime,
+            )
+            ensure_surface_exertion_terrain_material_resistance_for_runtime(
+                self.world, self.config
+            )
+        if getattr(self.config, "held_resource_object_terrain_contact_geometry", None) is not None:
+            from mechanistic_mind.physical_system.held_resource_object_terrain_contact_geometry import (
+                ensure_held_resource_object_terrain_contact_geometry_for_runtime,
+            )
+            ensure_held_resource_object_terrain_contact_geometry_for_runtime(
+                self.world, self.config
+            )
+        if getattr(self.config, "held_resource_object_terrain_mechanical_transmission", None) is not None:
+            from mechanistic_mind.physical_system.held_resource_object_terrain_mechanical_transmission import (
+                ensure_held_resource_object_terrain_mechanical_transmission_for_runtime,
+            )
+            ensure_held_resource_object_terrain_mechanical_transmission_for_runtime(
+                self.world, self.config
+            )
+        if getattr(self.config, "held_mediated_surface_exertion_integration", None) is not None:
+            from mechanistic_mind.physical_system.held_mediated_surface_exertion_integration import (
+                ensure_held_mediated_surface_exertion_integration_for_runtime,
+            )
+            ensure_held_mediated_surface_exertion_integration_for_runtime(
+                self.world, self.config
+            )
+        if getattr(self.config, "detached_terrain_material_initial_placement", None) is not None:
+            from mechanistic_mind.physical_system.detached_terrain_material_initial_placement import (
+                ensure_detached_terrain_material_initial_placement_for_runtime,
+            )
+            ensure_detached_terrain_material_initial_placement_for_runtime(
+                self.world, self.config
+            )
+        if getattr(self.config, "bnlt_move_breakaway_locomotion_repair", None) is not None:
+            from mechanistic_mind.physical_system.bnlt_move_breakaway_locomotion_repair import (
+                ensure_bnlt_move_breakaway_locomotion_repair_for_runtime,
+            )
+            ensure_bnlt_move_breakaway_locomotion_repair_for_runtime(
+                self.world, self.config
+            )
+        if getattr(self.config, "repeated_conservative_surface_column_separation", None) is not None:
+            from mechanistic_mind.physical_system.repeated_conservative_surface_column_separation import (
+                ensure_repeated_conservative_surface_column_separation_for_runtime,
+            )
+            ensure_repeated_conservative_surface_column_separation_for_runtime(
+                self.world, self.config
+            )
+        if getattr(self.config, "event_driven_crowded_placement_retry_contract", None) is not None:
+            from mechanistic_mind.physical_system.event_driven_crowded_placement_retry_contract import (
+                ensure_event_driven_crowded_placement_retry_contract_for_runtime,
+            )
+            ensure_event_driven_crowded_placement_retry_contract_for_runtime(
+                self.world, self.config
+            )
+        if getattr(self.config, "detached_material_amount_scaled_collision_radius", None) is not None:
+            from mechanistic_mind.physical_system.detached_material_amount_scaled_collision_radius import (
+                ensure_detached_material_amount_scaled_collision_radius_for_runtime,
+            )
+            ensure_detached_material_amount_scaled_collision_radius_for_runtime(
+                self.world, self.config
+            )
+        if getattr(self.config, "held_combine_radius_resize_transaction", None) is not None:
+            from mechanistic_mind.physical_system.held_combine_radius_resize_transaction import (
+                ensure_held_combine_radius_resize_transaction_for_runtime,
+            )
+            ensure_held_combine_radius_resize_transaction_for_runtime(
+                self.world, self.config
+            )
+        if getattr(self.config, "held_deposition_radius_shrink_transaction", None) is not None:
+            from mechanistic_mind.physical_system.held_deposition_radius_shrink_transaction import (
+                ensure_held_deposition_radius_shrink_transaction_for_runtime,
+            )
+            ensure_held_deposition_radius_shrink_transaction_for_runtime(
+                self.world, self.config
+            )
+        if getattr(self.config, "free_space_state_and_pe_authority_contract", None) is not None:
+            from mechanistic_mind.physical_system.free_space_state_and_pe_authority_contract import (
+                ensure_free_space_state_and_pe_authority_contract_for_runtime,
+            )
+            ensure_free_space_state_and_pe_authority_contract_for_runtime(
+                self.world, self.config
+            )
+        if getattr(self.config, "vertical_terrain_landing_contact_response", None) is not None:
+            from mechanistic_mind.physical_system.vertical_terrain_landing_contact_response import (
+                ensure_vertical_terrain_landing_contact_response_for_runtime,
+            )
+            ensure_vertical_terrain_landing_contact_response_for_runtime(
+                self.world, self.config
+            )
+        if getattr(self.config, "vertical_impact_acoustic_emission", None) is not None:
+            from mechanistic_mind.physical_system.vertical_impact_acoustic_emission import (
+                ensure_vertical_impact_acoustic_emission_for_runtime,
+            )
+            ensure_vertical_impact_acoustic_emission_for_runtime(
+                self.world, self.config
+            )
+        if getattr(self.config, "release_and_excavation_support_loss_integration", None) is not None:
+            from mechanistic_mind.physical_system.release_and_excavation_support_loss_integration import (
+                ensure_release_and_excavation_support_loss_integration_for_runtime,
+            )
+            ensure_release_and_excavation_support_loss_integration_for_runtime(
+                self.world, self.config
+            )
+        # Authoritative body refs for detached placement occupancy (never PlanetState.body).
+        try:
+            from mechanistic_mind.physical_system.spatial_contents import body_refs_for_runtime
+            self.world.detached_placement_body_refs = body_refs_for_runtime(self)
+            self.world._host_runtime = self
+        except Exception:
+            pass
         self.internal = initialize_internal_medium(self.config.internal)
         self.tick = 0
         self.last_internal_flux = None
@@ -268,6 +1494,13 @@ class PhysicalSystemRuntime:
         self._comp_conv_on = False
         self._motor_drive_on = False
         self._forced_action_once = None
+        self.last_manipulator_receipt = None
+        self.last_pair_receipt = None
+        self.last_material_transformation_receipt = None
+        self.pair_aperture = open_pair_aperture(self.config)
+        self.pair_state = "OPEN"
+        self.pair_contact = False
+        self._sync_embodiment_dofs()
         if self.config.cognition.cognition_enabled:
             self.last_agent_observation = self.agent_observation()
 
@@ -275,29 +1508,258 @@ class PhysicalSystemRuntime:
         sig = getattr(self.config, "physical_signal", None)
         include = bool(sig is not None and sig.enabled and sig.perception_enabled)
         nfe = getattr(self.config, "near_field_exteroception", None)
-        return accessible_observation(
+        if nfe is not None:
+            nfe.resource_object_vision_enabled = object_vision_is_active(self.config)
+            nfe.surface_optical_coating_enabled = physical_surface_optical_coating_is_active(self.config)
+        # Arm researcher-only volumetric vision capture for this scientific pass only.
+        from mechanistic_mind.physical_system.selected_organism_volumetric_vision_view import (
+            begin_scientific_capture as _sovv_begin,
+            end_scientific_capture as _sovv_end,
+        )
+
+        agent_id = str(getattr(self, "technical_id", None) or "agent_0")
+        body_id = str(
+            getattr(self.body, "body_id", None)
+            or getattr(self, "technical_id", None)
+            or "agent_0"
+        )
+        slot = getattr(self, "slot_index", None)
+        if slot is None and agent_id.startswith("agent_"):
+            try:
+                slot = int(agent_id.split("_", 1)[1])
+            except Exception:
+                slot = 0
+        run_id = str(getattr(self, "run_id", None) or getattr(self, "seed", None) or "live")
+        gen = getattr(self, "runtime_generation", None)
+        if gen is None:
+            gen = getattr(self.world, "runtime_generation", None)
+        _sovv_begin(
+            self.world,
+            agent_id=agent_id,
+            body_id=body_id,
+            agent_slot=int(slot) if slot is not None else None,
+            run_id=run_id,
+            runtime_generation=int(gen) if gen is not None else None,
+            decision_tick=int(self.tick),
+            experimenter=bool(getattr(self, "is_experimenter", False)),
+        )
+        try:
+            from mechanistic_mind.physical_system.beta4_performance_benchmark import (
+                count as _b4p_count,
+                is_enabled as _b4p_obs_on,
+                span as _b4p_obs_span,
+            )
+
+            def _build_obs():
+                return accessible_observation(
+                    world=self.world,
+                    body=self.body,
+                    internal=self.internal,
+                    planet_config=self.config.planet,
+                    body_config=self.config.body,
+                    include_signal_fields=include,
+                    near_field_cfg=nfe,
+                    foreign_bodies=foreign_bodies,
+                    vestibular_cfg=getattr(self.config, "vestibular", None),
+                    neck_proprioception_cfg=getattr(self.config, "neck_proprioception", None),
+                    articulated_head_cfg=getattr(self.config, "articulated_head", None),
+                    oscillatory_cfg=self._osc_cfg_for_observation(),
+                    orientation_meta=getattr(self, "last_orientation_meta", None),
+                    prev_omega=float(getattr(self, "_prev_body_omega", 0.0) or 0.0),
+                    manipulator_cfg=getattr(self.config, "single_physical_manipulator", None),
+                    holder_body_id=str(getattr(self, "technical_id", None) or "agent_0"),
+                    manipulator_proprioception_enabled=world_manipulators_active(self.config),
+                    physical_config=self.config,
+                    manipulator_runtime=self,
+                )
+
+            if _b4p_obs_on():
+                with _b4p_obs_span("observation_total"):
+                    with _b4p_obs_span("o4_reception", parent="observation_total"):
+                        obs = _build_obs()
+                    tr = getattr(self.world, "_o4_last_reception_trace", None) or {}
+                    _b4p_count("o4_candidates", int(tr.get("candidate_surfaces") or 0))
+                    _b4p_count("o4_los_queries", int(tr.get("los_queries") or 0))
+                    _b4p_count("o4_accepted", int(tr.get("accepted") or 0))
+            else:
+                obs = _build_obs()
+            # Finalize volumetric vision trace from exact stashed near-field sample.
+            try:
+                from mechanistic_mind.physical_system.selected_organism_volumetric_vision_view import (
+                    capture_from_near_field_sample as _sovv_cap,
+                )
+
+                stash = getattr(self.world, "_sovv_last_near_field_by_body", None) or {}
+                sample = stash.get(id(self.body)) if isinstance(stash, dict) else None
+                if isinstance(sample, dict):
+                    _sovv_cap(self.world, sample, diagnostic=False)
+            except Exception:
+                pass
+            # Finalize receptor-grounded FPV from exact O4 (survives SNF cache hits).
+            try:
+                from mechanistic_mind.physical_system.organism_receptor_grounded_3d_fpv import (
+                    capture_from_o4_trace as _fpv_cap,
+                )
+
+                by_body = getattr(self.world, "_o4_last_reception_by_body", None)
+                full_o4 = by_body.get(id(self.body)) if isinstance(by_body, dict) else None
+                if not isinstance(full_o4, dict):
+                    full_o4 = getattr(self.world, "_o4_last_reception_trace", None)
+                if isinstance(full_o4, dict):
+                    _fpv_cap(self.world, full_o4, diagnostic=False)
+            except Exception:
+                pass
+        finally:
+            _sovv_end(self.world)
+        self._drain_surface_optical_coating()
+        return obs
+
+    def _osc_cfg_for_observation(self):
+        osc = getattr(self.config, "oscillatory_signaling", None)
+        if getattr(self.world, "local_signal_transport", None) is not None:
+            from mechanistic_mind.physical_system.local_physical_signal_transport import bind_body_ids
+            from mechanistic_mind.physical_system.spatial_contents import body_refs_for_runtime
+
+            if not bool(getattr(self, "_lps_parent_managed", False)):
+                bind_body_ids(body_refs_for_runtime(self))
+        return osc
+
+    def _capture_selected_organism_auditory_boundary(
+        self, observation: dict[str, Any] | None, decision_tick: int
+    ) -> None:
+        """Freeze A5 osc_l/r from the cognition-bound observation. Researcher-only."""
+        agent_id = str(getattr(self, "technical_id", None) or "agent_0")
+        body_id = str(
+            getattr(self.body, "body_id", None)
+            or getattr(self, "technical_id", None)
+            or "agent_0"
+        )
+        run_id = str(getattr(self, "run_id", None) or getattr(self, "seed", None) or "live")
+        slot = getattr(self, "slot_index", None)
+        if slot is None:
+            # TwoAgent sets technical_id agent_N; parse slot when possible
+            if agent_id.startswith("agent_"):
+                try:
+                    slot = int(agent_id.split("_", 1)[1])
+                except Exception:
+                    slot = 0
+            else:
+                slot = 0
+        if isinstance(observation, dict):
+            # Skip if oscillatory perception path is inactive and no osc keys present.
+            has_osc = any(str(k).startswith("osc_l_") or str(k).startswith("osc_r_") for k in observation)
+            if has_osc:
+                from mechanistic_mind.physical_system.selected_organism_auditory_boundary_receipt import (
+                    capture_from_observation,
+                )
+                from mechanistic_mind.scientific_v3.ids import observation_id as _oid
+
+                okey = _oid(str(run_id), int(decision_tick), agent_id)
+                sav1 = capture_from_observation(
+                    self.world,
+                    observation=observation,
+                    scientific_tick=int(decision_tick),
+                    agent_id=agent_id,
+                    body_id=body_id,
+                    agent_slot=int(slot) if slot is not None else None,
+                    run_id=str(run_id),
+                    observation_key=okey,
+                    config=self.config,
+                    body=self.body,
+                    experimenter=bool(getattr(self, "is_experimenter", False)),
+                )
+                # ORGANISM_AUDITORY_TRANSFORMATION_TRACE_V1 — researcher-only A3↔A5 linkage.
+                # Atomic read of tick-stamped LPS auditory buffer; no LPS/phenotype recompute.
+                from mechanistic_mind.physical_system.organism_auditory_transformation_trace import (
+                    capture_linked_to_sav1 as _oatt_capture,
+                )
+
+                _oatt_capture(
+                    self.world,
+                    observation=observation,
+                    scientific_tick=int(decision_tick),
+                    agent_id=agent_id,
+                    body_id=body_id,
+                    agent_slot=int(slot) if slot is not None else None,
+                    run_id=str(run_id),
+                    observation_key=okey,
+                    config=self.config,
+                    body=self.body,
+                    sav1_receipt=sav1 if isinstance(sav1, dict) else None,
+                    experimenter=bool(getattr(self, "is_experimenter", False)),
+                )
+        # O5: finalize one researcher-only temporal alignment envelope at observation seam.
+        self._finalize_sensory_modality_temporal_alignment(
+            observation if isinstance(observation, dict) else None,
+            int(decision_tick),
+            agent_id=agent_id,
+            body_id=body_id,
+            run_id=run_id,
+        )
+
+    def _finalize_sensory_modality_temporal_alignment(
+        self,
+        observation: dict[str, Any] | None,
+        observation_tick: int,
+        *,
+        agent_id: str,
+        body_id: str,
+        run_id: str,
+    ) -> None:
+        from mechanistic_mind.physical_system.sensory_modality_temporal_alignment import (
+            finalize_alignment_envelope,
+            sensory_modality_temporal_alignment_is_active,
+        )
+
+        if not sensory_modality_temporal_alignment_is_active(self.config):
+            return
+        gen = getattr(self, "runtime_generation", None)
+        if gen is None:
+            gen = getattr(self.world, "runtime_generation", None)
+        finalize_alignment_envelope(
             world=self.world,
             body=self.body,
-            internal=self.internal,
-            planet_config=self.config.planet,
-            body_config=self.config.body,
-            include_signal_fields=include,
-            near_field_cfg=nfe,
-            foreign_bodies=foreign_bodies,
-            vestibular_cfg=getattr(self.config, "vestibular", None),
-            neck_proprioception_cfg=getattr(self.config, "neck_proprioception", None),
-            articulated_head_cfg=getattr(self.config, "articulated_head", None),
-            oscillatory_cfg=getattr(self.config, "oscillatory_signaling", None),
-            orientation_meta=getattr(self, "last_orientation_meta", None),
-            prev_omega=float(getattr(self, "_prev_body_omega", 0.0) or 0.0),
+            config=self.config,
+            observation=observation,
+            observation_tick=int(observation_tick),
+            agent_id=str(agent_id),
+            body_id=str(body_id),
+            run_id=str(run_id),
+            runtime_generation=gen,
+            runtime=self,
         )
+
+    def _drain_surface_optical_coating(self) -> None:
+        from mechanistic_mind.physical_system.physical_surface_optical_coating import HISTORY_LIMIT
+
+        world = self.world
+        rows = list(getattr(world, "_surface_optical_coating_buffer", None) or [])
+        world._surface_optical_coating_buffer = []
+        if not rows or not physical_surface_optical_coating_is_active(self.config):
+            return
+        history = self.surface_optical_coating_history
+        for row in rows:
+            receipt = {
+                "event": "SURFACE_OPTICAL_COATING_OBSERVED",
+                "tick": int(self.tick),
+                "agent_id": str(getattr(self, "technical_id", None) or "agent_0"),
+                "body_id": str(getattr(self.body, "body_id", None) or getattr(self, "technical_id", None) or "agent_0"),
+                **row,
+            }
+            self.last_surface_optical_coating_receipt = receipt
+            history.append(receipt)
+        if len(history) > HISTORY_LIMIT:
+            del history[:-HISTORY_LIMIT]
 
     def observation_views(self, foreign_bodies=None) -> dict[str, Any]:
         """Observer: WORLD TRUTH + AGENT OBSERVATION (separated)."""
         sig = getattr(self.config, "physical_signal", None)
         include = bool(sig is not None and sig.enabled and sig.perception_enabled)
         nfe = getattr(self.config, "near_field_exteroception", None)
-        return observation_bundle(
+        if nfe is not None:
+            nfe.resource_object_vision_enabled = object_vision_is_active(self.config)
+            nfe.surface_optical_coating_enabled = physical_surface_optical_coating_is_active(self.config)
+        bundle = observation_bundle(
             world=self.world,
             body=self.body,
             internal=self.internal,
@@ -307,6 +1769,8 @@ class PhysicalSystemRuntime:
             near_field_cfg=nfe,
             foreign_bodies=foreign_bodies,
         )
+        self._drain_surface_optical_coating()
+        return bundle
 
     def cognitive_view(self) -> dict[str, Any]:
         """Researcher panel snapshot.
@@ -420,6 +1884,42 @@ class PhysicalSystemRuntime:
     def _motor_increment_mode(self, site_path: bool) -> str:
         return "acceleration" if site_path else "force"
 
+
+    def _locomotor_mass_kg(self) -> float:
+        """Body mass plus held-load mass when effector-work accounting is active."""
+        m = float(self.config.body.mass)
+        try:
+            from mechanistic_mind.physical_system.effector_work_and_held_load_inertia_accounting import (
+                effector_work_held_load_is_active,
+                locomotor_mass_with_held_load,
+                record_holder_translation_charge,
+            )
+        except Exception:
+            return m
+        if not effector_work_held_load_is_active(self.config):
+            return m
+        try:
+            from mechanistic_mind.physical_system.spatial_contents import body_refs_for_runtime
+            refs = body_refs_for_runtime(self)
+            bid = str(refs[0][0]) if refs else str(getattr(self, "technical_id", None) or "agent_0")
+        except Exception:
+            bid = str(getattr(self, "technical_id", None) or "agent_0")
+        info = locomotor_mass_with_held_load(
+            body_mass=m,
+            world=self.world,
+            holder_body_id=bid,
+            config=self.config,
+        )
+        if float(info.get("held_mass") or 0.0) > 1e-15:
+            record_holder_translation_charge(
+                self.world,
+                self.config,
+                body_id=bid,
+                held_mass=float(info["held_mass"]),
+                tick=int(getattr(self, "tick", 0) or 0),
+            )
+        return float(info.get("effective_mass") or m)
+
     def _compute_work_allocation(
         self,
         *,
@@ -450,7 +1950,7 @@ class PhysicalSystemRuntime:
                 vy=float(self.body.vy) + float(adv[1]),
                 drive_ux=float(self.body.motor_ux),
                 drive_uy=float(self.body.motor_uy),
-                mass=float(self.config.body.mass),
+                mass=float(self._locomotor_mass_kg()),
                 v_max=float(self.config.body.v_max),
                 increment_mode=self._motor_increment_mode(site_path),
             )
@@ -459,7 +1959,7 @@ class PhysicalSystemRuntime:
                 vy=float(self.body.vy),
                 drive_ux=float(self.body.motor_ux),
                 drive_uy=float(self.body.motor_uy),
-                mass=float(self.config.body.mass),
+                mass=float(self._locomotor_mass_kg()),
                 v_max=float(self.config.body.v_max),
                 increment_mode=self._motor_increment_mode(site_path),
             )
@@ -482,7 +1982,7 @@ class PhysicalSystemRuntime:
             "MOTOR_REQUEST_AT_POST_ACTION_REQUEST_VELOCITY",
         ]
         adv = (action_request or {}).get("action_dv_requested_after_vmax") or [0.0, 0.0]
-        cross = float(self.config.body.mass) * (
+        cross = float(self._locomotor_mass_kg()) * (
             float(adv[0]) * float(mdv[0]) + float(adv[1]) * float(mdv[1])
         )
         alloc["motor_action_ke_cross_term"] = cross
@@ -499,6 +1999,18 @@ class PhysicalSystemRuntime:
         head_on = bool(getattr(self.config.articulated_head, "enabled", False))
         push_on = bool(getattr(self.config.physical_push, "enabled", False))
         osc_on = bool(getattr(getattr(self.config, "oscillatory_signaling", None), "enabled", False))
+        grasp_on = bool(grasp_release_is_active(self.config))
+        bilat_on = bool(bilateral_grasp_release_is_active(self.config))
+        pair_on = bool(bring_together_is_active(self.config))
+        merge_on = bool(material_composition_merge_is_active(self.config))
+        deposit_on = bool(explicit_surface_deposition_is_active(self.config))
+        from mechanistic_mind.physical_system.manipulator_relative_world_actuation import (
+            manipulator_relative_world_actuation_is_active as _mrwa_on,
+        )
+        from mechanistic_mind.physical_system.effector_bounded_actuator_effort import (
+            effector_bounded_actuator_effort_is_active as _ebae_on,
+        )
+        effector_z_on = bool(_mrwa_on(self.config) and _ebae_on(self.config))
         # Marker consumed by sample_near_field (legacy paths leave it unset/false).
         self.body._articulated_head_enabled = head_on  # noqa: SLF001
         self.body._osc_cfg = getattr(self.config, "oscillatory_signaling", None)  # noqa: SLF001
@@ -517,6 +2029,12 @@ class PhysicalSystemRuntime:
                     articulated_head=head_on,
                     physical_push=push_on,
                     oscillatory_signaling=osc_on,
+                    physical_grasp_release=grasp_on,
+                    physical_bilateral_grasp_release=bilat_on,
+                    physical_bilateral_bring_together=pair_on,
+                    material_composition_merge=merge_on,
+                    explicit_surface_deposition=deposit_on,
+                    effector_relative_z=effector_z_on,
                 )
             )
 
@@ -567,7 +2085,7 @@ class PhysicalSystemRuntime:
         budget = None if (not mw_on or alloc is None) else float(alloc.get("allocated_motor") or 0.0)
         self.last_motor_work_ledger = apply_motor_realization(
             self.body,
-            mass=float(self.config.body.mass),
+            mass=float(self._locomotor_mass_kg()),
             v_max=float(self.config.body.v_max),
             increment_mode=self._motor_increment_mode(site_path),
             accounting_enabled=mw_on,
@@ -598,22 +2116,44 @@ class PhysicalSystemRuntime:
         self.last_v3_decision_tick = decision_tick
         self.last_v3_body_before = body_before
         if self.config.cognition.cognition_enabled:
-            obs = observation if observation is not None else self.agent_observation()
+            from mechanistic_mind.physical_system.beta4_performance_benchmark import (
+                is_enabled as _b4p_on,
+                span as _b4p_span,
+            )
             from mechanistic_mind.research.tick_profiler import span as _prof_span
-            with _prof_span("cognition"):
-                cognition_result = run_cognition_before_action(
-                    self.cognition,
-                    observation=obs,
-                    tick=self.tick,
-                    rng_value=_rng_unit(self.seed, self.tick),
-                )
+
+            if observation is not None:
+                obs = observation
+            else:
+                obs = self.agent_observation()
+            if _b4p_on():
+                with _b4p_span("cognition_total", parent="begin_tick_total"):
+                    with _prof_span("cognition"):
+                        cognition_result = run_cognition_before_action(
+                            self.cognition,
+                            observation=obs,
+                            tick=self.tick,
+                            rng_value=_rng_unit(self.seed, self.tick),
+                        )
+            else:
+                with _prof_span("cognition"):
+                    cognition_result = run_cognition_before_action(
+                        self.cognition,
+                        observation=obs,
+                        tick=self.tick,
+                        rng_value=_rng_unit(self.seed, self.tick),
+                    )
             selected = cognition_result.selected_action
             self.last_agent_observation = obs
             self.last_selected_action = selected
+            self._capture_selected_organism_auditory_boundary(obs, decision_tick)
         else:
             self.last_selected_action = "WAIT"
             if observation is not None:
                 self.last_agent_observation = observation
+                self._capture_selected_organism_auditory_boundary(observation, decision_tick)
+        self._close_traction_experience()
+        self._close_traction_prediction()
 
         if self._forced_motor_once is not None:
             motor = CompositeMotorOutput(
@@ -623,6 +2163,13 @@ class PhysicalSystemRuntime:
                     self._forced_motor_once.get("oscillator")
                 ),
                 push=bool(self._forced_motor_once.get("push")),
+                manipulator=str(self._forced_motor_once.get("manipulator") or "NONE"),
+                manipulator_left=str(self._forced_motor_once.get("manipulator_left") or "NONE"),
+                manipulator_right=str(self._forced_motor_once.get("manipulator_right") or "NONE"),
+                manipulator_pair=str(self._forced_motor_once.get("manipulator_pair") or "NONE"),
+                apply_to_surface=bool(self._forced_motor_once.get("apply_to_surface")),
+                effector_z_left=int(self._forced_motor_once.get("effector_z_left") or 0),
+                effector_z_right=int(self._forced_motor_once.get("effector_z_right") or 0),
                 selection_source="FORCED_COMPOSITE",
             )
             motor.legacy_token = motor.compute_legacy_token()
@@ -670,6 +2217,11 @@ class PhysicalSystemRuntime:
                         self.last_motor_output.get("oscillator")
                     ),
                     push=bool(self.last_motor_output.get("push")),
+                    manipulator=str(self.last_motor_output.get("manipulator") or "NONE"),
+                    manipulator_left=str(self.last_motor_output.get("manipulator_left") or "NONE"),
+                    manipulator_right=str(self.last_motor_output.get("manipulator_right") or "NONE"),
+                    manipulator_pair=str(self.last_motor_output.get("manipulator_pair") or "NONE"),
+                    apply_to_surface=bool(self.last_motor_output.get("apply_to_surface")),
                     schema=str(self.last_motor_output.get("schema") or "COMPOSITE_MOTOR_V1"),
                     legacy_token=str(self.last_motor_output.get("legacy_token") or selected),
                     selection_source=str(
@@ -688,7 +2240,7 @@ class PhysicalSystemRuntime:
                     # Beta 3 last_action = legacy_token: MOVE first, else neck,
                     # then OSC emit/freq/amp, then PUSH.
                     token = str(motor.legacy_token or motor.compute_legacy_token())
-                    if token.startswith("NECK_") or token in OSC_ACTIONS or token == "PUSH":
+                    if token.startswith("NECK_") or token in OSC_ACTIONS or token == "PUSH" or token in ("GRASP", "RELEASE", "LEFT_GRASP", "LEFT_RELEASE", "RIGHT_GRASP", "RIGHT_RELEASE", "APPLY_TO_SURFACE"):
                         self.cognition["last_action"] = token
             else:
                 motor = CompositeMotorOutput.from_legacy(selected, source="LEGACY")
@@ -707,11 +2259,13 @@ class PhysicalSystemRuntime:
                 ),
                 vx=float(self.body.vx),
                 vy=float(self.body.vy),
-                mass=float(self.config.body.mass),
+                mass=float(self._locomotor_mass_kg()),
                 v_max=float(self.config.body.v_max),
                 impulse_scale=float(self.config.discrete_action_work.impulse_scale),
                 tick=int(self.tick),
             )
+            action_request = self._apply_surface_traction(action_request)
+            action_request = self._apply_static_traction_move_limit(action_request)
             alloc = self._compute_work_allocation(
                 site_path=site_path,
                 endo_on=endo_on,
@@ -727,6 +2281,8 @@ class PhysicalSystemRuntime:
                 ),
                 reservoir_max=float(self.config.deformation_work.reservoir_max),
             )
+            self._stamp_bnlt_move_breakaway_impulse()
+            self._capture_surface_traction_realization()
             # Apply neck / oscillator / push without erasing locomotion Δv.
             side = CompositeMotorOutput(
                 locomotion="WAIT",
@@ -758,11 +2314,13 @@ class PhysicalSystemRuntime:
                 action=selected,
                 vx=float(self.body.vx),
                 vy=float(self.body.vy),
-                mass=float(self.config.body.mass),
+                mass=float(self._locomotor_mass_kg()),
                 v_max=float(self.config.body.v_max),
                 impulse_scale=float(self.config.discrete_action_work.impulse_scale),
                 tick=int(self.tick),
             )
+            action_request = self._apply_surface_traction(action_request)
+            action_request = self._apply_static_traction_move_limit(action_request)
             alloc = self._compute_work_allocation(
                 site_path=site_path,
                 endo_on=endo_on,
@@ -778,6 +2336,8 @@ class PhysicalSystemRuntime:
                 ),
                 reservoir_max=float(self.config.deformation_work.reservoir_max),
             )
+            self._stamp_bnlt_move_breakaway_impulse()
+            self._capture_surface_traction_realization()
             # Legacy OSC fix: apply through physical action bridge when selected.
             if str(selected).startswith("OSC_"):
                 from mechanistic_mind.physical_system.actions import apply_physical_action
@@ -822,6 +2382,441 @@ class PhysicalSystemRuntime:
         }
         return selected
 
+    def _apply_surface_traction(self, request: dict[str, Any]) -> dict[str, Any]:
+        """Scale an active MOVE request from the body-COM deposit. Identity at 1.0."""
+        self._surface_traction_pending = None
+        self._traction_experience_physical = None
+        action = str(request.get("selected_action") or "")
+        if action not in ("MOVE:N", "MOVE:S", "MOVE:E", "MOVE:W"):
+            return request
+        if not surface_affinity_traction_is_active(self.config):
+            return request
+        # THIS preset only: gate affinity MOVE traction on grounded (prior tick).
+        from mechanistic_mind.physical_system.body_normal_load_traction import (
+            body_normal_load_traction_is_active as _bnlt_on,
+            note_affinity_move_gated_airborne,
+        )
+        if _bnlt_on(self.config) and not bool(getattr(self.body, "grounded", False)):
+            note_affinity_move_gated_airborne(self.world)
+            return request
+        from mechanistic_mind.physical_system.action_work import scale_locomotor_request_before_vmax
+        from mechanistic_mind.physical_system.surface_affinity_traction import plan_surface_traction
+
+        height, width = int(self.world.T.shape[0]), int(self.world.T.shape[1])
+        plan = plan_surface_traction(
+            world=self.world,
+            x=float(self.body.x),
+            y=float(self.body.y),
+            tick=int(self.tick),
+            width=width,
+            height=height,
+        )
+        multiplier = float(plan["traction_multiplier"])
+        nominal = [float(v) for v in (request.get("action_dv_requested") or [0.0, 0.0])]
+        if abs(multiplier - 1.0) > 1e-15:
+            request = scale_locomotor_request_before_vmax(
+                request,
+                multiplier=multiplier,
+                vx=float(self.body.vx),
+                vy=float(self.body.vy),
+                v_max=float(self.config.body.v_max),
+            )
+            nominal = [float(v) for v in (request.get("action_dv_requested") or nominal)]
+        scaled = [nominal[0] * multiplier, nominal[1] * multiplier]
+        if surface_traction_experience_is_active(self.config):
+            from mechanistic_mind.physical_system.surface_traction_experience import note_physical
+
+            scaled_note = [nominal[0] * multiplier, nominal[1] * multiplier]
+            self._traction_experience_physical = note_physical(
+                tick=int(self.tick),
+                body_id=str(getattr(self, "technical_id", None) or "agent_0"),
+                command=action,
+                plan=plan,
+                requested_dv=nominal,
+                scaled_dv=scaled_note,
+                after_vmax_dv=[
+                    float(v) for v in (request.get("action_dv_requested_after_vmax") or [0.0, 0.0])
+                ],
+                velocity_before=[float(self.body.vx), float(self.body.vy)],
+                position_before=[float(self.body.x), float(self.body.y)],
+            )
+        if plan.get("emit_receipt"):
+            self._surface_traction_pending = {
+                **plan,
+                "selected_locomotor_command": action,
+                "requested_locomotor_dv": nominal,
+                "traction_scaled_dv": scaled,
+                "after_vmax_dv": [float(v) for v in (request.get("action_dv_requested_after_vmax") or [0.0, 0.0])],
+                "velocity_before": [float(self.body.vx), float(self.body.vy)],
+                "position_before": [float(self.body.x), float(self.body.y)],
+                "body_id": str(getattr(self, "technical_id", None) or "agent_0"),
+                "v_max": float(self.config.body.v_max),
+            }
+        return request
+
+    def _stamp_bnlt_move_breakaway_impulse(self) -> None:
+        """Tick-local capacity-limited MOVE impulse for BNLT force-aware drive_accel."""
+        from mechanistic_mind.physical_system.bnlt_move_breakaway_locomotion_repair import (
+            bnlt_move_breakaway_locomotion_repair_is_active,
+            clear_move_impulse_on_body,
+            stamp_move_impulse_on_body,
+        )
+
+        if not bnlt_move_breakaway_locomotion_repair_is_active(self.config):
+            clear_move_impulse_on_body(self.body)
+            return
+        led = self.last_action_work_ledger or {}
+        impulse = led.get("action_impulse_realized") or [0.0, 0.0]
+        dv = led.get("action_dv_realized") or [0.0, 0.0]
+        stamp_move_impulse_on_body(
+            self.body,
+            impulse_xy=(float(impulse[0]), float(impulse[1])),
+            dv_xy=(float(dv[0]), float(dv[1])),
+        )
+
+    def _apply_static_traction_move_limit(self, request: dict[str, Any]) -> dict[str, Any]:
+        """G2A begin-tick: requested→limited MOVE impulse by μ_s·N·dt when grounded."""
+        action = str(request.get("selected_action") or "")
+        if action not in ("MOVE:N", "MOVE:S", "MOVE:E", "MOVE:W"):
+            return request
+        from mechanistic_mind.physical_system.body_static_traction_threshold import (
+            body_static_traction_threshold_is_active,
+            ensure_body_static_traction_threshold_for_runtime,
+            limit_move_impulse_by_static_traction,
+            mu_static_from_surface_affinity,
+            note_move_limited,
+        )
+        from mechanistic_mind.physical_system.free_resource_object_ground_friction import (
+            sample_support_surface_affinity,
+        )
+        from mechanistic_mind.physical_system.body_normal_load_traction import (
+            effective_normal_load_mass,
+        )
+        if not body_static_traction_threshold_is_active(self.config):
+            return request
+        st = ensure_body_static_traction_threshold_for_runtime(self.world, self.config)
+        if st is None:
+            return request
+        grounded = bool(getattr(self.body, "grounded", False))
+        # Airborne: no ground MOVE traction limit (and BNLT already gates affinity).
+        if not grounded:
+            return request
+        height, width = int(self.world.T.shape[0]), int(self.world.T.shape[1])
+        sample = sample_support_surface_affinity(
+            self.world, float(self.body.x), float(self.body.y), width=width, height=height
+        )
+        pair = mu_static_from_surface_affinity(
+            float(sample["surface_affinity"]),
+            mu_min=float(st.config.mu_min),
+            mu_max=float(st.config.mu_max),
+            static_ratio=float(st.config.static_ratio),
+        )
+        mass_info = effective_normal_load_mass(
+            body_mass=float(self.config.body.mass),
+            world=self.world,
+            holder_body_id=str(getattr(self, "technical_id", None) or "agent_0"),
+            config=self.config,
+        )
+        m_eff = float(mass_info["m_eff"])
+        from mechanistic_mind.physical_system.flat_ground_gravity import GRAVITY_ACCELERATION
+        g = float(GRAVITY_ACCELERATION)
+        st_fgg = getattr(self.world, "flat_ground_gravity_state", None)
+        if st_fgg is not None and getattr(st_fgg, "config", None) is not None:
+            g = float(getattr(st_fgg.config, "g", g))
+        N = m_eff * g  # PHYSICAL flat N — diagnostic shadow must not replace
+        try:
+            from mechanistic_mind.physical_system.diagnostic_normal_load_shadow import (
+                maybe_record_body_shadow,
+            )
+            bid = str(getattr(self, "technical_id", None) or "agent_0")
+            entity_kind = "experimenter" if bid.startswith("experimenter") else "body"
+            maybe_record_body_shadow(
+                self.world,
+                self.config,
+                body=self.body,
+                body_id=bid,
+                m_eff=float(m_eff),
+                g=float(g),
+                grounded=True,
+                held_mass=float(mass_info.get("held_mass") or 0.0),
+                body_mass=float(mass_info.get("body_mass") or m_eff),
+                entity_kind=entity_kind,
+                seam="MOVE_STATIC_CAPACITY",
+            )
+        except Exception:
+            pass
+        dv = [float(v) for v in (request.get("action_dv_requested") or [0.0, 0.0])]
+        lim = limit_move_impulse_by_static_traction(
+            dv[0], dv[1],
+            m_eff=m_eff,
+            mu_static=float(pair["mu_static"]),
+            normal_load_N=N,
+            grounded=True,
+        )
+        if lim.get("limited"):
+            from mechanistic_mind.physical_system.action_work import scale_locomotor_request_before_vmax
+            # Replace requested Δv with limited (scale relative to current request).
+            scale = float(lim["scale"])
+            request = scale_locomotor_request_before_vmax(
+                request,
+                multiplier=scale,
+                vx=float(self.body.vx),
+                vy=float(self.body.vy),
+                v_max=float(self.config.body.v_max),
+            )
+            note_move_limited(self.world)
+            request["static_traction_move_limit"] = lim
+        else:
+            request["static_traction_move_limit"] = lim
+        return request
+
+
+    def _capture_surface_traction_realization(self) -> None:
+        pending = self._surface_traction_pending
+        if not isinstance(pending, dict):
+            return
+        ledger = self.last_action_work_ledger or {}
+        pending["realized_dv"] = [float(v) for v in (ledger.get("action_dv_realized") or [0.0, 0.0])]
+        pending["work_request"] = float(ledger.get("action_work_requested") or 0.0)
+        pending["work_realized"] = float(ledger.get("action_work_realized") or 0.0)
+        pending["work_signed_realized"] = float(ledger.get("action_work_signed_realized") or 0.0)
+        pending["work_negative_realized"] = float(ledger.get("action_negative_work_realized") or 0.0)
+        pending["work_limited"] = bool(ledger.get("work_limited"))
+        pending["reservoir_before"] = ledger.get("mechanical_work_reservoir_before")
+        pending["reservoir_after"] = ledger.get("mechanical_work_reservoir_after")
+        pending["velocity_after_locomotor"] = [float(self.body.vx), float(self.body.vy)]
+
+    def _emit_surface_traction_receipt(self, body_before: dict[str, Any] | None) -> None:
+        pending = self._surface_traction_pending
+        self._surface_traction_pending = None
+        if not isinstance(pending, dict):
+            return
+        from mechanistic_mind.planet.topology import toroidal_delta
+        from mechanistic_mind.physical_system.surface_affinity_traction import (
+            ENERGY_INTERPRETATION,
+            EVENT_APPLIED,
+            HISTORY_LIMIT,
+        )
+
+        height, width = int(self.world.T.shape[0]), int(self.world.T.shape[1])
+        x0 = float((body_before or {}).get("x", pending["position_before"][0]))
+        y0 = float((body_before or {}).get("y", pending["position_before"][1]))
+        dx = float(toroidal_delta(x0, float(self.body.x), width))
+        dy = float(toroidal_delta(y0, float(self.body.y), height))
+        scaled = pending["traction_scaled_dv"]
+        after = pending["after_vmax_dv"]
+        clamped = abs(float(scaled[0]) - float(after[0])) > 1e-9 or abs(float(scaled[1]) - float(after[1])) > 1e-9
+        tick = int(pending["tick"])
+        body_id = str(pending["body_id"])
+        receipt = {
+            "event": EVENT_APPLIED,
+            "tick": tick,
+            "body_id": body_id,
+            "agent_id": body_id,
+            "selected_locomotor_command": pending["selected_locomotor_command"],
+            "resolved_cell": {
+                "cell_x": int(pending["cell_x"]),
+                "cell_y": int(pending["cell_y"]),
+                "policy": pending["cell_policy"],
+            },
+            "deposit_id": pending["deposit_id"],
+            "deposit_created_tick": pending.get("deposit_created_tick"),
+            "deposit_last_updated_tick": pending.get("deposit_last_updated_tick"),
+            "deposit_eligible_this_tick": bool(pending["deposit_eligible_this_tick"]),
+            "causal_latency": pending["causal_latency"],
+            "deposition_event_ids": list(pending.get("deposition_event_ids") or []),
+            "derivation_version": pending["derivation_version"],
+            "surface_affinity": float(pending["surface_affinity"]),
+            "formula_version": pending["formula_version"],
+            "traction_gain": float(pending["traction_gain"]),
+            "traction_min": float(pending["traction_min"]),
+            "traction_max": float(pending["traction_max"]),
+            "requested_locomotor_dv": list(pending["requested_locomotor_dv"]),
+            "traction_multiplier": float(pending["traction_multiplier"]),
+            "traction_scaled_dv": list(scaled),
+            "realized_dv": list(pending.get("realized_dv") or [0.0, 0.0]),
+            "v_max": float(pending["v_max"]),
+            "v_max_clamped": bool(clamped),
+            "work_request": pending.get("work_request"),
+            "work_realized": pending.get("work_realized"),
+            "work_signed_realized": pending.get("work_signed_realized"),
+            "work_negative_realized": pending.get("work_negative_realized"),
+            "work_limited": bool(pending.get("work_limited")),
+            "reservoir_before": pending.get("reservoir_before"),
+            "reservoir_after": pending.get("reservoir_after"),
+            "velocity_before": list(pending["velocity_before"]),
+            "velocity_after_locomotor": list(pending.get("velocity_after_locomotor") or pending["velocity_before"]),
+            "velocity_after": [float(self.body.vx), float(self.body.vy)],
+            "displacement_this_tick": [dx, dy],
+            "causal_source": pending["causal_source"],
+            "energy_interpretation": ENERGY_INTERPRETATION,
+            "recipe_match": False,
+            "semantic_effect": False,
+            "body_effect": False,
+            "material_reaction": False,
+            "deposit_consumed": False,
+            "deposit_mass_before": pending.get("deposit_mass"),
+            "deposit_mass_after": pending.get("deposit_mass"),
+            "deposit_quantity_before": pending.get("deposit_quantity"),
+            "deposit_quantity_after": pending.get("deposit_quantity"),
+            "researcher_only": True,
+            "agent_accessible": False,
+        }
+        self.last_surface_traction_receipt = receipt
+        history = self.surface_traction_history
+        history.append(receipt)
+        if len(history) > HISTORY_LIMIT:
+            del history[:-HISTORY_LIMIT]
+        self.structured_events.emit(EVENT_APPLIED, tick=tick, evidence=receipt)
+
+    def _open_traction_experience_pending(self, body_before: dict[str, Any] | None) -> None:
+        physical = self._traction_experience_physical
+        self._traction_experience_physical = None
+        if not isinstance(physical, dict) or self._traction_experience_pending is not None:
+            return
+        if not surface_traction_experience_is_active(self.config):
+            return
+        from mechanistic_mind.planet.topology import toroidal_delta
+        from mechanistic_mind.physical_system.surface_affinity_traction import resolve_body_com_cell
+        from mechanistic_mind.physical_system.surface_traction_experience import open_pending
+
+        height, width = int(self.world.T.shape[0]), int(self.world.T.shape[1])
+        x0 = float((physical.get("position_before") or [0.0, 0.0])[0])
+        y0 = float((physical.get("position_before") or [0.0, 0.0])[1])
+        dx = float(toroidal_delta(x0, float(self.body.x), width))
+        dy = float(toroidal_delta(y0, float(self.body.y), height))
+        cell_x, cell_y = resolve_body_com_cell(
+            float(self.body.x), float(self.body.y), width=width, height=height,
+        )
+        ledger = self.last_action_work_ledger or {}
+        realized = ledger.get("action_dv_realized") or physical.get("after_vmax_dv") or [0.0, 0.0]
+        selection = {}
+        if isinstance(self.cognition, dict):
+            selection = self.cognition.get("last_selection") or {}
+        source = str(
+            selection.get("source")
+            or (self.last_motor_output or {}).get("selection_source")
+            or ""
+        )
+        self._traction_experience_pending = open_pending(
+            physical,
+            realized_dv=[float(realized[0]), float(realized[1])],
+            velocity_after=[float(self.body.vx), float(self.body.vy)],
+            position_after=[float(self.body.x), float(self.body.y)],
+            displacement=[dx, dy],
+            cell_after={"cell_x": int(cell_x), "cell_y": int(cell_y)},
+            work_request=ledger.get("action_work_requested"),
+            work_realized=ledger.get("action_work_realized"),
+            selection_source=source,
+        )
+        _ = body_before
+
+    def _close_traction_experience(self) -> None:
+        pending = self._traction_experience_pending
+        if not isinstance(pending, dict):
+            return
+        if not surface_traction_experience_is_active(self.config):
+            self._traction_experience_pending = None
+            return
+        from mechanistic_mind.physical_system.surface_traction_experience import (
+            EVENT_EXPERIENCE,
+            HISTORY_LIMIT,
+            close_pending,
+        )
+
+        delivered = bool(self.config.cognition.cognition_enabled)
+        status, receipt = close_pending(
+            pending,
+            tick=int(self.tick),
+            observation=self.last_agent_observation if delivered else None,
+            cognition=self.cognition if delivered else None,
+            cognition_enabled=delivered,
+            last_closed_action_tick=self._traction_experience_closed_tick,
+        )
+        self._traction_experience_pending = None
+        if status != "emit" or not isinstance(receipt, dict):
+            return
+        self._traction_experience_closed_tick = int(receipt["action_tick"])
+        self.last_traction_experience_receipt = receipt
+        history = self.traction_experience_history
+        history.append(receipt)
+        if len(history) > HISTORY_LIMIT:
+            del history[:-HISTORY_LIMIT]
+        self.structured_events.emit(
+            EVENT_EXPERIENCE,
+            tick=int(receipt["consequence_observation_tick"]),
+            evidence=receipt,
+        )
+
+    def _open_traction_prediction_pending(self) -> None:
+        experience = self._traction_experience_pending
+        if not isinstance(experience, dict) or self._traction_prediction_pending is not None:
+            return
+        if not surface_traction_prediction_is_active(self.config):
+            return
+        from mechanistic_mind.physical_system.surface_traction_prediction import (
+            open_pending,
+            peek_issued_prediction,
+        )
+
+        ledger = self.last_action_work_ledger or {}
+        motor = self.last_motor_output if isinstance(self.last_motor_output, dict) else {}
+        issued = peek_issued_prediction(
+            self.cognition if self.config.cognition.cognition_enabled else None,
+            self.last_agent_observation,
+            motor,
+        )
+        self._traction_prediction_pending = open_pending(
+            experience,
+            issued=issued,
+            observation=self.last_agent_observation,
+            phase=str(getattr(self, "traction_adaptation_phase", None) or "UNSPECIFIED"),
+            reservoir_before=ledger.get("reservoir_before"),
+            v_max=float(getattr(self.config.body, "v_max", 0.0) or 0.0),
+            push=bool(motor.get("push")),
+            pair_contact=bool(getattr(self, "pair_contact", False)),
+            heading=float(getattr(self.body, "theta", 0.0) or 0.0),
+        )
+
+    def _close_traction_prediction(self) -> None:
+        pending = self._traction_prediction_pending
+        if not isinstance(pending, dict):
+            return
+        if not surface_traction_prediction_is_active(self.config):
+            self._traction_prediction_pending = None
+            return
+        from mechanistic_mind.physical_system.surface_traction_prediction import (
+            EVENT_ADAPTATION,
+            HISTORY_LIMIT,
+            close_pending,
+        )
+
+        delivered = bool(self.config.cognition.cognition_enabled)
+        status, receipt = close_pending(
+            pending,
+            tick=int(self.tick),
+            observation=self.last_agent_observation if delivered else None,
+            cognition=self.cognition if delivered else None,
+            cognition_enabled=delivered,
+            last_closed_action_tick=self._traction_prediction_closed_tick,
+            episode_index=int(self._traction_prediction_episode_index),
+        )
+        self._traction_prediction_pending = None
+        if status != "emit" or not isinstance(receipt, dict):
+            return
+        self._traction_prediction_closed_tick = int(receipt["action_tick"])
+        self._traction_prediction_episode_index = int(receipt["episode_index"]) + 1
+        self.last_traction_prediction_receipt = receipt
+        history = self.traction_prediction_history
+        history.append(receipt)
+        if len(history) > HISTORY_LIMIT:
+            del history[:-HISTORY_LIMIT]
+        self.structured_events.emit(
+            EVENT_ADAPTATION,
+            tick=int(receipt["consequence_observation_tick"]),
+            evidence=receipt,
+        )
+
     def finish_tick(self, *, skip_planet: bool = False, skip_resources: bool = False) -> None:
         """Advance world (optional), body, internal, resources. Completes one tick."""
         ctx = self._tick_ctx or {}
@@ -860,6 +2855,11 @@ class PhysicalSystemRuntime:
         )
         # Avoid double-counting lumped ENV→force when site-level path is active.
         endo_in_dynamics = endo_on and (not site_path) and (not mw_on)
+        loco_active = bool(
+            str(selected).upper().startswith("MOVE")
+            or abs(float(impulse[0])) + abs(float(impulse[1])) > 1e-12
+        )
+        loco_on = profile_is_active(self.config)
         step_physical_body(
             self.body,
             self.world,
@@ -867,6 +2867,9 @@ class PhysicalSystemRuntime:
             endogenous_motor_enabled=endo_in_dynamics,
             skip_material=site_path,
             skip_mechanical=site_path,
+            locomotion_profile=getattr(self.config, "locomotion_profile", None),
+            locomotion_profile_active=loco_on,
+            locomotor_active=loco_active,
         )
         force_contrib = {
             "environmental_site": [0.0, 0.0],
@@ -913,6 +2916,11 @@ class PhysicalSystemRuntime:
                         str(selected).upper().startswith("MOVE")
                         or abs(float(impulse[0])) + abs(float(impulse[1])) > 1e-12
                     ),
+                    locomotion_profile=getattr(self.config, "locomotion_profile", None),
+                    locomotion_profile_active=profile_is_active(self.config),
+                elevation_runtime_config=self.config,
+                elevation_body_id=str(getattr(self, "technical_id", None) or "agent_0"),
+                elevation_tick=int(self.tick),
                 )
                 self.last_deformation_meta = (self.last_orientation_meta or {}).get("deformation")
                 dm = self.last_deformation_meta or {}
@@ -994,7 +3002,6 @@ class PhysicalSystemRuntime:
                     self._apply_resource_steps()
                 nf = (self.last_morphology_meta or {}).get("net_force") or [0.0, 0.0]
                 force_contrib["environmental_site"] = [float(nf[0]), float(nf[1])]
-            # Compose endogenous motor as center-applied translation (no torque).
             if endo_on:
                 self._apply_realized_motor(site_path=True, endo_on=True, alloc=alloc if mw_on else None)
                 ml = self.last_motor_work_ledger or {}
@@ -1010,6 +3017,22 @@ class PhysicalSystemRuntime:
                     pass
                 elif self.config.body.displacement_enabled and orient_on:
                     pass
+            from mechanistic_mind.physical_system.body_normal_load_traction import (
+                body_normal_load_traction_is_active as _bnlt_rest_on,
+            )
+            rest_meta = apply_ground_rest_after_self_drive(
+                self.body,
+                body_cfg=self.config.body,
+                profile=getattr(self.config, "locomotion_profile", None),
+                profile_active=profile_is_active(self.config),
+                locomotor_active=(
+                    str(selected).upper().startswith("MOVE")
+                    or abs(float(impulse[0])) + abs(float(impulse[1])) > 1e-12
+                ),
+                bypass_gentle_v_stop=_bnlt_rest_on(self.config),
+            )
+            if rest_meta:
+                force_contrib["ground_rest_after_self"] = rest_meta
         else:
             self.last_internal_flux = step_internal_medium(
                 self.internal, self.body, self.config.internal
@@ -1027,9 +3050,42 @@ class PhysicalSystemRuntime:
                 force_contrib["endogenous_motor_drive"] = list(ml.get("motor_drive_requested") or [0.0, 0.0])
             elif endo_on:
                 force_contrib["endogenous_motor"] = [float(self.body.motor_ux), float(self.body.motor_uy)]
+            from mechanistic_mind.physical_system.body_normal_load_traction import (
+                body_normal_load_traction_is_active as _bnlt_rest_on,
+            )
+            rest_meta = apply_ground_rest_after_self_drive(
+                self.body,
+                body_cfg=self.config.body,
+                profile=getattr(self.config, "locomotion_profile", None),
+                profile_active=profile_is_active(self.config),
+                locomotor_active=(
+                    str(selected).upper().startswith("MOVE")
+                    or abs(float(impulse[0])) + abs(float(impulse[1])) > 1e-12
+                ),
+                bypass_gentle_v_stop=_bnlt_rest_on(self.config),
+            )
+            if rest_meta:
+                force_contrib["ground_rest_after_self"] = rest_meta
             # Head DOF still integrates when morph|orient site path is OFF.
             self._step_articulated_head(action_work_on=action_work_on)
             self._step_oscillatory_signaling()
+        self.last_force_contributions = force_contrib
+        om = self.last_orientation_meta if isinstance(self.last_orientation_meta, dict) else {}
+        loc_rec = om.get("locomotion") if isinstance(om, dict) else None
+        if isinstance(loc_rec, dict):
+            force_contrib["locomotion_profile"] = loc_rec.get("locomotion_profile")
+            force_contrib["gentle_terrain_locomotion"] = loc_rec.get("gentle_terrain_locomotion")
+            force_contrib["environment_force"] = loc_rec.get("environment_force")
+            force_contrib["potential_force"] = loc_rec.get("potential_force")
+            force_contrib["support_force"] = loc_rec.get("support_force")
+            force_contrib["self_force"] = loc_rec.get("self_force")
+            force_contrib["velocity_delta"] = loc_rec.get("velocity_delta")
+            force_contrib["displacement"] = loc_rec.get("displacement")
+        else:
+            force_contrib["locomotion_profile"] = (
+                "ACANTHOSTEGA_GENTLE" if profile_is_active(self.config) else "TIKTAALIK"
+            )
+            force_contrib["gentle_terrain_locomotion"] = bool(profile_is_active(self.config))
         self.last_force_contributions = force_contrib
         # Vestibular finite-difference memory (body-local ω only; not agent observation).
         self._prev_body_omega = float(getattr(self.body, "omega", 0.0) or 0.0)
@@ -1125,8 +3181,260 @@ class PhysicalSystemRuntime:
         self.last_endo_motor_meta = endo_meta
         self._internal_c_prev = np.asarray(self.internal.c, dtype=np.float64).copy()
         self._emit_structured_events(selected=selected, body_before=body_before)
+        # Phase C: after horizontal CoM integrate → gravity → support → then contacts.
+        from mechanistic_mind.physical_system.flat_ground_gravity import (
+            flat_ground_gravity_is_active as _fgg_active,
+            integrate_body_vertical,
+        )
+        if _fgg_active(self.config):
+            integrate_body_vertical(
+                self.body,
+                body_id=str(getattr(self, "technical_id", None) or "agent_0"),
+                body_cfg=self.config.body,
+                config=self.config,
+                tick=int(self.tick),
+                world=self.world,
+            )
+            from mechanistic_mind.physical_system.radius_aware_support_points import (
+                radius_aware_support_points_is_active as _rasp_on,
+                step_after_body_vertical as _rasp_body,
+            )
+            if _rasp_on(self.config):
+                _rasp_body(
+                    self.world,
+                    self.body,
+                    body_id=str(getattr(self, "technical_id", None) or "agent_0"),
+                    config=self.config,
+                    tick=int(self.tick),
+                )
+        if not bool(getattr(self, "_defer_manipulator_world", False)):
+            resolve_shared_world_manipulators([self], self.world, tick=int(self.tick))
+        # Agent-accessible effector relative_z: apply selected factors via EBAE before ETC
+        # so contact evaluates the final realized tip pose (Option A wiring).
+        from mechanistic_mind.physical_system.beta4_performance_benchmark import (
+            is_enabled as _b4p_on,
+            span as _b4p_span,
+        )
+
+        if not bool(getattr(self, "_defer_manipulator_world", False)):
+            if _b4p_on():
+                with _b4p_span("ebae_etc", parent="physics_finish_tick_total"):
+                    self._apply_agent_effector_relative_z_from_motor()
+            else:
+                self._apply_agent_effector_relative_z_from_motor()
+        from mechanistic_mind.physical_system.spatial_contents import (
+            body_refs_for_runtime,
+            multi_content_spatial_index_is_active,
+            reconcile_contents,
+        )
+        try:
+            self.world.detached_placement_body_refs = body_refs_for_runtime(self)
+            self.world._host_runtime = self
+        except Exception:
+            pass
+        if multi_content_spatial_index_is_active(self.config):
+            reconcile_contents(
+                self.world,
+                body_refs_for_runtime(self),
+                tick=int(self.tick),
+                reason="body_integration",
+                config=self.config,
+            )
+        if not bool(getattr(self, "_defer_manipulator_world", False)):
+            from mechanistic_mind.physical_system.physical_body_resource_object_contact import (
+                body_object_contact_is_active,
+                detect_body_resource_object_contacts,
+            )
+            if body_object_contact_is_active(self.config):
+                detect_body_resource_object_contacts(
+                    self.world,
+                    body_refs_for_runtime(self),
+                    tick=int(self.tick),
+                    config=self.config,
+                )
+                from mechanistic_mind.physical_system.body_resource_object_contact_impulse import (
+                    body_object_impulse_is_active,
+                    apply_body_object_contact_impulse,
+                )
+                if body_object_impulse_is_active(self.config):
+                    apply_body_object_contact_impulse(
+                        self.world,
+                        [(bid, b, self.config.body) for bid, b in body_refs_for_runtime(self)],
+                        tick=int(self.tick),
+                        config=self.config,
+                    )
+                    from mechanistic_mind.physical_system.body_resource_object_impact_acoustic_emission import (
+                        body_object_impact_acoustics_is_active,
+                        process_body_object_impact_acoustics,
+                    )
+                    if body_object_impact_acoustics_is_active(self.config):
+                        process_body_object_impact_acoustics(
+                            self.world,
+                            self.config,
+                            emission_tick=int(self.tick),
+                        )
+                from mechanistic_mind.physical_system.physical_resource_object_pair_contact import (
+                    resource_object_pair_contact_is_active,
+                    detect_resource_object_pair_contacts,
+                )
+                if resource_object_pair_contact_is_active(self.config):
+                    detect_resource_object_pair_contacts(
+                        self.world,
+                        tick=int(self.tick),
+                        config=self.config,
+                    )
+                    from mechanistic_mind.physical_system.resource_object_pair_contact_impulse import (
+                        resource_object_pair_impulse_is_active,
+                        apply_resource_object_pair_contact_impulse,
+                    )
+                    if resource_object_pair_impulse_is_active(self.config):
+                        apply_resource_object_pair_contact_impulse(
+                            self.world,
+                            tick=int(self.tick),
+                            config=self.config,
+                            bodies=body_refs_for_runtime(self),
+                        )
+                        from mechanistic_mind.physical_system.resource_object_pair_impact_acoustic_emission import (
+                            resource_object_pair_impact_acoustics_is_active,
+                            process_resource_object_pair_impact_acoustics,
+                        )
+                        if resource_object_pair_impact_acoustics_is_active(self.config):
+                            process_resource_object_pair_impact_acoustics(
+                                self.world,
+                                self.config,
+                                emission_tick=int(self.tick),
+                            )
+                from mechanistic_mind.physical_system.held_resource_object_foreign_body_contact import (
+                    held_foreign_body_contact_is_active,
+                    detect_held_resource_object_foreign_body_contacts,
+                )
+                if held_foreign_body_contact_is_active(self.config):
+                    detect_held_resource_object_foreign_body_contacts(
+                        self.world,
+                        body_refs_for_runtime(self),
+                        tick=int(self.tick),
+                        config=self.config,
+                    )
+                    from mechanistic_mind.physical_system.held_resource_object_translational_impulse_mediation import (
+                        held_translational_impulse_is_active,
+                        apply_held_resource_object_translational_impulse_mediation,
+                    )
+                    if held_translational_impulse_is_active(self.config):
+                        body_triples = [
+                            (bid, b, self.config.body) for bid, b in body_refs_for_runtime(self)
+                        ]
+                        apply_held_resource_object_translational_impulse_mediation(
+                            self.world,
+                            body_triples,
+                            tick=int(self.tick),
+                            config=self.config,
+                        )
+            from mechanistic_mind.physical_system.effector_terrain_contact_geometry import (
+                detect_effector_terrain_contacts,
+                effector_terrain_contact_geometry_is_active,
+            )
+            if effector_terrain_contact_geometry_is_active(self.config):
+                holders = [
+                    {
+                        "body_id": bid,
+                        "body": b,
+                        "config": self.config,
+                        "runtime": self,
+                    }
+                    for bid, b in body_refs_for_runtime(self)
+                ]
+                detect_effector_terrain_contacts(
+                    self.world,
+                    holders,
+                    tick=int(self.tick),
+                    config=self.config,
+                )
+            from mechanistic_mind.physical_system.held_resource_object_terrain_contact_geometry import (
+                detect_held_resource_object_terrain_contacts,
+                held_resource_object_terrain_contact_geometry_is_active,
+            )
+            if held_resource_object_terrain_contact_geometry_is_active(self.config):
+                holders_hotc = [
+                    {
+                        "body_id": bid,
+                        "body": b,
+                        "config": self.config,
+                        "runtime": self,
+                    }
+                    for bid, b in body_refs_for_runtime(self)
+                ]
+                detect_held_resource_object_terrain_contacts(
+                    self.world,
+                    holders_hotc,
+                    tick=int(self.tick),
+                    config=self.config,
+                )
+        from mechanistic_mind.physical_system.vertical_impact_acoustic_emission import (
+            process_vertical_impact_acoustic_emission,
+            vertical_impact_acoustic_emission_is_active,
+        )
+        if vertical_impact_acoustic_emission_is_active(self.config):
+            from mechanistic_mind.physical_system.beta4_performance_benchmark import (
+                is_enabled as _b4p_via_on,
+                span as _b4p_via_span,
+            )
+
+            if _b4p_via_on():
+                with _b4p_via_span("via", parent="physics_finish_tick_total"):
+                    process_vertical_impact_acoustic_emission(
+                        self.world,
+                        self.config,
+                        emission_tick=int(self.tick),
+                    )
+            else:
+                process_vertical_impact_acoustic_emission(
+                    self.world,
+                    self.config,
+                    emission_tick=int(self.tick),
+                )
+        self._emit_surface_traction_receipt(body_before)
+        self._open_traction_experience_pending(body_before)
+        self._open_traction_prediction_pending()
         self.tick += 1
+        if getattr(self.world, "local_signal_transport", None) is not None and not bool(
+            getattr(self, "_lps_parent_managed", False)
+        ):
+            # Single-body runtime: emissions of tick T and wavefront arrivals at T+1 (after pose commit).
+            from mechanistic_mind.physical_system.local_physical_signal_transport import step_end_of_tick
+            from mechanistic_mind.physical_system.beta4_performance_benchmark import (
+                is_enabled as _b4p_lps_on,
+                span as _b4p_lps_span,
+            )
+
+            def _lps_block() -> None:
+                step_end_of_tick(
+                    self.world,
+                    self.config,
+                    body_refs_for_runtime(self),
+                    tick_now=int(self.tick),
+                    articulated_head=bool(getattr(self.config.articulated_head, "enabled", False)),
+                )
+                from mechanistic_mind.physical_system.authoritative_physical_acoustic_stream_contract import (
+                    sync_acoustic_stream,
+                )
+
+                sync_acoustic_stream(self.world, scientific_tick=int(self.tick))
+                from mechanistic_mind.physical_system.observer_acoustic_probe import (
+                    sample_observer_acoustic_probe,
+                )
+
+                sample_observer_acoustic_probe(self.world, scientific_tick=int(self.tick))
+
+            if _b4p_lps_on():
+                with _b4p_lps_span("lps", parent="physics_finish_tick_total"):
+                    _lps_block()
+            else:
+                _lps_block()
         body_after = self.body.snapshot()
+        pair_rec = getattr(self, "last_pair_receipt", None)
+        if isinstance(pair_rec, dict):
+            body_after = dict(body_after)
+            body_after["pair"] = dict(pair_rec)
         # SCIENTIFIC_V3 CORE: post-commit snapshot for ConsequenceReceipt(T→T+1)
         self.last_v3_body_after = body_after
         internal_after = internal_summary(self.internal)
@@ -1160,10 +3468,23 @@ class PhysicalSystemRuntime:
         self._tick_ctx = None
 
     def step(self, n: int = 1) -> None:
+        from mechanistic_mind.physical_system.beta4_performance_benchmark import (
+            is_enabled as _b4p_on,
+            span as _b4p_span,
+        )
+
         for _ in range(max(1, int(n))):
-            self.begin_tick()
-            self.finish_tick()
-            self._maybe_auto_enable_psc()
+            if _b4p_on():
+                with _b4p_span("scientific_tick_total"):
+                    with _b4p_span("begin_tick_total", parent="scientific_tick_total"):
+                        self.begin_tick()
+                    with _b4p_span("physics_finish_tick_total", parent="scientific_tick_total"):
+                        self.finish_tick()
+                    self._maybe_auto_enable_psc()
+            else:
+                self.begin_tick()
+                self.finish_tick()
+                self._maybe_auto_enable_psc()
 
     def step_forced_action(self, action: str) -> None:
         """Research helper: downstream selected-action override, normal physics."""
@@ -1596,6 +3917,11 @@ class PhysicalSystemRuntime:
         if cfg is None or not cfg.enabled:
             self.last_osc_meta = {"enabled": False}
             return
+        if getattr(self.world, "local_signal_transport", None) is not None:
+            # Acanthostega single channel: OSC_EMIT is handled by local physical signal transport
+            # (end-of-tick emission + finite-speed wavefront); no OSC_BANDS diffusion field here.
+            self.last_osc_meta = {"enabled": True, "transport": "LOCAL_PHYSICAL_SIGNAL_TRANSPORT_V1"}
+            return
         ensure_osc_fields(self.world, cfg)
         head_on = bool(getattr(self.config.articulated_head, "enabled", False))
         self.last_osc_meta = step_oscillatory_signaling(
@@ -1607,6 +3933,99 @@ class PhysicalSystemRuntime:
             body_ids=["agent_0"],
             slots=[0],
         )
+
+    def _apply_agent_effector_relative_z_from_motor(
+        self, *, actuation_tick: int | None = None
+    ) -> dict[str, Any] | None:
+        """Realize COMPOSITE_MOTOR_V1 effector_z_* factors via existing EBAE (one request/hand/tick).
+
+        UP (+1) → +max_delta_z_per_tick (raises tip). DOWN (−1) → −rate (lowers tip).
+        NONE (0) → no request. Does not bypass EBAE / invent work.
+        """
+        from mechanistic_mind.physical_system.manipulator_relative_world_actuation import (
+            DEFAULT_MAX_DELTA_Z_PER_TICK,
+            manipulator_relative_world_actuation_is_active,
+        )
+        from mechanistic_mind.physical_system.effector_bounded_actuator_effort import (
+            effector_bounded_actuator_effort_is_active,
+            request_actuated_relative_displacement,
+        )
+
+        mo = self.last_motor_output if isinstance(self.last_motor_output, dict) else {}
+        zl = int(mo.get("effector_z_left") or 0)
+        zr = int(mo.get("effector_z_right") or 0)
+        # Clamp to ternary domain (legacy / corrupt dicts → NONE).
+        if zl not in (-1, 0, 1):
+            zl = 0
+        if zr not in (-1, 0, 1):
+            zr = 0
+        if zl == 0 and zr == 0:
+            self.last_agent_effector_z_actuation = {
+                "tick": int(self.tick) if actuation_tick is None else int(actuation_tick),
+                "left": None,
+                "right": None,
+                "status": "NONE",
+            }
+            return self.last_agent_effector_z_actuation
+        if not (
+            manipulator_relative_world_actuation_is_active(self.config)
+            and effector_bounded_actuator_effort_is_active(self.config)
+        ):
+            self.last_agent_effector_z_actuation = {
+                "tick": int(self.tick) if actuation_tick is None else int(actuation_tick),
+                "left": None,
+                "right": None,
+                "status": "CAPABILITY_OFF",
+            }
+            return self.last_agent_effector_z_actuation
+
+        mrwa_cfg = getattr(self.config, "manipulator_relative_world_actuation", None)
+        rate = float(getattr(mrwa_cfg, "max_delta_z_per_tick", DEFAULT_MAX_DELTA_Z_PER_TICK))
+        # Authoritative body_id matches MRWA/ETC keys (body_refs), not technical_id alone.
+        try:
+            from mechanistic_mind.physical_system.spatial_contents import body_refs_for_runtime
+
+            refs = body_refs_for_runtime(self)
+            body_id = str(refs[0][0]) if refs else str(
+                getattr(self.body, "body_id", None)
+                or getattr(self, "technical_id", None)
+                or "agent_0"
+            )
+        except Exception:
+            body_id = str(
+                getattr(self.body, "body_id", None)
+                or getattr(self, "technical_id", None)
+                or "agent_0"
+            )
+        if actuation_tick is not None:
+            act_tick = int(actuation_tick)
+        else:
+            ctx = getattr(self, "_tick_ctx", None)
+            if isinstance(ctx, dict) and ctx.get("decision_tick") is not None:
+                act_tick = int(ctx["decision_tick"])
+            else:
+                act_tick = int(self.tick)
+
+        receipts: dict[str, Any] = {"tick": act_tick, "status": "APPLIED"}
+        # Deterministic hand order: LEFT then RIGHT (no id()-dependent physics).
+        for hand, factor in (("LEFT", zl), ("RIGHT", zr)):
+            if factor == 0:
+                receipts[hand.lower()] = None
+                continue
+            req = float(factor) * rate
+            rec = request_actuated_relative_displacement(
+                self.world,
+                config=self.config,
+                body=self.body,
+                body_id=body_id,
+                effector_id=hand,
+                requested_delta_z=req,
+                tick=act_tick,
+                runtime=self,
+            )
+            receipts[hand.lower()] = rec
+        self.last_agent_effector_z_actuation = receipts
+        return receipts
 
     def _factorized_composite_from_cognition(
         self,
@@ -1622,6 +4041,18 @@ class PhysicalSystemRuntime:
         head_on = bool(getattr(self.config.articulated_head, "enabled", False))
         push_on = bool(getattr(self.config.physical_push, "enabled", False))
         osc_on = bool(getattr(getattr(self.config, "oscillatory_signaling", None), "enabled", False))
+        grasp_on = bool(grasp_release_is_active(self.config))
+        bilat_on = bool(bilateral_grasp_release_is_active(self.config))
+        pair_on = bool(bring_together_is_active(self.config))
+        merge_on = bool(material_composition_merge_is_active(self.config))
+        deposit_on = bool(explicit_surface_deposition_is_active(self.config))
+        from mechanistic_mind.physical_system.manipulator_relative_world_actuation import (
+            manipulator_relative_world_actuation_is_active as _mrwa_on,
+        )
+        from mechanistic_mind.physical_system.effector_bounded_actuator_effort import (
+            effector_bounded_actuator_effort_is_active as _ebae_on,
+        )
+        effector_z_on = bool(_mrwa_on(self.config) and _ebae_on(self.config))
         avail: list[str] = []
         if isinstance(self.cognition, dict):
             avail = [str(a) for a in (self.cognition.get("available_actions") or [])]
@@ -1631,22 +4062,69 @@ class PhysicalSystemRuntime:
                     articulated_head=head_on,
                     physical_push=push_on,
                     oscillatory_signaling=osc_on,
+                    physical_grasp_release=grasp_on,
+                    physical_bilateral_grasp_release=bilat_on,
+                    physical_bilateral_bring_together=pair_on,
+                    material_composition_merge=merge_on,
+                    explicit_surface_deposition=deposit_on,
+                    effector_relative_z=effector_z_on,
                 )
             )
         pred: list[dict[str, Any]] = []
         if cognition_result is not None:
             pred = list(getattr(cognition_result, "predictions", None) or [])
-        loco = str(selected or "WAIT")
-        if not (loco == "WAIT" or loco.startswith("MOVE:")):
+        selected_s = str(selected or "WAIT")
+        loco = selected_s
+        primary_manip = "NONE"
+        primary_left = "NONE"
+        primary_right = "NONE"
+        primary_pair = "NONE"
+        if selected_s in ("GRASP", "RELEASE") and grasp_on:
+            primary_manip = selected_s
+            loco = "WAIT"
+        elif selected_s in ("LEFT_GRASP", "LEFT_RELEASE") and bilat_on:
+            primary_left = selected_s.split("_", 1)[1]
+            loco = "WAIT"
+        elif selected_s in ("RIGHT_GRASP", "RIGHT_RELEASE") and bilat_on:
+            primary_right = selected_s.split("_", 1)[1]
+            loco = "WAIT"
+        elif selected_s in ("BRING_TOGETHER", "SEPARATE", "COMBINE") and pair_on and (selected_s != "COMBINE" or merge_on):
+            primary_pair = selected_s
+            loco = "WAIT"
+        elif selected_s == "APPLY_TO_SURFACE" and deposit_on:
+            loco = "WAIT"
+        elif not (loco == "WAIT" or loco.startswith("MOVE:")):
             loco = CompositeMotorOutput.from_legacy(loco, source="LEGACY").locomotion
-        neck, neck_src, osc, osc_src, push, push_src = select_factorized_side_channels(
+        bilat_extra: dict[str, str] = {}
+        effector_z_extra: dict[str, Any] = {}
+        neck, neck_src, osc, osc_src, push, push_src, manip, manip_src = select_factorized_side_channels(
             available=avail,
             predictions=pred,
             rng_value=_rng_unit(self.seed, self.tick),
             articulated_head=head_on,
             oscillatory=osc_on,
             physical_push=push_on,
+            physical_grasp_release=grasp_on,
+            bilateral_grasp_release=bilat_on,
+            bilateral_bring_together=pair_on,
+            bilateral_out=bilat_extra,
+            effector_relative_z=effector_z_on,
+            effector_z_out=effector_z_extra,
         )
+        if primary_manip != "NONE":
+            manip, manip_src = primary_manip, "COGNITION_PRIMARY"
+        left = str(bilat_extra.get("manipulator_left") or "NONE")
+        left_src = str(bilat_extra.get("manipulator_left_source") or "UNAVAILABLE")
+        right = str(bilat_extra.get("manipulator_right") or "NONE")
+        right_src = str(bilat_extra.get("manipulator_right_source") or "UNAVAILABLE")
+        pair = str(bilat_extra.get("manipulator_pair") or "NONE")
+        pair_src = str(bilat_extra.get("manipulator_pair_source") or "UNAVAILABLE")
+        if primary_left != "NONE":
+            left, left_src = primary_left, "COGNITION_PRIMARY"
+        if primary_right != "NONE":
+            right, right_src = primary_right, "COGNITION_PRIMARY"
+        if primary_pair != "NONE":
+            pair, pair_src = primary_pair, "COGNITION_PRIMARY"
         src = "COGNITION"
         if cognition_result is not None:
             src = str(getattr(cognition_result, "selection_source", None) or src)
@@ -1659,6 +4137,20 @@ class PhysicalSystemRuntime:
             osc_source=osc_src,
             push=push,
             push_source=push_src,
+            manipulator=manip,
+            manipulator_source=manip_src,
+            manipulator_left=left,
+            manipulator_left_source=left_src,
+            manipulator_right=right,
+            manipulator_right_source=right_src,
+            manipulator_pair=pair,
+            manipulator_pair_source=pair_src,
+            apply_to_surface=selected_s == "APPLY_TO_SURFACE" and deposit_on,
+            apply_to_surface_source="COGNITION_PRIMARY" if selected_s == "APPLY_TO_SURFACE" and deposit_on else "UNAVAILABLE",
+            effector_z_left=int(effector_z_extra.get("effector_z_left") or 0),
+            effector_z_left_source=str(effector_z_extra.get("effector_z_left_source") or "UNAVAILABLE"),
+            effector_z_right=int(effector_z_extra.get("effector_z_right") or 0),
+            effector_z_right_source=str(effector_z_extra.get("effector_z_right_source") or "UNAVAILABLE"),
         )
 
     def mechanisms(self) -> dict[str, Any]:
@@ -1687,10 +4179,71 @@ class PhysicalSystemRuntime:
                 ensure_osc_fields,
             )
             osc = getattr(self.config, "oscillatory_signaling", None)
-            if bool(enabled) and osc is not None:
+            if getattr(self.world, "local_signal_transport", None) is not None:
+                clear_osc_fields(self.world)
+            elif bool(enabled) and osc is not None:
                 ensure_osc_fields(self.world, osc)
             else:
                 clear_osc_fields(self.world)
+        if mechanism_id == "local_physical_signal_transport":
+            from mechanistic_mind.physical_system.local_physical_signal_transport import (
+                bind_body_ids,
+                ensure_local_signal_for_runtime,
+            )
+            from mechanistic_mind.physical_system.spatial_contents import body_refs_for_runtime
+
+            ensure_local_signal_for_runtime(self.world, self.config)
+            if getattr(self.world, "local_signal_transport", None) is not None:
+                bind_body_ids(body_refs_for_runtime(self))
+        if mechanism_id in ("local_physical_signal_transport", "physical_contact_acoustic_emission"):
+            from mechanistic_mind.physical_system.physical_contact_acoustic_emission import (
+                ensure_contact_acoustics_for_runtime,
+            )
+            ensure_contact_acoustics_for_runtime(self.world, self.config)
+        if mechanism_id == "free_resource_object_kinematics":
+            from mechanistic_mind.physical_system.free_resource_object_kinematics import (
+                ensure_free_object_kinematics_for_runtime,
+            )
+            ensure_free_object_kinematics_for_runtime(self.world, self.config)
+        if mechanism_id == "physical_resource_object_pair_contact":
+            from mechanistic_mind.physical_system.physical_resource_object_pair_contact import (
+                ensure_resource_object_pair_contact_for_runtime,
+            )
+            ensure_resource_object_pair_contact_for_runtime(self.world, self.config)
+        if mechanism_id == "resource_object_pair_contact_impulse":
+            from mechanistic_mind.physical_system.resource_object_pair_contact_impulse import (
+                ensure_resource_object_pair_impulse_for_runtime,
+            )
+            ensure_resource_object_pair_impulse_for_runtime(self.world, self.config)
+        if mechanism_id == "resource_object_pair_impact_acoustic_emission":
+            from mechanistic_mind.physical_system.resource_object_pair_impact_acoustic_emission import (
+                ensure_resource_object_pair_impact_acoustics_for_runtime,
+            )
+            ensure_resource_object_pair_impact_acoustics_for_runtime(self.world, self.config)
+        if mechanism_id == "physical_body_resource_object_contact":
+            from mechanistic_mind.physical_system.physical_body_resource_object_contact import (
+                ensure_body_object_contact_for_runtime,
+            )
+            ensure_body_object_contact_for_runtime(self.world, self.config)
+        if mechanism_id == "body_resource_object_contact_impulse":
+            from mechanistic_mind.physical_system.body_resource_object_contact_impulse import (
+                ensure_body_object_impulse_for_runtime,
+            )
+            ensure_body_object_impulse_for_runtime(self.world, self.config)
+        if mechanism_id in (
+            "local_physical_signal_transport",
+            "body_resource_object_impact_acoustic_emission",
+            "physical_contact_acoustic_emission",
+            "resource_object_pair_impact_acoustic_emission",
+        ):
+            from mechanistic_mind.physical_system.body_resource_object_impact_acoustic_emission import (
+                ensure_body_object_impact_acoustics_for_runtime,
+            )
+            ensure_body_object_impact_acoustics_for_runtime(self.world, self.config)
+            from mechanistic_mind.physical_system.resource_object_pair_impact_acoustic_emission import (
+                ensure_resource_object_pair_impact_acoustics_for_runtime,
+            )
+            ensure_resource_object_pair_impact_acoustics_for_runtime(self.world, self.config)
         if mechanism_id in ("physical_near_field_vision", "illumination_cycle"):
             nfe = getattr(self.config, "near_field_exteroception", None)
             if nfe is not None and nfe.enabled and nfe.surface_enabled:
@@ -1963,7 +4516,13 @@ class PhysicalSystemRuntime:
         }
 
     def _maybe_auto_enable_psc(self) -> dict[str, Any] | None:
-        """Deterministic tick-boundary PSC ON without resetting biography."""
+        """Deterministic tick-boundary PSC ON without resetting biography.
+
+        Validation / developmental schedule contract (when psc_off_ticks=N):
+        at tick >= N, exactly once: enable scenario competition AND open SMC
+        withhold (sensorimotor_consequence_withhold_from_psc=False). These are
+        not synonymous; both are required. History is preserved.
+        """
         n = getattr(self.config.cognition, "psc_off_ticks", None)
         if n is None:
             return None
@@ -1976,15 +4535,51 @@ class PhysicalSystemRuntime:
         if int(self.tick) < threshold:
             return None
         snap = self.set_mechanism("prospective_scenario_competition", True)
+        cog = self.config.cognition
+        withhold_was = bool(getattr(cog, "sensorimotor_consequence_withhold_from_psc", True))
+        cog.sensorimotor_consequence_withhold_from_psc = False
+        if hasattr(self, "cognition") and isinstance(self.cognition, dict):
+            cfgd = self.cognition.get("config")
+            if isinstance(cfgd, dict):
+                cfgd["sensorimotor_consequence_withhold_from_psc"] = False
+                cfgd["prospective_selection"] = str(
+                    getattr(cog, "prospective_selection", "") or ""
+                )
         self._psc_auto_activated = True
+        tick_i = int(self.tick)
         event = {
             "kind": "PSC_ACTIVATION",
-            "tick": int(self.tick),
-            "mode": str(getattr(self.config.cognition, "psc_motor_resolution", "") or ""),
+            "tick": tick_i,
+            "mode": str(getattr(cog, "psc_motor_resolution", "") or ""),
             "history_preserved": True,
+            "competition_enabled": True,
+            "withhold_opened": True,
+            "withhold_was": withhold_was,
+            "psc_off_ticks": threshold,
+        }
+        withhold_receipt = {
+            "kind": "SMC_WITHHOLD_OPEN",
+            "tick": tick_i,
+            "sensorimotor_consequence_withhold_from_psc": False,
+            "withhold_was": withhold_was,
+            "history_preserved": True,
+            "paired_psc_activation": True,
+            "psc_off_ticks": threshold,
         }
         self._psc_activation = event
-        return {"mechanism": snap, "event": event}
+        self._psc_withhold_open = withhold_receipt
+        emit = getattr(getattr(self, "structured_events", None), "emit", None)
+        if callable(emit):
+            try:
+                emit("PSC_ACTIVATION", dict(event))
+                emit("SMC_WITHHOLD_OPEN", dict(withhold_receipt))
+            except Exception:
+                pass
+        return {
+            "mechanism": snap,
+            "event": event,
+            "withhold_receipt": withhold_receipt,
+        }
 
     def set_motion_trace(self, *, enabled: bool, mode: str = "every_10") -> dict[str, Any]:
         self.motion_trace_enabled = bool(enabled)
@@ -2256,9 +4851,9 @@ class PhysicalSystemRuntime:
 
 
     def model_identity(self) -> dict[str, Any]:
-        from mechanistic_mind.model.tiktaalik import model_metadata
+        from mechanistic_mind.model.lines import identity_for_config
 
-        return model_metadata(self.config, seed=self.seed, tick=self.tick)
+        return identity_for_config(self.config, seed=self.seed, tick=self.tick)
 
     def snapshot(self, *, persist: bool = False) -> dict[str, Any]:
         """Complete causal state needed to continue this deterministic history.
@@ -2277,7 +4872,7 @@ class PhysicalSystemRuntime:
             cognition = deepcopy(self.cognition)
             last_obs = deepcopy(self.last_agent_observation)
             last_motor = deepcopy(self.last_motor_output)
-        return {
+        payload = {
             "schema": "mm.physical_system.snapshot.v2",
             "tick": self.tick,
             "seed": self.seed,
@@ -2289,6 +4884,8 @@ class PhysicalSystemRuntime:
                 "internal": self.config.internal.to_dict(),
                 "endogenous_motor": self.config.endogenous_motor.to_dict(),
                 "runtime_version": getattr(self.config, "runtime_version", RUNTIME_VERSION),
+                "model_line": getattr(self.config, "model_line", "TIKTAALIK") or "TIKTAALIK",
+                "public_preset": getattr(self.config, "public_preset", None),
                 "morphology_mechanics": self.config.morphology_mechanics.to_dict(),
                 "body_orientation": self.config.body_orientation.to_dict(),
                 "body_deformation": self.config.body_deformation.to_dict(),
@@ -2305,6 +4902,126 @@ class PhysicalSystemRuntime:
                 "neck_proprioception": self.config.neck_proprioception.to_dict(),
                 "oscillatory_signaling": self.config.oscillatory_signaling.to_dict(),
                 "cognition": self.config.cognition.to_dict(),
+                "locomotion_profile": (
+                    self.config.locomotion_profile.to_dict()
+                    if getattr(self.config, "locomotion_profile", None) is not None
+                    else tiktaalik_locomotion_profile().to_dict()
+                ),
+                "physical_resource_objects": (
+                    self.config.physical_resource_objects.to_dict()
+                    if getattr(self.config, "physical_resource_objects", None) is not None
+                    else PhysicalResourceObjectsConfig().to_dict()
+                ),
+                "physical_resource_object_vision": (
+                    self.config.physical_resource_object_vision.to_dict()
+                    if getattr(self.config, "physical_resource_object_vision", None) is not None
+                    else PhysicalResourceObjectVisionConfig().to_dict()
+                ),
+                "single_physical_manipulator": (
+                    self.config.single_physical_manipulator.to_dict()
+                    if getattr(self.config, "single_physical_manipulator", None) is not None
+                    else SinglePhysicalManipulatorConfig().to_dict()
+                ),
+                "physical_grasp_release": (
+                    self.config.physical_grasp_release.to_dict()
+                    if getattr(self.config, "physical_grasp_release", None) is not None
+                    else PhysicalGraspReleaseConfig().to_dict()
+                ),
+                "bilateral_physical_manipulators": (
+                    self.config.bilateral_physical_manipulators.to_dict()
+                    if getattr(self.config, "bilateral_physical_manipulators", None) is not None
+                    else BilateralPhysicalManipulatorsConfig().to_dict()
+                ),
+                "bilateral_grasp_release": (
+                    self.config.bilateral_grasp_release.to_dict()
+                    if getattr(self.config, "bilateral_grasp_release", None) is not None
+                    else BilateralGraspReleaseConfig().to_dict()
+                ),
+                "bilateral_bring_together": (
+                    self.config.bilateral_bring_together.to_dict()
+                    if getattr(self.config, "bilateral_bring_together", None) is not None
+                    else BilateralBringTogetherConfig().to_dict()
+                ),
+                "material_composition_merge": (
+                    self.config.material_composition_merge.to_dict()
+                    if getattr(self.config, "material_composition_merge", None) is not None
+                    else MaterialCompositionMergeConfig().to_dict()
+                ),
+                "passive_material_properties": (
+                    self.config.passive_material_properties.to_dict()
+                    if getattr(self.config, "passive_material_properties", None) is not None
+                    else PassiveMaterialPropertiesConfig().to_dict()
+                ),
+                "physical_optical_material_profile": (
+                    self.config.physical_optical_material_profile.to_dict()
+                    if getattr(self.config, "physical_optical_material_profile", None) is not None
+                    else PhysicalOpticalMaterialProfileConfig().to_dict()
+                ),
+                "exposed_surface_optical_interaction_authority": (
+                    self.config.exposed_surface_optical_interaction_authority.to_dict()
+                    if getattr(self.config, "exposed_surface_optical_interaction_authority", None) is not None
+                    else ExposedSurfaceOpticalInteractionAuthorityConfig().to_dict()
+                ),
+                "abstract_spectral_light_source_and_direct_transport": (
+                    self.config.abstract_spectral_light_source_and_direct_transport.to_dict()
+                    if getattr(self.config, "abstract_spectral_light_source_and_direct_transport", None) is not None
+                    else AbstractSpectralLightSourceAndDirectTransportConfig().to_dict()
+                ),
+                "object_body_held_optical_surfaces": (
+                    self.config.object_body_held_optical_surfaces.to_dict()
+                    if getattr(self.config, "object_body_held_optical_surfaces", None) is not None
+                    else ObjectBodyHeldOpticalSurfacesConfig().to_dict()
+                ),
+                "organism_physical_optical_reception": (
+                    self.config.organism_physical_optical_reception.to_dict()
+                    if getattr(self.config, "organism_physical_optical_reception", None) is not None
+                    else OrganismPhysicalOpticalReceptionConfig().to_dict()
+                ),
+                "sensory_modality_temporal_alignment": (
+                    self.config.sensory_modality_temporal_alignment.to_dict()
+                    if getattr(self.config, "sensory_modality_temporal_alignment", None) is not None
+                    else SensoryModalityTemporalAlignmentConfig().to_dict()
+                ),
+                "explicit_surface_deposition": (
+                    self.config.explicit_surface_deposition.to_dict()
+                    if getattr(self.config, "explicit_surface_deposition", None) is not None
+                    else ExplicitSurfaceDepositionConfig().to_dict()
+                ),
+                "surface_affinity_traction": (
+                    self.config.surface_affinity_traction.to_dict()
+                    if getattr(self.config, "surface_affinity_traction", None) is not None
+                    else SurfaceAffinityTractionConfig().to_dict()
+                ),
+                "surface_traction_experience": (
+                    self.config.surface_traction_experience.to_dict()
+                    if getattr(self.config, "surface_traction_experience", None) is not None
+                    else SurfaceTractionExperienceConfig().to_dict()
+                ),
+                "surface_traction_prediction": (
+                    self.config.surface_traction_prediction.to_dict()
+                    if getattr(self.config, "surface_traction_prediction", None) is not None
+                    else SurfaceTractionPredictionConfig().to_dict()
+                ),
+                "physical_surface_optical_coating": (
+                    self.config.physical_surface_optical_coating.to_dict()
+                    if getattr(self.config, "physical_surface_optical_coating", None) is not None
+                    else PhysicalSurfaceOpticalCoatingConfig().to_dict()
+                ),
+                "world_material_transactions": (
+                    self.config.world_material_transactions.to_dict()
+                    if getattr(self.config, "world_material_transactions", None) is not None
+                    else WorldMaterialTransactionsConfig().to_dict()
+                ),
+                "multi_content_spatial_index": (
+                    self.config.multi_content_spatial_index.to_dict()
+                    if getattr(self.config, "multi_content_spatial_index", None) is not None
+                    else {"enabled": False, "schema_version": "MULTI_CONTENT_SPATIAL_INDEX_V1"}
+                ),
+                "procedural_surface_columns": (
+                    self.config.procedural_surface_columns.to_dict()
+                    if getattr(self.config, "procedural_surface_columns", None) is not None
+                    else {"enabled": False}
+                ),
             },
             "world": serialize_planet_state(self.world, self.config.planet),
             "body": {
@@ -2316,16 +5033,818 @@ class PhysicalSystemRuntime:
             "last_agent_observation": last_obs,
             "last_selected_action": self.last_selected_action,
             "last_motor_output": last_motor,
+            "last_manipulator_receipt": deepcopy(self.last_manipulator_receipt) if persist is False else self.last_manipulator_receipt,
+            "last_pair_receipt": deepcopy(getattr(self, "last_pair_receipt", None)) if persist is False else getattr(self, "last_pair_receipt", None),
+            "last_material_transformation_receipt": deepcopy(getattr(self, "last_material_transformation_receipt", None)) if persist is False else getattr(self, "last_material_transformation_receipt", None),
+            "pair_aperture": float(getattr(self, "pair_aperture", 0.84) or 0.84),
+            "pair_state": str(getattr(self, "pair_state", "OPEN") or "OPEN"),
+            "pair_contact": bool(getattr(self, "pair_contact", False)),
+            "technical_id": str(getattr(self, "technical_id", None) or "agent_0"),
             "internal_c_prev": None if self._internal_c_prev is None else np.asarray(self._internal_c_prev, dtype=float).tolist(),
             "prev_body_omega": float(getattr(self, "_prev_body_omega", 0.0) or 0.0),
             "last_orientation_meta": deepcopy(self.last_orientation_meta) if persist is False else self.last_orientation_meta,
+            # PSC schedule persistence (experiment protocol; not organism observation).
+            "psc_schedule": {
+                "psc_off_ticks": getattr(self.config.cognition, "psc_off_ticks", None),
+                "psc_auto_activated": bool(getattr(self, "_psc_auto_activated", False)),
+                "psc_activation": deepcopy(getattr(self, "_psc_activation", None)),
+                "psc_withhold_open": deepcopy(getattr(self, "_psc_withhold_open", None)),
+                "prospective_selection": str(
+                    getattr(self.config.cognition, "prospective_selection", "") or ""
+                ),
+                "sensorimotor_consequence_withhold_from_psc": bool(
+                    getattr(
+                        self.config.cognition,
+                        "sensorimotor_consequence_withhold_from_psc",
+                        True,
+                    )
+                ),
+            },
         }
+        if str(getattr(self.config, "model_line", "") or "").upper() != "ACANTHOSTEGA":
+            payload["config"].pop("passive_material_properties", None)
+            payload["config"].pop("physical_optical_material_profile", None)
+            payload["config"].pop("exposed_surface_optical_interaction_authority", None)
+            payload["config"].pop("abstract_spectral_light_source_and_direct_transport", None)
+            payload["config"].pop("object_body_held_optical_surfaces", None)
+            payload["config"].pop("organism_physical_optical_reception", None)
+            payload["config"].pop("sensory_modality_temporal_alignment", None)
+            payload["config"].pop("explicit_surface_deposition", None)
+            payload["config"].pop("surface_affinity_traction", None)
+            payload["config"].pop("surface_traction_experience", None)
+            payload["config"].pop("surface_traction_prediction", None)
+            payload["config"].pop("physical_surface_optical_coating", None)
+            payload["config"].pop("world_material_transactions", None)
+            payload["config"].pop("multi_content_spatial_index", None)
+            payload["config"].pop("procedural_surface_columns", None)
+        from mechanistic_mind.physical_system.conservative_surface_column_transfer import (
+            conservative_surface_column_transfer_is_active,
+        )
+        if conservative_surface_column_transfer_is_active(self.config):
+            # Written only when ON so every earlier preset's snapshot keeps its exact key set.
+            payload["config"]["conservative_surface_column_transfer"] = (
+                self.config.conservative_surface_column_transfer.to_dict()
+            )
+        from mechanistic_mind.physical_system.local_physical_signal_transport import (
+            local_physical_signal_transport_is_active as _lps_active,
+        )
+        if _lps_active(self.config):
+            # Written only when ON (Tiktaalik / previous Acanthostega snapshots keep their key set).
+            payload["config"]["local_physical_signal_transport"] = (
+                self.config.local_physical_signal_transport.to_dict()
+            )
+        from mechanistic_mind.physical_system.physical_contact_acoustic_emission import (
+            physical_contact_acoustic_emission_is_active as _pca_active,
+        )
+        if _pca_active(self.config):
+            # Written only when ON (every earlier preset's snapshot keeps its exact key set).
+            payload["config"]["physical_contact_acoustic_emission"] = (
+                self.config.physical_contact_acoustic_emission.to_dict()
+            )
+        from mechanistic_mind.physical_system.free_resource_object_kinematics import (
+            free_resource_object_kinematics_is_active as _fok_active,
+        )
+        if _fok_active(self.config):
+            # Written only when ON (every earlier preset's snapshot keeps its exact key set).
+            payload["config"]["free_resource_object_kinematics"] = (
+                self.config.free_resource_object_kinematics.to_dict()
+            )
+        from mechanistic_mind.physical_system.physical_body_resource_object_contact import (
+            body_object_contact_is_active as _boc_active,
+        )
+        if _boc_active(self.config):
+            payload["config"]["physical_body_resource_object_contact"] = (
+                self.config.physical_body_resource_object_contact.to_dict()
+            )
+        from mechanistic_mind.physical_system.body_resource_object_contact_impulse import (
+            body_object_impulse_is_active as _boi_active,
+        )
+        if _boi_active(self.config):
+            payload["config"]["body_resource_object_contact_impulse"] = (
+                self.config.body_resource_object_contact_impulse.to_dict()
+            )
+        from mechanistic_mind.physical_system.body_resource_object_impact_acoustic_emission import (
+            body_object_impact_acoustics_is_active as _oia_active,
+            serialize_state as _oia_serialize,
+        )
+        if _oia_active(self.config):
+            payload["config"]["body_resource_object_impact_acoustic_emission"] = (
+                self.config.body_resource_object_impact_acoustic_emission.to_dict()
+            )
+            payload["body_object_impact_acoustic_state"] = _oia_serialize(
+                getattr(self.world, "body_object_impact_acoustic_state", None)
+            )
+        from mechanistic_mind.physical_system.physical_resource_object_pair_contact import (
+            resource_object_pair_contact_is_active as _ooc_active,
+            serialize_state as _ooc_serialize,
+        )
+        if _ooc_active(self.config):
+            payload["config"]["physical_resource_object_pair_contact"] = (
+                self.config.physical_resource_object_pair_contact.to_dict()
+            )
+            payload["resource_object_pair_contact_state"] = _ooc_serialize(
+                getattr(self.world, "resource_object_pair_contact_state", None)
+            )
+        from mechanistic_mind.physical_system.resource_object_pair_contact_impulse import (
+            resource_object_pair_impulse_is_active as _ooi_active,
+            serialize_state as _ooi_serialize,
+        )
+        if _ooi_active(self.config):
+            payload["config"]["resource_object_pair_contact_impulse"] = (
+                self.config.resource_object_pair_contact_impulse.to_dict()
+            )
+            payload["resource_object_pair_contact_impulse_state"] = _ooi_serialize(
+                getattr(self.world, "resource_object_pair_contact_impulse_state", None)
+            )
+        from mechanistic_mind.physical_system.resource_object_pair_impact_acoustic_emission import (
+            resource_object_pair_impact_acoustics_is_active as _ooia_active,
+            serialize_state as _ooia_serialize,
+        )
+        if _ooia_active(self.config):
+            payload["config"]["resource_object_pair_impact_acoustic_emission"] = (
+                self.config.resource_object_pair_impact_acoustic_emission.to_dict()
+            )
+            payload["resource_object_pair_impact_acoustic_state"] = _ooia_serialize(
+                getattr(self.world, "resource_object_pair_impact_acoustic_state", None)
+            )
+
+        from mechanistic_mind.physical_system.held_resource_object_foreign_body_contact import (
+            held_foreign_body_contact_is_active as _hfc_active,
+            serialize_state as _hfc_serialize,
+        )
+        if _hfc_active(self.config):
+            payload["config"]["held_resource_object_foreign_body_contact"] = (
+                self.config.held_resource_object_foreign_body_contact.to_dict()
+            )
+            payload["held_foreign_body_contact_state"] = _hfc_serialize(
+                getattr(self.world, "held_foreign_body_contact_state", None)
+            )
+        from mechanistic_mind.physical_system.held_resource_object_translational_impulse_mediation import (
+            held_translational_impulse_is_active as _hti_active,
+            serialize_state as _hti_serialize,
+        )
+        if _hti_active(self.config):
+            payload["config"]["held_resource_object_translational_impulse_mediation"] = (
+                self.config.held_resource_object_translational_impulse_mediation.to_dict()
+            )
+            payload["held_translational_impulse_state"] = _hti_serialize(
+                getattr(self.world, "held_translational_impulse_state", None)
+            )
+
+        from mechanistic_mind.physical_system.effector_work_and_held_load_inertia_accounting import (
+            effector_work_held_load_is_active as _ehl_active,
+            serialize_state as _ehl_serialize,
+        )
+        if _ehl_active(self.config):
+            payload["config"]["effector_work_and_held_load_inertia_accounting"] = (
+                self.config.effector_work_and_held_load_inertia_accounting.to_dict()
+            )
+            payload["effector_work_held_load_state"] = _ehl_serialize(
+                getattr(self.world, "effector_work_held_load_state", None)
+            )
+
+        from mechanistic_mind.physical_system.flat_ground_gravity import (
+            flat_ground_gravity_is_active as _fgg_ser_active,
+            serialize_state as _fgg_serialize,
+        )
+        if _fgg_ser_active(self.config):
+            payload["config"]["flat_ground_gravity"] = (
+                self.config.flat_ground_gravity.to_dict()
+            )
+            payload["flat_ground_gravity_state"] = _fgg_serialize(
+                getattr(self.world, "flat_ground_gravity_state", None)
+            )
+
+        from mechanistic_mind.physical_system.free_resource_object_ground_friction import (
+            free_resource_object_ground_friction_is_active as _fogf_ser_active,
+            serialize_state as _fogf_serialize,
+        )
+        if _fogf_ser_active(self.config):
+            payload["config"]["free_resource_object_ground_friction"] = (
+                self.config.free_resource_object_ground_friction.to_dict()
+            )
+            payload["free_resource_object_ground_friction_state"] = _fogf_serialize(
+                getattr(self.world, "free_resource_object_ground_friction_state", None)
+            )
+
+        from mechanistic_mind.physical_system.surface_elevation_support import (
+            surface_elevation_support_is_active as _ses_ser_active,
+            serialize_state as _ses_serialize,
+        )
+        if _ses_ser_active(self.config):
+            payload["config"]["surface_elevation_support"] = (
+                self.config.surface_elevation_support.to_dict()
+            )
+            payload["surface_elevation_support_state"] = _ses_serialize(
+                getattr(self.world, "surface_elevation_support_state", None)
+            )
+
+        from mechanistic_mind.physical_system.body_normal_load_traction import (
+            body_normal_load_traction_is_active as _bnlt_ser_active,
+            serialize_state as _bnlt_serialize,
+        )
+        if _bnlt_ser_active(self.config):
+            payload["config"]["body_normal_load_traction"] = (
+                self.config.body_normal_load_traction.to_dict()
+            )
+            payload["body_normal_load_traction_state"] = _bnlt_serialize(
+                getattr(self.world, "body_normal_load_traction_state", None)
+            )
+        from mechanistic_mind.physical_system.continuous_surface_geometry import (
+            continuous_surface_geometry_is_active as _csg_ser_active,
+            serialize_state as _csg_serialize,
+        )
+        if _csg_ser_active(self.config) and getattr(self.config, "continuous_surface_geometry", None) is not None:
+            payload["config"]["continuous_surface_geometry"] = (
+                self.config.continuous_surface_geometry.to_dict()
+            )
+            payload["continuous_surface_geometry_state"] = _csg_serialize(
+                getattr(self.world, "continuous_surface_geometry_state", None)
+            )
+
+        from mechanistic_mind.physical_system.body_static_traction_threshold import (
+            body_static_traction_threshold_is_active as _bst_ser_active,
+            serialize_state as _bst_serialize,
+        )
+        if _bst_ser_active(self.config) and getattr(self.config, "body_static_traction_threshold", None) is not None:
+            payload["config"]["body_static_traction_threshold"] = (
+                self.config.body_static_traction_threshold.to_dict()
+            )
+            payload["body_static_traction_threshold_state"] = _bst_serialize(
+                getattr(self.world, "body_static_traction_threshold_state", None)
+            )
+
+        from mechanistic_mind.physical_system.free_resource_object_static_traction_threshold import (
+            free_resource_object_static_traction_threshold_is_active as _fost_ser_active,
+            serialize_state as _fost_serialize,
+        )
+        if _fost_ser_active(self.config) and getattr(self.config, "free_resource_object_static_traction_threshold", None) is not None:
+            payload["config"]["free_resource_object_static_traction_threshold"] = (
+                self.config.free_resource_object_static_traction_threshold.to_dict()
+            )
+            payload["free_resource_object_static_traction_threshold_state"] = _fost_serialize(
+                getattr(self.world, "free_resource_object_static_traction_threshold_state", None)
+            )
+        from mechanistic_mind.physical_system.radius_aware_support_points import (
+            radius_aware_support_points_is_active as _rasp_ser_active,
+            serialize_state as _rasp_serialize,
+        )
+        if _rasp_ser_active(self.config) and getattr(self.config, "radius_aware_support_points", None) is not None:
+            payload["config"]["radius_aware_support_points"] = (
+                self.config.radius_aware_support_points.to_dict()
+            )
+            payload["radius_aware_support_points_state"] = _rasp_serialize(
+                getattr(self.world, "radius_aware_support_points_state", None)
+            )
+        from mechanistic_mind.physical_system.ses_decomposition_contract import (
+            ses_decomposition_contract_is_active as _sdc_ser_active,
+            serialize_state as _sdc_serialize,
+        )
+        if _sdc_ser_active(self.config) and getattr(self.config, "ses_decomposition_contract", None) is not None:
+            payload["config"]["ses_decomposition_contract"] = (
+                self.config.ses_decomposition_contract.to_dict()
+            )
+            payload["ses_decomposition_contract_state"] = _sdc_serialize(
+                getattr(self.world, "ses_decomposition_contract_state", None)
+            )
+        from mechanistic_mind.physical_system.ses_runtime_transition_classifier import (
+            ses_runtime_transition_classifier_is_active as _srtc_ser_active,
+            serialize_state as _srtc_serialize,
+        )
+        if _srtc_ser_active(self.config) and getattr(self.config, "ses_runtime_transition_classifier", None) is not None:
+            payload["config"]["ses_runtime_transition_classifier"] = (
+                self.config.ses_runtime_transition_classifier.to_dict()
+            )
+            payload["ses_runtime_transition_classifier_state"] = _srtc_serialize(
+                getattr(self.world, "ses_runtime_transition_classifier_state", None)
+            )
+        from mechanistic_mind.physical_system.radius_aware_face_sweep import (
+            radius_aware_face_sweep_is_active as _rafs_ser_active,
+            serialize_state as _rafs_serialize,
+        )
+        if _rafs_ser_active(self.config) and getattr(self.config, "radius_aware_face_sweep", None) is not None:
+            payload["config"]["radius_aware_face_sweep"] = (
+                self.config.radius_aware_face_sweep.to_dict()
+            )
+            payload["radius_aware_face_sweep_state"] = _rafs_serialize(
+                getattr(self.world, "radius_aware_face_sweep_state", None)
+            )
+        from mechanistic_mind.physical_system.diagnostic_normal_load_shadow import (
+            diagnostic_normal_load_shadow_is_active as _dnls_ser_active,
+            serialize_state as _dnls_serialize,
+        )
+        if _dnls_ser_active(self.config) and getattr(self.config, "diagnostic_normal_load_shadow", None) is not None:
+            payload["config"]["diagnostic_normal_load_shadow"] = (
+                self.config.diagnostic_normal_load_shadow.to_dict()
+            )
+            payload["diagnostic_normal_load_shadow_state"] = _dnls_serialize(
+                getattr(self.world, "diagnostic_normal_load_shadow_state", None)
+            )
+        from mechanistic_mind.physical_system.continuous_gravitational_pe_diagnostic_shadow import (
+            continuous_gravitational_pe_diagnostic_shadow_is_active as _cgpe_ser_active,
+            serialize_state as _cgpe_serialize,
+        )
+        if _cgpe_ser_active(self.config) and getattr(self.config, "continuous_gravitational_pe_diagnostic_shadow", None) is not None:
+            payload["config"]["continuous_gravitational_pe_diagnostic_shadow"] = (
+                self.config.continuous_gravitational_pe_diagnostic_shadow.to_dict()
+            )
+            payload["continuous_gravitational_pe_diagnostic_shadow_state"] = _cgpe_serialize(
+                getattr(self.world, "continuous_gravitational_pe_diagnostic_shadow_state", None)
+            )
+        from mechanistic_mind.physical_system.continuous_gravitational_pe import (
+            continuous_gravitational_pe_is_active as _cgp_ser_active,
+            serialize_state as _cgp_serialize,
+        )
+        if _cgp_ser_active(self.config) and getattr(self.config, "continuous_gravitational_pe", None) is not None:
+            payload["config"]["continuous_gravitational_pe"] = (
+                self.config.continuous_gravitational_pe.to_dict()
+            )
+            payload["continuous_gravitational_pe_state"] = _cgp_serialize(
+                getattr(self.world, "continuous_gravitational_pe_state", None)
+            )
+        from mechanistic_mind.physical_system.tangent_gravity_diagnostic_shadow import (
+            tangent_gravity_diagnostic_shadow_is_active as _tgds_ser_active,
+            serialize_state as _tgds_serialize,
+        )
+        if _tgds_ser_active(self.config) and getattr(self.config, "tangent_gravity_diagnostic_shadow", None) is not None:
+            payload["config"]["tangent_gravity_diagnostic_shadow"] = (
+                self.config.tangent_gravity_diagnostic_shadow.to_dict()
+            )
+            payload["tangent_gravity_diagnostic_shadow_state"] = _tgds_serialize(
+                getattr(self.world, "tangent_gravity_diagnostic_shadow_state", None)
+            )
+        from mechanistic_mind.physical_system.coherent_slope_dynamics import (
+            coherent_slope_dynamics_is_active as _csd_ser_active,
+            serialize_state as _csd_serialize,
+        )
+        if _csd_ser_active(self.config) and getattr(self.config, "coherent_slope_dynamics", None) is not None:
+            payload["config"]["coherent_slope_dynamics"] = (
+                self.config.coherent_slope_dynamics.to_dict()
+            )
+            payload["coherent_slope_dynamics_state"] = _csd_serialize(
+                getattr(self.world, "coherent_slope_dynamics_state", None)
+            )
+        from mechanistic_mind.physical_system.conservative_surface_material_separation import (
+            conservative_surface_material_separation_is_active as _csms_ser_active,
+            serialize_state as _csms_serialize,
+        )
+        if _csms_ser_active(self.config) and getattr(
+            self.config, "conservative_surface_material_separation", None
+        ) is not None:
+            payload["config"]["conservative_surface_material_separation"] = (
+                self.config.conservative_surface_material_separation.to_dict()
+            )
+            payload["surface_material_separation_state"] = _csms_serialize(
+                getattr(self.world, "surface_material_separation_state", None)
+            )
+        from mechanistic_mind.physical_system.effector_terrain_contact_geometry import (
+            effector_terrain_contact_geometry_is_active as _etc_ser_active,
+            serialize_state as _etc_serialize,
+        )
+        if _etc_ser_active(self.config) and getattr(
+            self.config, "effector_terrain_contact_geometry", None
+        ) is not None:
+            payload["config"]["effector_terrain_contact_geometry"] = (
+                self.config.effector_terrain_contact_geometry.to_dict()
+            )
+            payload["effector_terrain_contact_geometry_state"] = _etc_serialize(
+                getattr(self.world, "effector_terrain_contact_geometry_state", None)
+            )
+        from mechanistic_mind.physical_system.effector_occupancy_reachability_trace import (
+            effector_occupancy_reachability_trace_is_active as _eort_ser_active,
+            serialize_state as _eort_serialize,
+        )
+        if _eort_ser_active(self.config) and getattr(
+            self.config, "effector_occupancy_reachability_trace", None
+        ) is not None:
+            payload["config"]["effector_occupancy_reachability_trace"] = (
+                self.config.effector_occupancy_reachability_trace.to_dict()
+            )
+            payload["effector_occupancy_reachability_trace_state"] = _eort_serialize(
+                getattr(self.world, "effector_occupancy_reachability_trace_state", None)
+            )
+        from mechanistic_mind.physical_system.manipulator_relative_world_actuation import (
+            manipulator_relative_world_actuation_is_active as _mrwa_ser_active,
+            serialize_state as _mrwa_serialize,
+        )
+        if _mrwa_ser_active(self.config) and getattr(
+            self.config, "manipulator_relative_world_actuation", None
+        ) is not None:
+            payload["config"]["manipulator_relative_world_actuation"] = (
+                self.config.manipulator_relative_world_actuation.to_dict()
+            )
+            payload["manipulator_relative_world_actuation_state"] = _mrwa_serialize(
+                getattr(self.world, "manipulator_relative_world_actuation_state", None)
+            )
+        from mechanistic_mind.physical_system.effector_bounded_actuator_effort import (
+            effector_bounded_actuator_effort_is_active as _ebae_ser_active,
+            serialize_state as _ebae_serialize,
+        )
+        if _ebae_ser_active(self.config) and getattr(
+            self.config, "effector_bounded_actuator_effort", None
+        ) is not None:
+            payload["config"]["effector_bounded_actuator_effort"] = (
+                self.config.effector_bounded_actuator_effort.to_dict()
+            )
+            payload["effector_bounded_actuator_effort_state"] = _ebae_serialize(
+                getattr(self.world, "effector_bounded_actuator_effort_state", None)
+            )
+        from mechanistic_mind.physical_system.surface_exertion_terrain_material_resistance import (
+            surface_exertion_terrain_material_resistance_is_active as _setmr_ser_active,
+            serialize_state as _setmr_serialize,
+        )
+        if _setmr_ser_active(self.config) and getattr(
+            self.config, "surface_exertion_terrain_material_resistance", None
+        ) is not None:
+            payload["config"]["surface_exertion_terrain_material_resistance"] = (
+                self.config.surface_exertion_terrain_material_resistance.to_dict()
+            )
+            payload["surface_exertion_terrain_material_resistance_state"] = _setmr_serialize(
+                getattr(self.world, "surface_exertion_terrain_material_resistance_state", None)
+            )
+        from mechanistic_mind.physical_system.minimal_vision_3d_geometric_interface import (
+            minimal_vision_3d_geometric_interface_is_active as _vw6_ser_active,
+        )
+        if _vw6_ser_active(self.config) or getattr(
+            self.config, "minimal_vision_3d_geometric_interface", None
+        ) is not None:
+            payload["config"]["minimal_vision_3d_geometric_interface"] = (
+                self.config.minimal_vision_3d_geometric_interface.to_dict()
+            )
+        from mechanistic_mind.physical_system.held_resource_object_terrain_contact_geometry import (
+            held_resource_object_terrain_contact_geometry_is_active as _hotc_ser_active,
+            serialize_state as _hotc_serialize,
+        )
+        if _hotc_ser_active(self.config) and getattr(
+            self.config, "held_resource_object_terrain_contact_geometry", None
+        ) is not None:
+            payload["config"]["held_resource_object_terrain_contact_geometry"] = (
+                self.config.held_resource_object_terrain_contact_geometry.to_dict()
+            )
+            payload["held_resource_object_terrain_contact_geometry_state"] = _hotc_serialize(
+                getattr(self.world, "held_resource_object_terrain_contact_geometry_state", None)
+            )
+        from mechanistic_mind.physical_system.held_resource_object_terrain_mechanical_transmission import (
+            held_resource_object_terrain_mechanical_transmission_is_active as _hotmt_ser_active,
+            serialize_state as _hotmt_serialize,
+        )
+        if _hotmt_ser_active(self.config) and getattr(
+            self.config, "held_resource_object_terrain_mechanical_transmission", None
+        ) is not None:
+            payload["config"]["held_resource_object_terrain_mechanical_transmission"] = (
+                self.config.held_resource_object_terrain_mechanical_transmission.to_dict()
+            )
+            payload["held_resource_object_terrain_mechanical_transmission_state"] = _hotmt_serialize(
+                getattr(
+                    self.world,
+                    "held_resource_object_terrain_mechanical_transmission_state",
+                    None,
+                )
+            )
+        from mechanistic_mind.physical_system.held_mediated_surface_exertion_integration import (
+            held_mediated_surface_exertion_integration_is_active as _hmsi_ser_active,
+            serialize_state as _hmsi_serialize,
+        )
+        if _hmsi_ser_active(self.config) and getattr(
+            self.config, "held_mediated_surface_exertion_integration", None
+        ) is not None:
+            payload["config"]["held_mediated_surface_exertion_integration"] = (
+                self.config.held_mediated_surface_exertion_integration.to_dict()
+            )
+            payload["held_mediated_surface_exertion_integration_state"] = _hmsi_serialize(
+                getattr(self.world, "held_mediated_surface_exertion_integration_state", None)
+            )
+        from mechanistic_mind.physical_system.detached_terrain_material_initial_placement import (
+            detached_terrain_material_initial_placement_is_active as _dtip_ser_active,
+            serialize_state as _dtip_serialize,
+        )
+        if _dtip_ser_active(self.config) or getattr(
+            self.config, "detached_terrain_material_initial_placement", None
+        ) is not None:
+            payload["config"]["detached_terrain_material_initial_placement"] = (
+                self.config.detached_terrain_material_initial_placement.to_dict()
+            )
+            payload["detached_terrain_material_initial_placement_state"] = _dtip_serialize(
+                getattr(self.world, "detached_terrain_material_initial_placement_state", None)
+            )
+        from mechanistic_mind.physical_system.bnlt_move_breakaway_locomotion_repair import (
+            bnlt_move_breakaway_locomotion_repair_is_active as _bnlt_rep_ser_active,
+            serialize_state as _bnlt_rep_serialize,
+        )
+        if _bnlt_rep_ser_active(self.config) or getattr(
+            self.config, "bnlt_move_breakaway_locomotion_repair", None
+        ) is not None:
+            payload["config"]["bnlt_move_breakaway_locomotion_repair"] = (
+                self.config.bnlt_move_breakaway_locomotion_repair.to_dict()
+            )
+            payload["bnlt_move_breakaway_locomotion_repair_state"] = _bnlt_rep_serialize(
+                getattr(self.world, "bnlt_move_breakaway_locomotion_repair_state", None)
+            )
+        from mechanistic_mind.physical_system.repeated_conservative_surface_column_separation import (
+            repeated_conservative_surface_column_separation_is_active as _rcss_ser_active,
+            serialize_state as _rcss_serialize,
+        )
+        if _rcss_ser_active(self.config) or getattr(
+            self.config, "repeated_conservative_surface_column_separation", None
+        ) is not None:
+            payload["config"]["repeated_conservative_surface_column_separation"] = (
+                self.config.repeated_conservative_surface_column_separation.to_dict()
+            )
+            payload["repeated_conservative_surface_column_separation_state"] = _rcss_serialize(
+                getattr(self.world, "repeated_conservative_surface_column_separation_state", None)
+            )
+        from mechanistic_mind.physical_system.event_driven_crowded_placement_retry_contract import (
+            event_driven_crowded_placement_retry_contract_is_active as _crowded_ser_active,
+            serialize_state as _crowded_serialize,
+        )
+        if _crowded_ser_active(self.config) or getattr(
+            self.config, "event_driven_crowded_placement_retry_contract", None
+        ) is not None:
+            payload["config"]["event_driven_crowded_placement_retry_contract"] = (
+                self.config.event_driven_crowded_placement_retry_contract.to_dict()
+            )
+            payload["event_driven_crowded_placement_retry_contract_state"] = _crowded_serialize(
+                getattr(self.world, "event_driven_crowded_placement_retry_contract_state", None)
+            )
+        from mechanistic_mind.physical_system.detached_material_amount_scaled_collision_radius import (
+            detached_material_amount_scaled_collision_radius_is_active as _size_geo_ser_active,
+            serialize_state as _size_geo_serialize,
+        )
+        if _size_geo_ser_active(self.config) or getattr(
+            self.config, "detached_material_amount_scaled_collision_radius", None
+        ) is not None:
+            payload["config"]["detached_material_amount_scaled_collision_radius"] = (
+                self.config.detached_material_amount_scaled_collision_radius.to_dict()
+            )
+            payload["detached_material_amount_scaled_collision_radius_state"] = _size_geo_serialize(
+                getattr(self.world, "detached_material_amount_scaled_collision_radius_state", None)
+            )
+        from mechanistic_mind.physical_system.held_combine_radius_resize_transaction import (
+            held_combine_radius_resize_transaction_is_active as _held_combine_ser_active,
+            serialize_state as _held_combine_serialize,
+        )
+        if _held_combine_ser_active(self.config) or getattr(
+            self.config, "held_combine_radius_resize_transaction", None
+        ) is not None:
+            payload["config"]["held_combine_radius_resize_transaction"] = (
+                self.config.held_combine_radius_resize_transaction.to_dict()
+            )
+            payload["held_combine_radius_resize_transaction_state"] = _held_combine_serialize(
+                getattr(self.world, "held_combine_radius_resize_transaction_state", None)
+            )
+        from mechanistic_mind.physical_system.held_deposition_radius_shrink_transaction import (
+            held_deposition_radius_shrink_transaction_is_active as _held_deposition_ser_active,
+            serialize_state as _held_deposition_serialize,
+        )
+        if _held_deposition_ser_active(self.config) or getattr(
+            self.config, "held_deposition_radius_shrink_transaction", None
+        ) is not None:
+            payload["config"]["held_deposition_radius_shrink_transaction"] = (
+                self.config.held_deposition_radius_shrink_transaction.to_dict()
+            )
+            payload["held_deposition_radius_shrink_transaction_state"] = _held_deposition_serialize(
+                getattr(self.world, "held_deposition_radius_shrink_transaction_state", None)
+            )
+        from mechanistic_mind.physical_system.free_space_state_and_pe_authority_contract import (
+            free_space_state_and_pe_authority_contract_is_active as _fs_ser_active,
+            serialize_state as _fs_serialize,
+        )
+        if _fs_ser_active(self.config) or getattr(
+            self.config, "free_space_state_and_pe_authority_contract", None
+        ) is not None:
+            payload["config"]["free_space_state_and_pe_authority_contract"] = (
+                self.config.free_space_state_and_pe_authority_contract.to_dict()
+            )
+            payload["free_space_state_and_pe_authority_contract_state"] = _fs_serialize(
+                getattr(self.world, "free_space_state_and_pe_authority_contract_state", None)
+            )
+        from mechanistic_mind.physical_system.vertical_terrain_landing_contact_response import (
+            vertical_terrain_landing_contact_response_is_active as _vtl_ser_active,
+            serialize_state as _vtl_serialize,
+        )
+        if _vtl_ser_active(self.config) or getattr(
+            self.config, "vertical_terrain_landing_contact_response", None
+        ) is not None:
+            payload["config"]["vertical_terrain_landing_contact_response"] = (
+                self.config.vertical_terrain_landing_contact_response.to_dict()
+            )
+            payload["vertical_terrain_landing_contact_response_state"] = _vtl_serialize(
+                getattr(self.world, "vertical_terrain_landing_contact_response_state", None)
+            )
+        from mechanistic_mind.physical_system.vertical_impact_acoustic_emission import (
+            vertical_impact_acoustic_emission_is_active as _via_ser_active,
+            serialize_state as _via_serialize,
+        )
+        if _via_ser_active(self.config) or getattr(
+            self.config, "vertical_impact_acoustic_emission", None
+        ) is not None:
+            payload["config"]["vertical_impact_acoustic_emission"] = (
+                self.config.vertical_impact_acoustic_emission.to_dict()
+            )
+            payload["vertical_impact_acoustic_emission_state"] = _via_serialize(
+                getattr(self.world, "vertical_impact_acoustic_emission_state", None)
+            )
+        from mechanistic_mind.physical_system.authoritative_physical_acoustic_stream_contract import (
+            serialize_state as _apas_serialize,
+            state_of as _apas_state_of,
+        )
+        if _apas_state_of(self.world) is not None or getattr(
+            self.world, "local_signal_transport", None
+        ) is not None:
+            payload["authoritative_physical_acoustic_stream_state"] = _apas_serialize(
+                _apas_state_of(self.world)
+            )
+        from mechanistic_mind.physical_system.observer_acoustic_probe import (
+            serialize_state as _oap_serialize,
+            state_of as _oap_state_of,
+            ensure_probe_state as _oap_ensure,
+        )
+        # Researcher configuration (+ bounded sample history); not physical LPS state.
+        if _oap_state_of(self.world) is not None or getattr(
+            self.world, "local_signal_transport", None
+        ) is not None:
+            _oap_ensure(self.world)
+            payload["observer_acoustic_probe_state"] = _oap_serialize(_oap_state_of(self.world))
+        from mechanistic_mind.physical_system.selected_organism_auditory_boundary_receipt import (
+            serialize_state as _soab_serialize,
+            state_of as _soab_state_of,
+            ensure_state as _soab_ensure,
+        )
+        if _soab_state_of(self.world) is not None or getattr(
+            self.world, "local_signal_transport", None
+        ) is not None:
+            _soab_ensure(self.world)
+            payload["selected_organism_auditory_boundary_state"] = _soab_serialize(
+                _soab_state_of(self.world)
+            )
+        from mechanistic_mind.physical_system.selected_organism_volumetric_vision_view import (
+            serialize_state as _sovv_serialize,
+            state_of as _sovv_state_of,
+            ensure_state as _sovv_ensure,
+        )
+        if _sovv_state_of(self.world) is not None:
+            payload["selected_organism_volumetric_vision_state"] = _sovv_serialize(
+                _sovv_state_of(self.world)
+            )
+        elif getattr(getattr(self.config, "minimal_vision_3d_geometric_interface", None), "enabled", False):
+            _sovv_ensure(self.world)
+            payload["selected_organism_volumetric_vision_state"] = _sovv_serialize(
+                _sovv_state_of(self.world)
+            )
+        from mechanistic_mind.physical_system.organism_receptor_grounded_3d_fpv import (
+            serialize_state as _fpv_serialize,
+            state_of as _fpv_state_of,
+        )
+        if _fpv_state_of(self.world) is not None:
+            payload["organism_receptor_grounded_3d_fpv_state"] = _fpv_serialize(
+                _fpv_state_of(self.world)
+            )
+        from mechanistic_mind.physical_system.organism_auditory_transformation_trace import (
+            serialize_state as _oatt_serialize,
+            state_of as _oatt_state_of,
+            ensure_state as _oatt_ensure,
+        )
+        if _oatt_state_of(self.world) is not None or getattr(
+            self.world, "local_signal_transport", None
+        ) is not None:
+            _oatt_ensure(self.world)
+            payload["organism_auditory_transformation_trace_state"] = _oatt_serialize(
+                _oatt_state_of(self.world)
+            )
+        from mechanistic_mind.physical_system.sensory_modality_temporal_alignment import (
+            serialize_state as _o5_serialize,
+            sensory_modality_temporal_alignment_is_active as _o5_active,
+        )
+        if _o5_active(self.config) or getattr(
+            self.world, "_o5_alignment_envelopes", None
+        ) is not None:
+            ser = _o5_serialize(self.world)
+            if ser is not None:
+                payload["sensory_modality_temporal_alignment_state"] = ser
+        from mechanistic_mind.physical_system.release_and_excavation_support_loss_integration import (
+            release_and_excavation_support_loss_integration_is_active as _resli_ser_active,
+            serialize_state as _resli_serialize,
+        )
+        if _resli_ser_active(self.config) or getattr(
+            self.config, "release_and_excavation_support_loss_integration", None
+        ) is not None:
+            payload["config"]["release_and_excavation_support_loss_integration"] = (
+                self.config.release_and_excavation_support_loss_integration.to_dict()
+            )
+            payload["release_and_excavation_support_loss_integration_state"] = _resli_serialize(
+                getattr(self.world, "release_and_excavation_support_loss_integration_state", None)
+            )
+
+        if getattr(self, "last_surface_deposition_receipt", None) is not None:
+            payload["last_surface_deposition_receipt"] = (
+                deepcopy(self.last_surface_deposition_receipt) if persist is False
+                else self.last_surface_deposition_receipt
+            )
+        if getattr(self, "last_surface_traction_receipt", None) is not None:
+            payload["last_surface_traction_receipt"] = (
+                deepcopy(self.last_surface_traction_receipt) if persist is False
+                else self.last_surface_traction_receipt
+            )
+        if getattr(self, "last_traction_experience_receipt", None) is not None:
+            payload["last_traction_experience_receipt"] = (
+                deepcopy(self.last_traction_experience_receipt) if persist is False
+                else self.last_traction_experience_receipt
+            )
+        if getattr(self, "_traction_experience_pending", None) is not None:
+            payload["traction_experience_pending"] = (
+                deepcopy(self._traction_experience_pending) if persist is False
+                else self._traction_experience_pending
+            )
+        if getattr(self, "traction_experience_history", None):
+            payload["traction_experience_history"] = (
+                deepcopy(self.traction_experience_history) if persist is False
+                else list(self.traction_experience_history)
+            )
+        if getattr(self, "_traction_experience_closed_tick", None) is not None:
+            payload["traction_experience_closed_tick"] = int(self._traction_experience_closed_tick)
+        if getattr(self, "last_traction_prediction_receipt", None) is not None:
+            payload["last_traction_prediction_receipt"] = (
+                deepcopy(self.last_traction_prediction_receipt) if persist is False
+                else self.last_traction_prediction_receipt
+            )
+        if getattr(self, "_traction_prediction_pending", None) is not None:
+            payload["traction_prediction_pending"] = (
+                deepcopy(self._traction_prediction_pending) if persist is False
+                else self._traction_prediction_pending
+            )
+        if getattr(self, "traction_prediction_history", None):
+            payload["traction_prediction_history"] = (
+                deepcopy(self.traction_prediction_history) if persist is False
+                else list(self.traction_prediction_history)
+            )
+        if getattr(self, "_traction_prediction_closed_tick", None) is not None:
+            payload["traction_prediction_closed_tick"] = int(self._traction_prediction_closed_tick)
+        payload["traction_prediction_episode_index"] = int(
+            getattr(self, "_traction_prediction_episode_index", 0) or 0
+        )
+        if getattr(self, "surface_optical_coating_history", None):
+            payload["surface_optical_coating_history"] = (
+                deepcopy(self.surface_optical_coating_history) if persist is False
+                else list(self.surface_optical_coating_history)
+            )
+        if getattr(self, "last_surface_optical_coating_receipt", None) is not None:
+            payload["last_surface_optical_coating_receipt"] = (
+                deepcopy(self.last_surface_optical_coating_receipt) if persist is False
+                else self.last_surface_optical_coating_receipt
+            )
+        phase = getattr(self, "traction_adaptation_phase", None)
+        if phase and phase != "UNSPECIFIED":
+            payload["traction_adaptation_phase"] = str(phase)
+        return payload
 
     @classmethod
-    def restore(cls, payload: dict[str, Any]) -> "PhysicalSystemRuntime":
+    def restore(
+        cls,
+        payload: dict[str, Any],
+        *,
+        world_seed: int | None = None,
+        shared_world_member: bool = False,
+    ) -> "PhysicalSystemRuntime":
+        """shared_world_member=True (TwoAgentRuntime.restore only): this slot is one of several bodies of
+        a shared world, so shared-world finalization (holder-attachment sanitation and the derived
+        spatial-index rebuild) is left to the container, which runs it once after every slot is bound.
+        Default False = unchanged single-agent restore."""
+        from mechanistic_mind.physical_system.spatial_contents import MultiContentSpatialIndexConfig
+        from mechanistic_mind.physical_system.procedural_surface_columns import (
+            ProceduralSurfaceColumnsConfig,
+        )
+        from mechanistic_mind.physical_system.conservative_surface_column_transfer import (
+            ConservativeSurfaceColumnTransferConfig,
+        )
+
         configs = payload["config"]
+        cog_raw = configs.get("cognition") if isinstance(configs.get("cognition"), dict) else {}
+        legacy_psc_off_ticks = "psc_off_ticks" not in cog_raw and "psc_schedule" not in payload
         cog_cfg = CognitionConfig.from_dict(configs.get("cognition"))
+        # Prefer explicit top-level psc_schedule block when present (post-repair snapshots).
+        sched = payload.get("psc_schedule") if isinstance(payload.get("psc_schedule"), dict) else None
+        if sched is not None and "psc_off_ticks" in sched:
+            cog_cfg.psc_off_ticks = sched.get("psc_off_ticks")
+        elif "psc_off_ticks" in cog_raw:
+            try:
+                v = cog_raw.get("psc_off_ticks")
+                cog_cfg.psc_off_ticks = None if v is None else int(v)
+            except (TypeError, ValueError):
+                cog_cfg.psc_off_ticks = None
+        if sched is not None and "prospective_selection" in sched and sched.get("prospective_selection"):
+            cog_cfg.prospective_selection = str(sched.get("prospective_selection"))
+        if sched is not None and "sensorimotor_consequence_withhold_from_psc" in sched:
+            cog_cfg.sensorimotor_consequence_withhold_from_psc = bool(
+                sched.get("sensorimotor_consequence_withhold_from_psc")
+            )
         config = PhysicalSystemConfig(
+            runtime_version=str(configs.get("runtime_version") or RUNTIME_VERSION),
+            model_line=str(configs.get("model_line") or (payload.get("model") or {}).get("model_line") or "TIKTAALIK"),
+            public_preset=(
+                configs.get("public_preset")
+                if configs.get("public_preset") is not None
+                else (payload.get("model") or {}).get("public_preset")
+            ),
             ecology_preset=str(configs.get("ecology_preset") or "CURRENT"),
             planet=PlanetConfig.from_dict(configs["planet"]),
             body=_config_from_dict(PhysicalBodyConfig, configs["body"]),
@@ -2350,10 +5869,246 @@ class PhysicalSystemRuntime:
             oscillatory_signaling=OscillatorySignalingConfig.from_dict(
                 configs.get("oscillatory_signaling")
             ),
+            locomotion_profile=LocomotionPhysicsProfile.from_dict(
+                configs.get("locomotion_profile")
+            ),
+            physical_resource_objects=PhysicalResourceObjectsConfig.from_dict(
+                configs.get("physical_resource_objects")
+            ),
+            physical_resource_object_vision=PhysicalResourceObjectVisionConfig.from_dict(
+                configs.get("physical_resource_object_vision")
+            ),
+            single_physical_manipulator=SinglePhysicalManipulatorConfig.from_dict(
+                configs.get("single_physical_manipulator")
+            ),
+            physical_grasp_release=PhysicalGraspReleaseConfig.from_dict(
+                configs.get("physical_grasp_release")
+            ),
+            bilateral_physical_manipulators=BilateralPhysicalManipulatorsConfig.from_dict(
+                configs.get("bilateral_physical_manipulators")
+            ),
+            bilateral_grasp_release=BilateralGraspReleaseConfig.from_dict(
+                configs.get("bilateral_grasp_release")
+            ),
+            bilateral_bring_together=BilateralBringTogetherConfig.from_dict(
+                configs.get("bilateral_bring_together")
+            ),
+            material_composition_merge=MaterialCompositionMergeConfig.from_dict(
+                configs.get("material_composition_merge")
+            ),
+            passive_material_properties=PassiveMaterialPropertiesConfig.from_dict(
+                configs.get("passive_material_properties")
+            ),
+            physical_optical_material_profile=PhysicalOpticalMaterialProfileConfig.from_dict(
+                configs.get("physical_optical_material_profile")
+            ),
+            exposed_surface_optical_interaction_authority=ExposedSurfaceOpticalInteractionAuthorityConfig.from_dict(
+                configs.get("exposed_surface_optical_interaction_authority")
+            ),
+            abstract_spectral_light_source_and_direct_transport=AbstractSpectralLightSourceAndDirectTransportConfig.from_dict(
+                configs.get("abstract_spectral_light_source_and_direct_transport")
+            ),
+            object_body_held_optical_surfaces=ObjectBodyHeldOpticalSurfacesConfig.from_dict(
+                configs.get("object_body_held_optical_surfaces")
+            ),
+            organism_physical_optical_reception=OrganismPhysicalOpticalReceptionConfig.from_dict(
+                configs.get("organism_physical_optical_reception")
+            ),
+            sensory_modality_temporal_alignment=SensoryModalityTemporalAlignmentConfig.from_dict(
+                configs.get("sensory_modality_temporal_alignment")
+            ),
+            explicit_surface_deposition=ExplicitSurfaceDepositionConfig.from_dict(
+                configs.get("explicit_surface_deposition")
+            ),
+            surface_affinity_traction=SurfaceAffinityTractionConfig.from_dict(
+                configs.get("surface_affinity_traction")
+            ),
+            surface_traction_experience=SurfaceTractionExperienceConfig.from_dict(
+                configs.get("surface_traction_experience")
+            ),
+            surface_traction_prediction=SurfaceTractionPredictionConfig.from_dict(
+                configs.get("surface_traction_prediction")
+            ),
+            physical_surface_optical_coating=PhysicalSurfaceOpticalCoatingConfig.from_dict(
+                configs.get("physical_surface_optical_coating")
+            ),
+            world_material_transactions=WorldMaterialTransactionsConfig.from_dict(
+                configs.get("world_material_transactions")
+            ),
+            multi_content_spatial_index=MultiContentSpatialIndexConfig.from_dict(
+                configs.get("multi_content_spatial_index")
+            ),
+            procedural_surface_columns=ProceduralSurfaceColumnsConfig.from_dict(
+                configs.get("procedural_surface_columns")
+            ),
+            # Missing field (every older snapshot) -> None -> mechanism OFF.
+            conservative_surface_column_transfer=(
+                ConservativeSurfaceColumnTransferConfig.from_dict(
+                    configs.get("conservative_surface_column_transfer")
+                )
+                if configs.get("conservative_surface_column_transfer")
+                else None
+            ),
+            local_physical_signal_transport=_lps_config_from_snapshot(configs),
+            physical_contact_acoustic_emission=_pca_config_from_snapshot(configs),
+            free_resource_object_kinematics=_fok_config_from_snapshot(configs),
+            physical_body_resource_object_contact=_boc_config_from_snapshot(configs),
+            body_resource_object_contact_impulse=_boi_config_from_snapshot(configs),
+            body_resource_object_impact_acoustic_emission=_oia_config_from_snapshot(configs),
+            physical_resource_object_pair_contact=_ooc_config_from_snapshot(configs),
+            resource_object_pair_contact_impulse=_ooi_config_from_snapshot(configs),
+            resource_object_pair_impact_acoustic_emission=_ooia_config_from_snapshot(configs),
+            held_resource_object_foreign_body_contact=_hfc_config_from_snapshot(configs),
+            held_resource_object_translational_impulse_mediation=_hti_config_from_snapshot(configs),
+            effector_work_and_held_load_inertia_accounting=_ehl_config_from_snapshot(configs),
+            flat_ground_gravity=_fgg_config_from_snapshot(configs),
+            free_resource_object_ground_friction=_fogf_config_from_snapshot(configs),
+            surface_elevation_support=_ses_config_from_snapshot(configs),
+            body_normal_load_traction=_bnlt_config_from_snapshot(configs),
+            continuous_surface_geometry=_csg_config_from_snapshot(configs),
+            body_static_traction_threshold=_bst_config_from_snapshot(configs),
+            free_resource_object_static_traction_threshold=_fost_config_from_snapshot(configs),
+            radius_aware_support_points=_rasp_config_from_snapshot(configs),
+            ses_decomposition_contract=_sdc_config_from_snapshot(configs),
+            ses_runtime_transition_classifier=_srtc_config_from_snapshot(configs),
+            radius_aware_face_sweep=_rafs_config_from_snapshot(configs),
+            diagnostic_normal_load_shadow=_dnls_config_from_snapshot(configs),
+            continuous_gravitational_pe_diagnostic_shadow=_cgpe_config_from_snapshot(configs),
+            continuous_gravitational_pe=_cgp_config_from_snapshot(configs),
+            tangent_gravity_diagnostic_shadow=_tgds_config_from_snapshot(configs),
+            coherent_slope_dynamics=_csd_config_from_snapshot(configs),
+            conservative_surface_material_separation=_csms_config_from_snapshot(configs),
+            effector_terrain_contact_geometry=_etc_config_from_snapshot(configs),
+            effector_occupancy_reachability_trace=_eort_config_from_snapshot(configs),
+            manipulator_relative_world_actuation=_mrwa_config_from_snapshot(configs),
+            effector_bounded_actuator_effort=_ebae_config_from_snapshot(configs),
+            surface_exertion_terrain_material_resistance=_setmr_config_from_snapshot(configs),
+            held_resource_object_terrain_contact_geometry=_hotc_config_from_snapshot(configs),
+            held_resource_object_terrain_mechanical_transmission=_hotmt_config_from_snapshot(configs),
+            held_mediated_surface_exertion_integration=_hmsi_config_from_snapshot(configs),
+            detached_terrain_material_initial_placement=_dtip_config_from_snapshot(configs),
+            bnlt_move_breakaway_locomotion_repair=_bnlt_repair_config_from_snapshot(configs),
+            repeated_conservative_surface_column_separation=_rcss_config_from_snapshot(configs),
+            event_driven_crowded_placement_retry_contract=_crowded_retry_config_from_snapshot(configs),
+            detached_material_amount_scaled_collision_radius=_detached_material_size_geometry_config_from_snapshot(configs),
+            held_combine_radius_resize_transaction=_held_combine_radius_resize_transaction_config_from_snapshot(configs),
+            held_deposition_radius_shrink_transaction=_held_deposition_radius_shrink_transaction_config_from_snapshot(configs),
+            free_space_state_and_pe_authority_contract=_free_space_state_and_pe_authority_contract_config_from_snapshot(configs),
+            vertical_terrain_landing_contact_response=_vertical_terrain_landing_contact_response_config_from_snapshot(configs),
+            vertical_impact_acoustic_emission=_vertical_impact_acoustic_emission_config_from_snapshot(configs),
+            release_and_excavation_support_loss_integration=_release_and_excavation_support_loss_integration_config_from_snapshot(configs),
             cognition=cog_cfg,
         )
+        raw_vw6 = configs.get("minimal_vision_3d_geometric_interface")
+        if isinstance(raw_vw6, dict) and raw_vw6:
+            from mechanistic_mind.physical_system.minimal_vision_3d_geometric_interface import (
+                MinimalVision3DGeometricInterfaceConfig,
+            )
+            config.minimal_vision_3d_geometric_interface = (
+                MinimalVision3DGeometricInterfaceConfig.from_dict(raw_vw6)
+            )
+            # VW6 requires VW1 occupancy authority.
+            from mechanistic_mind.physical_system.volumetric_world_material_occupancy import (
+                set_volumetric_world_material_occupancy,
+            )
+            set_volumetric_world_material_occupancy(config, True)
+        raw_o2 = configs.get("exposed_surface_optical_interaction_authority")
+        if isinstance(raw_o2, dict) and raw_o2:
+            config.exposed_surface_optical_interaction_authority = (
+                ExposedSurfaceOpticalInteractionAuthorityConfig.from_dict(raw_o2)
+            )
+            if bool(raw_o2.get("enabled", False)):
+                from mechanistic_mind.physical_system.volumetric_world_material_occupancy import (
+                    set_volumetric_world_material_occupancy,
+                )
+                set_volumetric_world_material_occupancy(config, True)
+        raw_o3 = configs.get("abstract_spectral_light_source_and_direct_transport")
+        if isinstance(raw_o3, dict) and raw_o3:
+            config.abstract_spectral_light_source_and_direct_transport = (
+                AbstractSpectralLightSourceAndDirectTransportConfig.from_dict(raw_o3)
+            )
+            if bool(raw_o3.get("enabled", False)):
+                from mechanistic_mind.physical_system.volumetric_world_material_occupancy import (
+                    set_volumetric_world_material_occupancy,
+                )
+                from mechanistic_mind.physical_system.exposed_surface_optical_interaction_authority import (
+                    set_exposed_surface_optical_interaction_authority,
+                )
+                from mechanistic_mind.physical_system.physical_optical_material_profile import (
+                    set_physical_optical_material_profile,
+                )
+
+                set_volumetric_world_material_occupancy(config, True)
+                set_physical_optical_material_profile(config, True)
+                set_exposed_surface_optical_interaction_authority(config, True)
+        raw_o3a = configs.get("object_body_held_optical_surfaces")
+        if isinstance(raw_o3a, dict) and raw_o3a:
+            config.object_body_held_optical_surfaces = (
+                ObjectBodyHeldOpticalSurfacesConfig.from_dict(raw_o3a)
+            )
+            if bool(raw_o3a.get("enabled", False)):
+                from mechanistic_mind.physical_system.object_body_held_optical_surfaces import (
+                    set_object_body_held_optical_surfaces,
+                )
+                from mechanistic_mind.physical_system.abstract_spectral_light_source_and_direct_transport import (
+                    set_abstract_spectral_light_source_and_direct_transport,
+                )
+                set_abstract_spectral_light_source_and_direct_transport(config, True)
+                set_object_body_held_optical_surfaces(config, True)
+        raw_o4 = configs.get("organism_physical_optical_reception")
+        if isinstance(raw_o4, dict) and raw_o4:
+            config.organism_physical_optical_reception = (
+                OrganismPhysicalOpticalReceptionConfig.from_dict(raw_o4)
+            )
+            if bool(raw_o4.get("enabled", False)):
+                from mechanistic_mind.physical_system.organism_physical_optical_reception import (
+                    set_organism_physical_optical_reception,
+                )
+                from mechanistic_mind.physical_system.object_body_held_optical_surfaces import (
+                    set_object_body_held_optical_surfaces,
+                )
+                from mechanistic_mind.physical_system.abstract_spectral_light_source_and_direct_transport import (
+                    set_abstract_spectral_light_source_and_direct_transport,
+                )
+                set_abstract_spectral_light_source_and_direct_transport(config, True)
+                set_object_body_held_optical_surfaces(config, True)
+                set_organism_physical_optical_reception(config, True)
+        raw_o5 = configs.get("sensory_modality_temporal_alignment")
+        if isinstance(raw_o5, dict) and raw_o5:
+            config.sensory_modality_temporal_alignment = (
+                SensoryModalityTemporalAlignmentConfig.from_dict(raw_o5)
+            )
+            if bool(raw_o5.get("enabled", False)):
+                from mechanistic_mind.physical_system.sensory_modality_temporal_alignment import (
+                    set_sensory_modality_temporal_alignment,
+                )
+                set_sensory_modality_temporal_alignment(config, True)
         runtime = cls(seed=int(payload["seed"]), config=config)
         runtime.world, runtime.config.planet = restore_planet_state(payload["world"])
+        try:
+            from mechanistic_mind.ui.psy_observer_web.vertical_display_contract import (
+                invalidate_vertical_display_cache,
+            )
+
+            invalidate_vertical_display_cache(runtime.world)
+        except Exception:
+            pass
+        try:
+            from mechanistic_mind.physical_system.exposed_surface_optical_interaction_authority import (
+                invalidate_exposed_surface_cache,
+            )
+            from mechanistic_mind.physical_system.abstract_spectral_light_source_and_direct_transport import (
+                invalidate_direct_light_cache,
+            )
+
+            invalidate_exposed_surface_cache(runtime.world)
+            invalidate_direct_light_cache(runtime.world)
+            from mechanistic_mind.physical_system.object_body_held_optical_surfaces import (
+                invalidate_entity_surface_cache,
+            )
+            invalidate_entity_surface_cache(runtime.world)
+        except Exception:
+            pass
         b = payload["body"]
         runtime.body = PhysicalBodyState(
             tick=int(b["tick"]), x=float(b["x"]), y=float(b["y"]),
@@ -2363,6 +6118,9 @@ class PhysicalSystemRuntime:
             motor_ux=float(b.get("motor_ux", 0.0)), motor_uy=float(b.get("motor_uy", 0.0)),
             B_site=None if b.get("B_site") is None else np.asarray(b["B_site"], dtype=np.float64),
             theta=float(b.get("theta", 0.0)), omega=float(b.get("omega", 0.0)),
+            z=float(b.get("z", 0.0) or 0.0), vz=float(b.get("vz", 0.0) or 0.0),
+            grounded=bool(b["grounded"]) if "grounded" in b else True,
+            vertical_half_extent=(float(b["vertical_half_extent"]) if b.get("vertical_half_extent") is not None else None),
             head_relative_angle=float(b.get("head_relative_angle", 0.0) or 0.0),
             head_omega=float(b.get("head_omega", 0.0) or 0.0),
             neck_motor=float(b.get("neck_motor", 0.0) or 0.0),
@@ -2399,9 +6157,72 @@ class PhysicalSystemRuntime:
                 clear_derived_indexes(runtime.cognition)
         else:
             runtime.cognition = empty_cognitive_state(runtime.config.cognition)
+        # Restore PSC schedule activation flags (must not re-fire or drop absolute enable tick).
+        sched = payload.get("psc_schedule") if isinstance(payload.get("psc_schedule"), dict) else None
+        if sched is not None:
+            runtime._psc_auto_activated = bool(sched.get("psc_auto_activated", False))
+            runtime._psc_activation = deepcopy(sched.get("psc_activation"))
+            runtime._psc_withhold_open = deepcopy(sched.get("psc_withhold_open"))
+            runtime._psc_schedule_legacy_status = "OK"
+        else:
+            runtime._psc_auto_activated = bool(payload.get("psc_auto_activated", False))
+            runtime._psc_activation = deepcopy(payload.get("psc_activation"))
+            runtime._psc_withhold_open = deepcopy(payload.get("psc_withhold_open"))
+            runtime._psc_schedule_legacy_status = (
+                "LEGACY_MISSING_PSC_OFF_TICKS_EXPLICIT_STATUS_NOT_SILENT_DEFAULT"
+                if legacy_psc_off_ticks
+                else "OK"
+            )
+        # Keep live cognition.config aligned with restored CognitionConfig schedule fields.
+        if isinstance(runtime.cognition, dict):
+            cfgd = runtime.cognition.setdefault("config", {})
+            if isinstance(cfgd, dict):
+                cfgd["psc_off_ticks"] = getattr(runtime.config.cognition, "psc_off_ticks", None)
+                cfgd["prospective_selection"] = str(
+                    getattr(runtime.config.cognition, "prospective_selection", "") or ""
+                )
+                cfgd["sensorimotor_consequence_withhold_from_psc"] = bool(
+                    getattr(
+                        runtime.config.cognition,
+                        "sensorimotor_consequence_withhold_from_psc",
+                        True,
+                    )
+                )
         runtime.last_agent_observation = deepcopy(payload.get("last_agent_observation"))
         runtime.last_selected_action = payload.get("last_selected_action")
         runtime.last_motor_output = deepcopy(payload.get("last_motor_output"))
+        runtime.last_manipulator_receipt = deepcopy(payload.get("last_manipulator_receipt"))
+        runtime.last_pair_receipt = deepcopy(payload.get("last_pair_receipt"))
+        runtime.last_material_transformation_receipt = deepcopy(payload.get("last_material_transformation_receipt"))
+        runtime.last_surface_deposition_receipt = deepcopy(payload.get("last_surface_deposition_receipt"))
+        runtime.last_surface_traction_receipt = deepcopy(payload.get("last_surface_traction_receipt"))
+        runtime.last_traction_experience_receipt = deepcopy(payload.get("last_traction_experience_receipt"))
+        runtime._traction_experience_pending = deepcopy(payload.get("traction_experience_pending"))
+        runtime.traction_experience_history = list(deepcopy(payload.get("traction_experience_history") or []))
+        closed = payload.get("traction_experience_closed_tick")
+        runtime._traction_experience_closed_tick = None if closed is None else int(closed)
+        runtime.last_traction_prediction_receipt = deepcopy(payload.get("last_traction_prediction_receipt"))
+        runtime._traction_prediction_pending = deepcopy(payload.get("traction_prediction_pending"))
+        runtime.traction_prediction_history = list(deepcopy(payload.get("traction_prediction_history") or []))
+        pred_closed = payload.get("traction_prediction_closed_tick")
+        runtime._traction_prediction_closed_tick = None if pred_closed is None else int(pred_closed)
+        runtime._traction_prediction_episode_index = int(payload.get("traction_prediction_episode_index") or 0)
+        runtime.traction_adaptation_phase = str(payload.get("traction_adaptation_phase") or "UNSPECIFIED")
+        runtime.last_surface_optical_coating_receipt = deepcopy(
+            payload.get("last_surface_optical_coating_receipt")
+        )
+        runtime.surface_optical_coating_history = list(
+            deepcopy(payload.get("surface_optical_coating_history") or [])
+        )
+        if payload.get("pair_aperture") is None:
+            runtime.pair_aperture = open_pair_aperture(runtime.config)
+            runtime.pair_state = "OPEN"
+            runtime.pair_contact = False
+        else:
+            runtime.pair_aperture = float(payload.get("pair_aperture") or open_pair_aperture(runtime.config))
+            runtime.pair_state = str(payload.get("pair_state") or "OPEN")
+            runtime.pair_contact = bool(payload.get("pair_contact"))
+        runtime.technical_id = str(payload.get("technical_id") or "agent_0")
         runtime._internal_c_prev = (
             None
             if payload.get("internal_c_prev") is None
@@ -2410,6 +6231,9 @@ class PhysicalSystemRuntime:
         runtime._prev_body_omega = float(payload.get("prev_body_omega", 0.0) or 0.0)
         runtime.last_orientation_meta = deepcopy(payload.get("last_orientation_meta"))
         runtime._sync_embodiment_dofs()
+        from mechanistic_mind.physical_system.physical_manipulator import sanitize_attachments
+        if not shared_world_member:
+            sanitize_attachments(runtime.world, {str(runtime.technical_id)})
         if not (runtime.tick == runtime.world.tick == runtime.body.tick == runtime.internal.tick):
             raise ValueError("snapshot contains incoherent physical ticks")
         nfe = runtime.config.near_field_exteroception
@@ -2425,4 +6249,651 @@ class PhysicalSystemRuntime:
             install_surface_optical_on_planet(
                 runtime.world, experiment_seed=runtime.seed, cfg=nfe
             )
+        from mechanistic_mind.physical_system.spatial_contents import (
+            body_refs_for_runtime,
+            multi_content_spatial_index_is_active,
+            rebuild_from_world,
+        )
+        saved_generation = int(getattr(runtime.world, "spatial_index_generation", 0) or 0)
+        if multi_content_spatial_index_is_active(runtime.config) and not shared_world_member:
+            rebuild_from_world(
+                runtime.world,
+                body_refs_for_runtime(runtime),
+                tick=int(runtime.tick),
+                reason="restore",
+                config=runtime.config,
+            )
+            if saved_generation:
+                runtime.world.spatial_contents.generation = saved_generation
+                runtime.world.spatial_index_generation = saved_generation
+        from mechanistic_mind.physical_system.procedural_surface_columns import (
+            ensure_surface_columns_for_runtime,
+        )
+        # Shared-world containers (two-agent) pass the world seed; slot seeds are agent streams.
+        ensure_surface_columns_for_runtime(
+            runtime.world, runtime.config,
+            experiment_seed=runtime.seed if world_seed is None else int(world_seed),
+        )
+        from mechanistic_mind.physical_system.volumetric_world_material_occupancy import (
+            ensure_state as ensure_volumetric_occupancy_for_runtime,
+        )
+        ensure_volumetric_occupancy_for_runtime(runtime.world, runtime.config)
+        from mechanistic_mind.physical_system.occupancy_support_and_contact_queries import (
+            ensure_state as ensure_occupancy_support_contact_for_runtime,
+        )
+        ensure_occupancy_support_contact_for_runtime(runtime.world, runtime.config)
+        from mechanistic_mind.physical_system.volumetric_world_material_separation import (
+            ensure_state as ensure_volumetric_separation_for_runtime,
+        )
+        ensure_volumetric_separation_for_runtime(runtime.world, runtime.config)
+        from mechanistic_mind.physical_system.volumetric_world_material_reintegration import (
+            ensure_state as ensure_volumetric_reintegration_for_runtime,
+        )
+        ensure_volumetric_reintegration_for_runtime(runtime.world, runtime.config)
+        from mechanistic_mind.physical_system.effector_held_occupancy_exertion_bridge import (
+            ensure_state as ensure_vw5_bridge_for_runtime,
+        )
+        ensure_vw5_bridge_for_runtime(runtime.world, runtime.config)
+        from mechanistic_mind.physical_system.minimal_vision_3d_geometric_interface import (
+            ensure_state as ensure_vw6_vision_for_runtime,
+        )
+        ensure_vw6_vision_for_runtime(runtime.world, runtime.config)
+        setattr(runtime.world, "_physical_system_config", runtime.config)
+        from mechanistic_mind.physical_system.local_physical_signal_transport import (
+            bind_body_ids,
+            local_physical_signal_transport_is_active as _lps_active,
+            restore_state as _lps_restore,
+        )
+        raw_lps = getattr(runtime.world, "_local_signal_transport_payload", None)
+        if raw_lps is not None:
+            try:
+                del runtime.world._local_signal_transport_payload
+            except AttributeError:
+                pass
+        if _lps_active(runtime.config) or raw_lps:
+            # Missing snapshot field -> config None -> OFF; state without config -> dropped.
+            _lps_restore(runtime.world, raw_lps, runtime.config)
+            if getattr(runtime.world, "local_signal_transport", None) is not None:
+                bind_body_ids(body_refs_for_runtime(runtime))
+        from mechanistic_mind.physical_system.physical_contact_acoustic_emission import (
+            physical_contact_acoustic_emission_is_active as _pca_active,
+            restore_state as _pca_restore,
+        )
+        raw_pca = getattr(runtime.world, "_contact_acoustic_payload", None)
+        if raw_pca is not None:
+            try:
+                del runtime.world._contact_acoustic_payload
+            except AttributeError:
+                pass
+        if _pca_active(runtime.config) or raw_pca:
+            # Missing snapshot field -> config None -> OFF (no retroactive sounds).
+            _pca_restore(runtime.world, raw_pca, runtime.config)
+        from mechanistic_mind.physical_system.free_resource_object_kinematics import (
+            restore_state as _fok_restore,
+        )
+        raw_fok = getattr(runtime.world, "_free_object_kinematics_payload", None)
+        if raw_fok is not None:
+            try:
+                del runtime.world._free_object_kinematics_payload
+            except AttributeError:
+                pass
+        # Always: OFF (every older snapshot) -> no state, any free object at rest with v = 0;
+        # ON without saved state -> fresh state with empty effector pose history (no false impulse).
+        _fok_restore(runtime.world, raw_fok, runtime.config)
+        from mechanistic_mind.physical_system.physical_body_resource_object_contact import (
+            restore_state as _boc_restore,
+        )
+        raw_boc = getattr(runtime.world, "_body_object_contact_payload", None)
+        if raw_boc is not None:
+            try:
+                del runtime.world._body_object_contact_payload
+            except AttributeError:
+                pass
+        # Missing snapshot -> OFF; ON without saved state -> fresh episodes (no false BEGIN on restore).
+        _boc_restore(runtime.world, raw_boc, runtime.config)
+        from mechanistic_mind.physical_system.body_resource_object_contact_impulse import (
+            restore_state as _boi_restore,
+        )
+        raw_boi = getattr(runtime.world, "_body_object_contact_impulse_payload", None)
+        if raw_boi is not None:
+            try:
+                del runtime.world._body_object_contact_impulse_payload
+            except AttributeError:
+                pass
+        _boi_restore(runtime.world, raw_boi, runtime.config)
+        from mechanistic_mind.physical_system.body_resource_object_impact_acoustic_emission import (
+            restore_state as _oia_restore,
+        )
+        raw_oia = getattr(runtime.world, "_body_object_impact_acoustic_payload", None)
+        if raw_oia is not None:
+            try:
+                del runtime.world._body_object_impact_acoustic_payload
+            except AttributeError:
+                pass
+        # Also accept top-level snapshot key written alongside config.
+        if raw_oia is None and isinstance(payload.get("body_object_impact_acoustic_state"), dict):
+            raw_oia = payload.get("body_object_impact_acoustic_state")
+        _oia_restore(runtime.world, raw_oia, runtime.config)
+        from mechanistic_mind.physical_system.physical_resource_object_pair_contact import (
+            restore_state as _ooc_restore,
+        )
+        raw_ooc = getattr(runtime.world, "_resource_object_pair_contact_payload", None)
+        if raw_ooc is not None:
+            try:
+                del runtime.world._resource_object_pair_contact_payload
+            except AttributeError:
+                pass
+        if raw_ooc is None and isinstance(payload.get("resource_object_pair_contact_state"), dict):
+            raw_ooc = payload.get("resource_object_pair_contact_state")
+        _ooc_restore(runtime.world, raw_ooc, runtime.config)
+        from mechanistic_mind.physical_system.resource_object_pair_contact_impulse import (
+            restore_state as _ooi_restore,
+        )
+        raw_ooi = getattr(runtime.world, "_resource_object_pair_contact_impulse_payload", None)
+        if raw_ooi is not None:
+            try:
+                del runtime.world._resource_object_pair_contact_impulse_payload
+            except AttributeError:
+                pass
+        if raw_ooi is None and isinstance(payload.get("resource_object_pair_contact_impulse_state"), dict):
+            raw_ooi = payload.get("resource_object_pair_contact_impulse_state")
+        _ooi_restore(runtime.world, raw_ooi, runtime.config)
+        from mechanistic_mind.physical_system.resource_object_pair_impact_acoustic_emission import (
+            restore_state as _ooia_restore,
+        )
+        raw_ooia = getattr(runtime.world, "_resource_object_pair_impact_acoustic_payload", None)
+        if raw_ooia is not None:
+            try:
+                del runtime.world._resource_object_pair_impact_acoustic_payload
+            except AttributeError:
+                pass
+        if raw_ooia is None and isinstance(payload.get("resource_object_pair_impact_acoustic_state"), dict):
+            raw_ooia = payload.get("resource_object_pair_impact_acoustic_state")
+        _ooia_restore(runtime.world, raw_ooia, runtime.config)
+        from mechanistic_mind.physical_system.held_resource_object_foreign_body_contact import (
+            restore_state as _hfc_restore,
+        )
+        raw_hfc = getattr(runtime.world, "_held_foreign_body_contact_payload", None)
+        if raw_hfc is not None:
+            try:
+                del runtime.world._held_foreign_body_contact_payload
+            except AttributeError:
+                pass
+        if raw_hfc is None and isinstance(payload.get("held_foreign_body_contact_state"), dict):
+            raw_hfc = payload.get("held_foreign_body_contact_state")
+        _hfc_restore(runtime.world, raw_hfc, runtime.config)
+        from mechanistic_mind.physical_system.held_resource_object_translational_impulse_mediation import (
+            restore_state as _hti_restore,
+        )
+        raw_hti = getattr(runtime.world, "_held_translational_impulse_payload", None)
+        if raw_hti is not None:
+            try:
+                del runtime.world._held_translational_impulse_payload
+            except Exception:
+                pass
+        if raw_hti is None and isinstance(payload.get("held_translational_impulse_state"), dict):
+            raw_hti = payload.get("held_translational_impulse_state")
+        _hti_restore(runtime.world, raw_hti, runtime.config)
+        from mechanistic_mind.physical_system.effector_work_and_held_load_inertia_accounting import (
+            restore_state as _ehl_restore,
+        )
+        raw_ehl = getattr(runtime.world, "_effector_work_held_load_payload", None)
+        if raw_ehl is not None:
+            try:
+                del runtime.world._effector_work_held_load_payload
+            except Exception:
+                pass
+        if raw_ehl is None and isinstance(payload.get("effector_work_held_load_state"), dict):
+            raw_ehl = payload.get("effector_work_held_load_state")
+        _ehl_restore(runtime.world, raw_ehl, runtime.config)
+        from mechanistic_mind.physical_system.flat_ground_gravity import (
+            restore_state as _fgg_restore,
+            ensure_body_vertical as _fgg_ensure_body,
+            flat_ground_gravity_is_active as _fgg_active,
+        )
+        raw_fgg = getattr(runtime.world, "_flat_ground_gravity_payload", None)
+        if raw_fgg is not None:
+            try:
+                del runtime.world._flat_ground_gravity_payload
+            except Exception:
+                pass
+        if raw_fgg is None and isinstance(payload.get("flat_ground_gravity_state"), dict):
+            raw_fgg = payload.get("flat_ground_gravity_state")
+        _fgg_restore(runtime.world, raw_fgg, runtime.config)
+        # Gate: do NOT inject z/vz/grounded/vertical_half_extent into legacy
+        # Tiktaalik / pre-FGG snapshots. Migrate only when FGG/Phase C vertical
+        # is active, or when vertical fields are already present in the body snap.
+        _bpayload_gate = payload.get("body") or {}
+        _vertical_already = any(
+            k in _bpayload_gate for k in ("z", "vz", "grounded", "vertical_half_extent")
+        )
+        if _fgg_active(runtime.config) or _vertical_already:
+            _fgg_ensure_body(runtime.body, runtime.config)
+        from mechanistic_mind.physical_system.free_resource_object_ground_friction import (
+            restore_state as _fogf_restore,
+        )
+        raw_fogf = getattr(runtime.world, "_free_resource_object_ground_friction_payload", None)
+        if raw_fogf is not None:
+            try:
+                del runtime.world._free_resource_object_ground_friction_payload
+            except Exception:
+                pass
+        if raw_fogf is None and isinstance(payload.get("free_resource_object_ground_friction_state"), dict):
+            raw_fogf = payload.get("free_resource_object_ground_friction_state")
+        _fogf_restore(runtime.world, raw_fogf, runtime.config)
+        from mechanistic_mind.physical_system.surface_elevation_support import (
+            restore_state as _ses_restore,
+        )
+        raw_ses = getattr(runtime.world, "_surface_elevation_support_payload", None)
+        if raw_ses is not None:
+            try:
+                del runtime.world._surface_elevation_support_payload
+            except Exception:
+                pass
+        if raw_ses is None and isinstance(payload.get("surface_elevation_support_state"), dict):
+            raw_ses = payload.get("surface_elevation_support_state")
+        if raw_ses is not None:
+            _ses_restore(runtime.world, raw_ses, runtime.config)
+        from mechanistic_mind.physical_system.body_normal_load_traction import (
+            restore_state as _bnlt_restore,
+        )
+        raw_bnlt = getattr(runtime.world, "_body_normal_load_traction_payload", None)
+        if raw_bnlt is not None:
+            try:
+                del runtime.world._body_normal_load_traction_payload
+            except Exception:
+                pass
+        if raw_bnlt is None and isinstance(payload.get("body_normal_load_traction_state"), dict):
+            raw_bnlt = payload.get("body_normal_load_traction_state")
+        _bnlt_restore(runtime.world, raw_bnlt, runtime.config)
+        from mechanistic_mind.physical_system.continuous_surface_geometry import (
+            restore_state as _csg_restore,
+        )
+        raw_csg = getattr(runtime.world, "_continuous_surface_geometry_payload", None)
+        if raw_csg is not None:
+            try:
+                del runtime.world._continuous_surface_geometry_payload
+            except Exception:
+                pass
+        if raw_csg is None and isinstance(payload.get("continuous_surface_geometry_state"), dict):
+            raw_csg = payload.get("continuous_surface_geometry_state")
+        _csg_restore(runtime.world, runtime.config, raw_csg)
+        from mechanistic_mind.physical_system.body_static_traction_threshold import (
+            restore_state as _bst_restore,
+        )
+        raw_bst = getattr(runtime.world, "_body_static_traction_threshold_payload", None)
+        if raw_bst is not None:
+            try:
+                del runtime.world._body_static_traction_threshold_payload
+            except Exception:
+                pass
+        if raw_bst is None and isinstance(payload.get("body_static_traction_threshold_state"), dict):
+            raw_bst = payload.get("body_static_traction_threshold_state")
+        _bst_restore(runtime.world, raw_bst, runtime.config)
+        from mechanistic_mind.physical_system.free_resource_object_static_traction_threshold import (
+            restore_state as _fost_restore,
+        )
+        raw_fost = getattr(runtime.world, "_free_resource_object_static_traction_threshold_payload", None)
+        if raw_fost is not None:
+            try:
+                del runtime.world._free_resource_object_static_traction_threshold_payload
+            except Exception:
+                pass
+        if raw_fost is None and isinstance(payload.get("free_resource_object_static_traction_threshold_state"), dict):
+            raw_fost = payload.get("free_resource_object_static_traction_threshold_state")
+        _fost_restore(runtime.world, raw_fost, runtime.config)
+        from mechanistic_mind.physical_system.radius_aware_support_points import (
+            restore_state as _rasp_restore,
+        )
+        raw_rasp = getattr(runtime.world, "_radius_aware_support_points_payload", None)
+        if raw_rasp is not None:
+            try:
+                del runtime.world._radius_aware_support_points_payload
+            except Exception:
+                pass
+        if raw_rasp is None and isinstance(payload.get("radius_aware_support_points_state"), dict):
+            raw_rasp = payload.get("radius_aware_support_points_state")
+        _rasp_restore(runtime.world, raw_rasp, runtime.config)
+        from mechanistic_mind.physical_system.ses_decomposition_contract import (
+            restore_state as _sdc_restore,
+        )
+        raw_sdc = payload.get("ses_decomposition_contract_state")
+        _sdc_restore(runtime.world, raw_sdc if isinstance(raw_sdc, dict) else None, runtime.config)
+        from mechanistic_mind.physical_system.ses_runtime_transition_classifier import (
+            restore_state as _srtc_restore,
+        )
+        raw_srtc = payload.get("ses_runtime_transition_classifier_state")
+        _srtc_restore(runtime.world, raw_srtc if isinstance(raw_srtc, dict) else None, runtime.config)
+        from mechanistic_mind.physical_system.radius_aware_face_sweep import (
+            restore_state as _rafs_restore,
+        )
+        raw_rafs = payload.get("radius_aware_face_sweep_state")
+        _rafs_restore(runtime.world, raw_rafs if isinstance(raw_rafs, dict) else None, runtime.config)
+        from mechanistic_mind.physical_system.diagnostic_normal_load_shadow import (
+            restore_state as _dnls_restore,
+        )
+        raw_dnls = payload.get("diagnostic_normal_load_shadow_state")
+        _dnls_restore(runtime.world, raw_dnls if isinstance(raw_dnls, dict) else None, runtime.config)
+        from mechanistic_mind.physical_system.continuous_gravitational_pe_diagnostic_shadow import (
+            restore_state as _cgpe_restore,
+        )
+        raw_cgpe = payload.get("continuous_gravitational_pe_diagnostic_shadow_state")
+        _cgpe_restore(runtime.world, raw_cgpe if isinstance(raw_cgpe, dict) else None, runtime.config)
+        from mechanistic_mind.physical_system.continuous_gravitational_pe import (
+            restore_state as _cgp_restore,
+        )
+        raw_cgp = payload.get("continuous_gravitational_pe_state")
+        _cgp_restore(runtime.world, raw_cgp if isinstance(raw_cgp, dict) else None, runtime.config)
+        from mechanistic_mind.physical_system.tangent_gravity_diagnostic_shadow import (
+            restore_state as _tgds_restore,
+        )
+        raw_tgds = payload.get("tangent_gravity_diagnostic_shadow_state")
+        _tgds_restore(runtime.world, raw_tgds if isinstance(raw_tgds, dict) else None, runtime.config)
+        from mechanistic_mind.physical_system.coherent_slope_dynamics import (
+            restore_state as _csd_restore,
+        )
+        raw_csd = payload.get("coherent_slope_dynamics_state")
+        _csd_restore(runtime.world, raw_csd if isinstance(raw_csd, dict) else None, runtime.config)
+        from mechanistic_mind.physical_system.conservative_surface_material_separation import (
+            restore_state as _csms_restore,
+        )
+        raw_csms = payload.get("surface_material_separation_state")
+        _csms_restore(runtime.world, raw_csms if isinstance(raw_csms, dict) else None)
+        from mechanistic_mind.physical_system.effector_terrain_contact_geometry import (
+            restore_state as _etc_restore,
+        )
+        raw_etc = payload.get("effector_terrain_contact_geometry_state")
+        _etc_restore(
+            runtime.world,
+            raw_etc if isinstance(raw_etc, dict) else None,
+            runtime.config,
+        )
+        from mechanistic_mind.physical_system.effector_occupancy_reachability_trace import (
+            restore_state as _eort_restore,
+        )
+        raw_eort = payload.get("effector_occupancy_reachability_trace_state")
+        _eort_restore(
+            runtime.world,
+            raw_eort if isinstance(raw_eort, dict) else None,
+            runtime.config,
+        )
+        from mechanistic_mind.physical_system.manipulator_relative_world_actuation import (
+            restore_state as _mrwa_restore,
+        )
+        raw_mrwa = payload.get("manipulator_relative_world_actuation_state")
+        _mrwa_restore(
+            runtime.world,
+            raw_mrwa if isinstance(raw_mrwa, dict) else None,
+            runtime.config,
+        )
+        from mechanistic_mind.physical_system.effector_bounded_actuator_effort import (
+            restore_state as _ebae_restore,
+        )
+        raw_ebae = payload.get("effector_bounded_actuator_effort_state")
+        _ebae_restore(
+            runtime.world,
+            raw_ebae if isinstance(raw_ebae, dict) else None,
+            runtime.config,
+        )
+        from mechanistic_mind.physical_system.surface_exertion_terrain_material_resistance import (
+            restore_state as _setmr_restore,
+        )
+        raw_setmr = payload.get("surface_exertion_terrain_material_resistance_state")
+        _setmr_restore(
+            runtime.world,
+            raw_setmr if isinstance(raw_setmr, dict) else None,
+            runtime.config,
+        )
+        from mechanistic_mind.physical_system.held_resource_object_terrain_contact_geometry import (
+            restore_state as _hotc_restore,
+        )
+        raw_hotc = payload.get("held_resource_object_terrain_contact_geometry_state")
+        _hotc_restore(
+            runtime.world,
+            raw_hotc if isinstance(raw_hotc, dict) else None,
+            runtime.config,
+        )
+        from mechanistic_mind.physical_system.held_resource_object_terrain_mechanical_transmission import (
+            restore_state as _hotmt_restore,
+        )
+        raw_hotmt = payload.get("held_resource_object_terrain_mechanical_transmission_state")
+        _hotmt_restore(
+            runtime.world,
+            raw_hotmt if isinstance(raw_hotmt, dict) else None,
+            runtime.config,
+        )
+        from mechanistic_mind.physical_system.held_mediated_surface_exertion_integration import (
+            restore_state as _hmsi_restore,
+        )
+        raw_hmsi = payload.get("held_mediated_surface_exertion_integration_state")
+        _hmsi_restore(
+            runtime.world,
+            raw_hmsi if isinstance(raw_hmsi, dict) else None,
+            runtime.config,
+        )
+        from mechanistic_mind.physical_system.detached_terrain_material_initial_placement import (
+            restore_state as _dtip_restore,
+        )
+        raw_dtip = payload.get("detached_terrain_material_initial_placement_state")
+        _dtip_restore(
+            runtime.world,
+            raw_dtip if isinstance(raw_dtip, dict) else None,
+            runtime.config,
+        )
+        from mechanistic_mind.physical_system.bnlt_move_breakaway_locomotion_repair import (
+            restore_state as _bnlt_rep_restore,
+        )
+        raw_bnlt_rep = payload.get("bnlt_move_breakaway_locomotion_repair_state")
+        _bnlt_rep_restore(
+            runtime.world,
+            raw_bnlt_rep if isinstance(raw_bnlt_rep, dict) else None,
+            runtime.config,
+        )
+        from mechanistic_mind.physical_system.repeated_conservative_surface_column_separation import (
+            restore_state as _rcss_restore,
+        )
+        raw_rcss = payload.get("repeated_conservative_surface_column_separation_state")
+        _rcss_restore(
+            runtime.world,
+            raw_rcss if isinstance(raw_rcss, dict) else None,
+            runtime.config,
+        )
+        from mechanistic_mind.physical_system.event_driven_crowded_placement_retry_contract import (
+            restore_state as _crowded_restore,
+        )
+        raw_crowded = payload.get("event_driven_crowded_placement_retry_contract_state")
+        _crowded_restore(
+            runtime.world,
+            raw_crowded if isinstance(raw_crowded, dict) else None,
+            runtime.config,
+        )
+        from mechanistic_mind.physical_system.detached_material_amount_scaled_collision_radius import (
+            restore_state as _size_geo_restore,
+        )
+        raw_size_geo = payload.get("detached_material_amount_scaled_collision_radius_state")
+        _size_geo_restore(
+            runtime.world,
+            raw_size_geo if isinstance(raw_size_geo, dict) else None,
+            runtime.config,
+        )
+        from mechanistic_mind.physical_system.held_combine_radius_resize_transaction import (
+            restore_state as _held_combine_restore,
+        )
+        raw_held_combine = payload.get("held_combine_radius_resize_transaction_state")
+        _held_combine_restore(
+            runtime.world,
+            raw_held_combine if isinstance(raw_held_combine, dict) else None,
+            runtime.config,
+        )
+        from mechanistic_mind.physical_system.held_deposition_radius_shrink_transaction import (
+            restore_state as _held_deposition_restore,
+        )
+        raw_held_deposition = payload.get("held_deposition_radius_shrink_transaction_state")
+        _held_deposition_restore(
+            runtime.world,
+            raw_held_deposition if isinstance(raw_held_deposition, dict) else None,
+            runtime.config,
+        )
+        from mechanistic_mind.physical_system.free_space_state_and_pe_authority_contract import (
+            restore_state as _fs_restore,
+        )
+        raw_fs = payload.get("free_space_state_and_pe_authority_contract_state")
+        _fs_restore(
+            runtime.world,
+            raw_fs if isinstance(raw_fs, dict) else None,
+            runtime.config,
+        )
+        from mechanistic_mind.physical_system.vertical_terrain_landing_contact_response import (
+            restore_state as _vtl_restore,
+        )
+        raw_vtl = payload.get("vertical_terrain_landing_contact_response_state")
+        _vtl_restore(
+            runtime.world,
+            raw_vtl if isinstance(raw_vtl, dict) else None,
+            runtime.config,
+        )
+        from mechanistic_mind.physical_system.vertical_impact_acoustic_emission import (
+            restore_state as _via_restore,
+        )
+        raw_via = payload.get("vertical_impact_acoustic_emission_state")
+        _via_restore(
+            runtime.world,
+            raw_via if isinstance(raw_via, dict) else None,
+            runtime.config,
+        )
+        from mechanistic_mind.physical_system.authoritative_physical_acoustic_stream_contract import (
+            restore_state as _apas_restore,
+            rebuild_stream_from_histories as _apas_rebuild,
+            state_of as _apas_state_of,
+        )
+        raw_apas = getattr(runtime.world, "_authoritative_physical_acoustic_stream_payload", None)
+        if raw_apas is not None:
+            try:
+                del runtime.world._authoritative_physical_acoustic_stream_payload
+            except AttributeError:
+                pass
+        if raw_apas is None and isinstance(payload.get("authoritative_physical_acoustic_stream_state"), dict):
+            raw_apas = payload.get("authoritative_physical_acoustic_stream_state")
+        if isinstance(raw_apas, dict):
+            _apas_restore(runtime.world, raw_apas)
+        elif getattr(runtime.world, "local_signal_transport", None) is not None:
+            # Older snapshots: rebuild from restored mechanism/LPS histories (no re-emit).
+            _apas_rebuild(runtime.world)
+        # Restore must never enqueue into LPS; seen_emission_ids prevent stream duplicates.
+        _ = _apas_state_of(runtime.world)
+        from mechanistic_mind.physical_system.observer_acoustic_probe import (
+            restore_state as _oap_restore,
+        )
+        raw_oap = getattr(runtime.world, "_observer_acoustic_probe_payload", None)
+        if raw_oap is not None:
+            try:
+                del runtime.world._observer_acoustic_probe_payload
+            except AttributeError:
+                pass
+        if raw_oap is None and isinstance(payload.get("observer_acoustic_probe_state"), dict):
+            raw_oap = payload.get("observer_acoustic_probe_state")
+        if isinstance(raw_oap, dict):
+            # Restore config + history only; do not re-sample old ticks.
+            _oap_restore(runtime.world, raw_oap)
+        from mechanistic_mind.physical_system.selected_organism_auditory_boundary_receipt import (
+            restore_state as _soab_restore,
+        )
+        raw_soab = getattr(runtime.world, "_selected_organism_auditory_boundary_payload", None)
+        if raw_soab is not None:
+            try:
+                del runtime.world._selected_organism_auditory_boundary_payload
+            except AttributeError:
+                pass
+        if raw_soab is None and isinstance(
+            payload.get("selected_organism_auditory_boundary_state"), dict
+        ):
+            raw_soab = payload.get("selected_organism_auditory_boundary_state")
+        if isinstance(raw_soab, dict):
+            # History only; never replay into cognition / LPS / playback.
+            _soab_restore(runtime.world, raw_soab)
+        from mechanistic_mind.physical_system.selected_organism_volumetric_vision_view import (
+            restore_state as _sovv_restore,
+        )
+        raw_sovv = getattr(runtime.world, "_selected_organism_volumetric_vision_payload", None)
+        if raw_sovv is not None:
+            try:
+                del runtime.world._selected_organism_volumetric_vision_payload
+            except AttributeError:
+                pass
+        if raw_sovv is None and isinstance(
+            payload.get("selected_organism_volumetric_vision_state"), dict
+        ):
+            raw_sovv = payload.get("selected_organism_volumetric_vision_state")
+        if isinstance(raw_sovv, dict):
+            # History only; never regenerate perception or alter cognition.
+            _sovv_restore(runtime.world, raw_sovv)
+        from mechanistic_mind.physical_system.organism_receptor_grounded_3d_fpv import (
+            restore_state as _fpv_restore,
+        )
+        raw_fpv = getattr(runtime.world, "_organism_receptor_grounded_3d_fpv_payload", None)
+        if raw_fpv is not None:
+            try:
+                del runtime.world._organism_receptor_grounded_3d_fpv_payload
+            except AttributeError:
+                pass
+        if raw_fpv is None and isinstance(
+            payload.get("organism_receptor_grounded_3d_fpv_state"), dict
+        ):
+            raw_fpv = payload.get("organism_receptor_grounded_3d_fpv_state")
+        if isinstance(raw_fpv, dict):
+            # Researcher FPV state only; restore does not create a new observation.
+            _fpv_restore(runtime.world, raw_fpv)
+        from mechanistic_mind.physical_system.organism_auditory_transformation_trace import (
+            restore_state as _oatt_restore,
+        )
+        raw_oatt = getattr(runtime.world, "_organism_auditory_transformation_trace_payload", None)
+        if raw_oatt is not None:
+            try:
+                del runtime.world._organism_auditory_transformation_trace_payload
+            except AttributeError:
+                pass
+        if raw_oatt is None and isinstance(
+            payload.get("organism_auditory_transformation_trace_state"), dict
+        ):
+            raw_oatt = payload.get("organism_auditory_transformation_trace_state")
+        if isinstance(raw_oatt, dict):
+            # History only; never regenerate A3, SAV1, LPS, or playback.
+            _oatt_restore(runtime.world, raw_oatt)
+        from mechanistic_mind.physical_system.sensory_modality_temporal_alignment import (
+            restore_state as _o5_restore,
+        )
+        raw_o5s = getattr(runtime.world, "_sensory_modality_temporal_alignment_payload", None)
+        if raw_o5s is not None:
+            try:
+                del runtime.world._sensory_modality_temporal_alignment_payload
+            except AttributeError:
+                pass
+        if raw_o5s is None and isinstance(
+            payload.get("sensory_modality_temporal_alignment_state"), dict
+        ):
+            raw_o5s = payload.get("sensory_modality_temporal_alignment_state")
+        # History only; never create live envelopes or replay reception on restore.
+        _o5_restore(runtime.world, raw_o5s if isinstance(raw_o5s, dict) else None)
+        from mechanistic_mind.physical_system.researcher_physical_optical_audit_view import (
+            invalidate_o6_display_cache as _o6_invalidate,
+        )
+        _o6_invalidate(runtime.world)
+        from mechanistic_mind.physical_system.release_and_excavation_support_loss_integration import (
+            restore_state as _resli_restore,
+        )
+        raw_resli = payload.get("release_and_excavation_support_loss_integration_state")
+        _resli_restore(
+            runtime.world,
+            raw_resli if isinstance(raw_resli, dict) else None,
+            runtime.config,
+        )
+        bpayload = payload.get("body") or {}
+        if "z" in bpayload:
+            runtime.body.z = float(bpayload.get("z") or 0.0)
+        if "vz" in bpayload:
+            runtime.body.vz = float(bpayload.get("vz") or 0.0)
+        if "grounded" in bpayload:
+            runtime.body.grounded = bool(bpayload.get("grounded"))
+        if bpayload.get("vertical_half_extent") is not None:
+            runtime.body.vertical_half_extent = float(bpayload["vertical_half_extent"])
         return runtime

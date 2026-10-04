@@ -1,16 +1,20 @@
 /**
  * PSC MOTOR RESOLUTION — experiment control (not a science change).
- * Authoritative state from GET/POST /api/config/psc-motor-resolution.
+ * Live path: GET/POST /api/config/psc-motor-resolution.
+ * Deferred path: parent owns the draft; no network until Apply Experiment.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { deferredMotorStatus, liveMotorStatus } from './pscUiAuthority.ts';
 
 export type PscMotorResolution = 'LOCO_FACTORIZED' | 'OBSERVED_COMPOSITE';
 
 type Props = {
   pscEnabled: boolean;
-  /** Optional: parent can force a refresh key after reset/load */
   refreshKey?: string | number;
   compact?: boolean;
+  deferred?: boolean;
+  mode?: PscMotorResolution;
+  onModeChange?: (mode: PscMotorResolution) => void;
 };
 
 type ApiState = {
@@ -29,13 +33,16 @@ function normalize(raw: string | undefined | null): PscMotorResolution {
   return 'LOCO_FACTORIZED';
 }
 
-export function PscMotorResolutionControl({ pscEnabled, refreshKey, compact }: Props) {
-  const [mode, setMode] = useState<PscMotorResolution>('LOCO_FACTORIZED');
+export function PscMotorResolutionControl({
+  pscEnabled, refreshKey, compact, deferred, mode: modeProp, onModeChange,
+}: Props) {
+  const [mode, setMode] = useState<PscMotorResolution>(modeProp || 'LOCO_FACTORIZED');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastOk, setLastOk] = useState<ApiState | null>(null);
 
   const load = useCallback(async () => {
+    if (deferred) return;
     try {
       const r = await fetch('/api/config/psc-motor-resolution');
       const j = (await r.json()) as ApiState;
@@ -45,16 +52,25 @@ export function PscMotorResolutionControl({ pscEnabled, refreshKey, compact }: P
     } catch (e: any) {
       setError(String(e?.message || e || 'load failed'));
     }
-  }, []);
+  }, [deferred]);
 
   useEffect(() => {
+    if (deferred) {
+      if (modeProp) setMode(modeProp);
+      return;
+    }
     void load();
-  }, [load, refreshKey]);
+  }, [load, refreshKey, deferred, modeProp]);
 
   async function select(next: PscMotorResolution) {
     if (busy || next === mode) return;
+    if (deferred) {
+      setMode(next);
+      onModeChange?.(next);
+      return;
+    }
     const prev = mode;
-    setMode(next); // optimistic
+    setMode(next);
     setBusy(true);
     setError(null);
     try {
@@ -65,7 +81,6 @@ export function PscMotorResolutionControl({ pscEnabled, refreshKey, compact }: P
       });
       const j = await r.json();
       if (!r.ok || j.accepted === false) {
-        // restore authoritative
         await load();
         setError('MOTOR RESOLUTION UPDATE FAILED');
         return;
@@ -92,13 +107,12 @@ export function PscMotorResolutionControl({ pscEnabled, refreshKey, compact }: P
     }
   }
 
-  const status = !pscEnabled
-    ? mode === 'OBSERVED_COMPOSITE'
-      ? 'READY — PSC OFF'
-      : 'READY'
-    : mode === 'OBSERVED_COMPOSITE'
-      ? 'ACTIVE · EXPERIMENTAL'
-      : 'ACTIVE';
+  const status = deferred
+    ? deferredMotorStatus(pscEnabled)
+    : liveMotorStatus({
+        pscCurrentlyOn: pscEnabled,
+        observedComposite: mode === 'OBSERVED_COMPOSITE',
+      });
 
   const preserved =
     lastOk &&
@@ -147,6 +161,7 @@ export function PscMotorResolutionControl({ pscEnabled, refreshKey, compact }: P
           History preserved · SMC preserved · Body preserved
         </div>
       )}
+      {deferred && <div className="subtle">Draft only — applies with APPLY EXPERIMENT.</div>}
       {error && <div className="na">{error}</div>}
     </div>
   );

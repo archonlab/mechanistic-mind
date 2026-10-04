@@ -7,9 +7,9 @@ import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -30,6 +30,16 @@ WEB_DIST = Path(__file__).resolve().parent / "web_dist"
 
 class ControlBody(BaseModel):
     n: int = 1
+
+
+class ForcedMotorBody(BaseModel):
+    locomotion: str = "WAIT"
+    manipulator: str = "NONE"
+    manipulator_left: str = "NONE"
+    manipulator_right: str = "NONE"
+    manipulator_pair: str = "NONE"
+    apply_to_surface: bool = False
+    slot: int = 0
 
 
 class StopBody(BaseModel):
@@ -95,6 +105,22 @@ class ExperimentBody(BaseModel):
     pe_cold_history_eviction: bool | None = None
 
 
+@app.middleware("http")
+async def _instance_shutdown_cookie(request: Request, call_next):  # type: ignore[no-untyped-def]
+    response = await call_next(request)
+    token = os.environ.get("PSY_OBSERVER_SHUTDOWN_TOKEN")
+    if token and "mm_shutdown_token" not in request.cookies:
+        response.set_cookie(
+            key="mm_shutdown_token",
+            value=token,
+            httponly=True,
+            samesite="strict",
+            path="/",
+            max_age=86_400,
+        )
+    return response
+
+
 @app.get("/api/health")
 def health() -> dict[str, Any]:
     from mechanistic_mind.model.tiktaalik import display_name, model_metadata
@@ -104,13 +130,93 @@ def health() -> dict[str, Any]:
     return {
         "ok": True,
         "app": "Psy Observer",
-        "model": display_name(),
+        "model": meta.get("display_name") if isinstance(meta, dict) else display_name(),
         "model_metadata": meta,
         "version": __version__,
         "runtime": "TwoAgentRuntime" if getattr(session.runtime, "slots", None) else "PhysicalSystemRuntime",
         "instance_id": os.environ.get("PSY_OBSERVER_INSTANCE_ID"),
+        "package_identity": os.environ.get("PSY_OBSERVER_PACKAGE_IDENTITY"),
         "local": True,
+        "supervisor_pid": os.environ.get("PSY_OBSERVER_SUPERVISOR_PID"),
+        "supervisor_starttime": os.environ.get("PSY_OBSERVER_SUPERVISOR_STARTTIME"),
+        "backend_pid": os.getpid(),
+        # Never include shutdown_token.
     }
+
+
+def _cancel_all_analysis_jobs() -> dict[str, Any]:
+    cancelled: list[str] = []
+    for job_id in list(_ANALYSIS_JOBS.keys()):
+        try:
+            analysis_job_cancel(job_id)
+            cancelled.append(job_id)
+        except Exception:
+            continue
+    import time as _time
+
+    deadline = _time.monotonic() + 2.5
+    while _time.monotonic() < deadline:
+        if not any(_analysis_job_alive(rec) for rec in _ANALYSIS_JOBS.values()):
+            break
+        _time.sleep(0.08)
+    for rec in list(_ANALYSIS_JOBS.values()):
+        proc = rec.get("proc")
+        if proc is not None and getattr(proc, "poll", lambda: 0)() is None:
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+            try:
+                proc.wait(timeout=1.5)
+            except Exception:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+        out_dir = rec.get("out_dir")
+        if out_dir:
+            try:
+                from .process_ownership import read_progress, write_interrupted_progress, job_is_terminal
+
+                prog = read_progress(Path(out_dir))
+                if prog and not job_is_terminal(prog):
+                    write_interrupted_progress(Path(out_dir), prog, reason="application_shutdown")
+            except Exception:
+                pass
+    return {"cancelled_job_ids": cancelled}
+
+
+@app.post("/api/instance/shutdown")
+def instance_shutdown(request: Request) -> Any:
+    """Authenticated graceful process shutdown. Token is never returned."""
+    import signal
+    import threading
+    import time as _time
+
+    from .instance_lifecycle import ENV_SHUTDOWN_TOKEN, tokens_match
+
+    expected = os.environ.get(ENV_SHUTDOWN_TOKEN)
+    provided = request.headers.get("X-MM-Shutdown-Token") or request.cookies.get("mm_shutdown_token")
+    if not tokens_match(provided, expected):
+        return JSONResponse({"ok": False, "error": "unauthorized"}, status_code=403)
+    jobs = _cancel_all_analysis_jobs()
+    try:
+        sess = get_session()
+        sess.stop(save=False, reason="APPLICATION_SHUTDOWN")
+    except Exception:
+        pass
+
+    def _die() -> None:
+        if os.environ.get("PYTEST_CURRENT_TEST"):
+            return
+        _time.sleep(0.2)
+        try:
+            os.kill(os.getpid(), signal.SIGTERM)
+        except Exception:
+            os._exit(0)
+
+    threading.Thread(target=_die, daemon=True, name="mm-observer-shutdown").start()
+    return {"ok": True, "shutting_down": True, "jobs": jobs}
 
 
 @app.get("/api/model")
@@ -134,8 +240,34 @@ def instance() -> dict[str, Any]:
 
 
 @app.get("/api/state")
-def state() -> dict[str, Any]:
-    return get_session().current_frame()
+def state() -> Response:
+    """Return published Observer frame as canonical JSON bytes.
+
+    P4B: same-tick encoded-response cache (Starlette-compatible) skips repeated
+    jsonable_encoder + dumps for identical paused/polling authorities.
+    """
+    from mechanistic_mind.ui.psy_observer_web import observer_canonical_response_encoding as p4b
+
+    sess = get_session()
+    frame = sess.current_frame()
+    interest = getattr(sess, "_observer_interest", None)
+    products = None
+    if interest is not None:
+        products = sorted(str(p) for p in getattr(interest, "products", ()) or ())
+    auth = p4b.authority_key_from_frame(
+        frame,
+        run_id=getattr(sess, "_active_run_id", None),
+        runtime_generation=int(getattr(sess, "_runtime_generation", 0) or 0),
+        subscription_products=products,
+        evidence_mode=str(getattr(sess.config, "evidence_mode", None) or "FULL_SCIENTIFIC"),
+        endpoint="GET /api/state",
+    )
+    try:
+        body = p4b.encode_and_cache(frame, auth)
+    except Exception:
+        # Preserve prior FastAPI behavior on encode failure (no poisoned cache entry).
+        raise
+    return Response(content=body, media_type=p4b.MEDIA_TYPE)
 
 
 @app.get("/api/header")
@@ -163,9 +295,17 @@ def experiment() -> dict[str, Any]:
     return (get_session().current_frame().get("experiment") or {})
 
 
-@app.get("/api/experiment/applied-configuration")
-def applied_configuration() -> dict[str, Any]:
-    return get_session().applied_configuration_receipt()
+@app.get("/api/experiment/canonical-preset")
+def canonical_preset(name: str | None = None) -> dict[str, Any]:
+    from mechanistic_mind.physical_system.experiment_canonical import (
+        normalize_preset_name,
+        preset_canonical,
+    )
+
+    return {
+        "preset": normalize_preset_name(name),
+        "canonical": preset_canonical(name),
+    }
 
 
 @app.get("/api/world/boundary")
@@ -271,9 +411,75 @@ def control_step(body: ControlBody | None = None) -> dict[str, Any]:
     return get_session().step(n=n)
 
 
+@app.post("/api/debug/forced-motor")
+def debug_forced_motor(body: ForcedMotorBody | None = None) -> dict[str, Any]:
+    """Researcher probe for GRASP/RELEASE. Not a default action policy."""
+    b = body or ForcedMotorBody()
+    return get_session().researcher_forced_motor(
+        {"locomotion": b.locomotion, "manipulator": b.manipulator, "manipulator_left": b.manipulator_left, "manipulator_right": b.manipulator_right, "manipulator_pair": b.manipulator_pair, "apply_to_surface": b.apply_to_surface, "slot": b.slot}
+    )
+
+
+class SurfaceColumnTransferBody(BaseModel):
+    source_cell_x: float | None = None
+    source_cell_y: float | None = None
+    destination_cell_x: float | None = None
+    destination_cell_y: float | None = None
+    requested_thickness: float | None = None
+    expected_source_revision: int | None = None
+    expected_destination_revision: int | None = None
+    researcher_id: str | None = None
+    reason: str | None = None
+
+
+@app.post("/api/research/surface-column-transfer")
+def research_surface_column_transfer(body: SurfaceColumnTransferBody) -> dict[str, Any]:
+    """Researcher setup/intervention API (INTERVENTION_SETUP). Not an agent control or motor command."""
+    return get_session().researcher_surface_column_transfer(body.model_dump() if hasattr(body, "model_dump") else body.dict())
+
+
+class LocalSignalEmissionBody(BaseModel):
+    x: float | None = None
+    y: float | None = None
+    frequency: float | None = None
+    amplitude: float | None = None
+    band_energies: list[float] | None = None
+    researcher_id: str | None = None
+
+
+@app.post("/api/research/local-signal-emission")
+def research_local_signal_emission(body: LocalSignalEmissionBody) -> dict[str, Any]:
+    """Researcher calibration emission (INTERVENTION_SETUP). Not an agent control; no message delivery."""
+    return get_session().researcher_local_signal_emission(body.model_dump() if hasattr(body, "model_dump") else body.dict())
+
+
+class AcousticProbeBody(BaseModel):
+    enabled: bool | None = None
+    x: float | None = None
+    y: float | None = None
+    clear_history: bool | None = None
+
+
+@app.post("/api/research/acoustic-probe")
+def research_acoustic_probe(body: AcousticProbeBody) -> dict[str, Any]:
+    """Passive Observer acoustic probe configuration. Researcher-only; no LPS emit/enqueue."""
+    return get_session().researcher_acoustic_probe(
+        body.model_dump(exclude_none=True) if hasattr(body, "model_dump") else body.dict(exclude_none=True)
+    )
+
+
+class ResetBody(BaseModel):
+    seed: int | None = None
+    public_preset: str | None = None
+
+
 @app.post("/api/control/reset")
-def control_reset(seed: int | None = None) -> dict[str, Any]:
-    return get_session().reset(seed=seed)
+def control_reset(body: ResetBody | None = None, seed: int | None = None) -> dict[str, Any]:
+    b = body or ResetBody()
+    return get_session().reset(
+        seed=b.seed if b.seed is not None else seed,
+        public_preset=b.public_preset,
+    )
 
 
 @app.post("/api/control/speed")
@@ -961,6 +1167,84 @@ def _analysis_jobs_root() -> Path:
     return Path(root) / "analysis_jobs"
 
 
+def _analysis_job_progress(out_dir: Path) -> dict[str, Any]:
+    progress_path = out_dir / "progress.json"
+    if not progress_path.is_file():
+        return {}
+    try:
+        return json.loads(progress_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _analysis_job_alive(rec: dict[str, Any] | None) -> bool | None:
+    if not rec or rec.get("proc") is None:
+        return None
+    return rec["proc"].poll() is None
+
+
+@app.get("/api/analysis/jobs")
+def analysis_jobs_list() -> dict[str, Any]:
+    """List known jobs (memory + on-disk progress) for reconnect."""
+    root = _analysis_jobs_root()
+    jobs: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for job_id, rec in list(_ANALYSIS_JOBS.items()):
+        seen.add(job_id)
+        out_dir = Path(rec["out_dir"])
+        prog = _analysis_job_progress(out_dir)
+        jobs.append({
+            "job_id": job_id,
+            "pid": rec.get("pid"),
+            "alive": _analysis_job_alive(rec),
+            "source": rec.get("source"),
+            "run_id": rec.get("run_id"),
+            "out_dir": str(out_dir),
+            **{k: prog.get(k) for k in (
+                "state", "status", "phase", "terminal", "snapshot_terminal_tick", "started_at", "updated_at",
+            ) if k in prog},
+        })
+    if root.is_dir():
+        for child in sorted(root.iterdir(), reverse=True)[:40]:
+            if not child.is_dir() or child.name in seen:
+                continue
+            prog = _analysis_job_progress(child)
+            if not prog:
+                continue
+            jobs.append({
+                "job_id": child.name,
+                "alive": None,
+                "out_dir": str(child),
+                **{k: prog.get(k) for k in (
+                    "state", "status", "phase", "terminal", "snapshot_terminal_tick", "started_at", "updated_at", "run_id",
+                    "owner_instance_id", "owner_package_identity", "status_text", "message",
+                ) if k in prog},
+            })
+    from .process_ownership import INTERRUPTED_BY_APPLICATION_EXIT, job_is_terminal, job_owned_by_this_backend
+
+    inst = os.environ.get("PSY_OBSERVER_INSTANCE_ID")
+    ident = os.environ.get("PSY_OBSERVER_PACKAGE_IDENTITY")
+    active = []
+    for j in jobs:
+        if job_is_terminal(j):
+            continue
+        if str(j.get("state") or j.get("status") or "") == INTERRUPTED_BY_APPLICATION_EXIT:
+            continue
+        owner_inst = j.get("owner_instance_id")
+        owner_pkg = j.get("owner_package_identity")
+        if owner_inst and inst and str(owner_inst) != str(inst):
+            continue
+        if owner_pkg and ident and str(owner_pkg) != str(ident):
+            continue
+        if owner_inst or owner_pkg:
+            if not job_owned_by_this_backend(j) and j.get("job_id") not in _ANALYSIS_JOBS:
+                continue
+        elif j.get("job_id") not in _ANALYSIS_JOBS:
+            continue
+        active.append(j)
+    return {"jobs": jobs, "active": active[:8]}
+
+
 @app.post("/api/analysis/jobs")
 def analysis_job_start(payload: dict[str, Any] | None = None) -> dict[str, Any]:
     """Start heavy analysis in a subprocess. Does not mutate the source run."""
@@ -971,12 +1255,14 @@ def analysis_job_start(payload: dict[str, Any] | None = None) -> dict[str, Any]:
 
     from mechanistic_mind.ui.psy_observer_web.scientific_history import published_run_dir
     from mechanistic_mind.ui.psy_observer_web.run_finalize import default_results_root
+    from mechanistic_mind.scientific_v3.analyzer_next.snapshot import build_evidence_snapshot
 
     body = payload or {}
     source = str(body.get("source") or "current").lower()
     sess = get_session()
     run_dir: Path | None = None
     rid = str(body.get("run_id") or "").strip()
+    runtime_generation = None
     if source == "current":
         with sess._lock:
             live = sess._sci_live_dir
@@ -988,6 +1274,7 @@ def analysis_job_start(payload: dict[str, Any] | None = None) -> dict[str, Any]:
                 except Exception:
                     pass
             rid = rid or str(sess._active_run_id or "")
+            runtime_generation = getattr(sess, "_runtime_generation", None)
         run_dir = Path(live) if live else None
     elif source == "saved":
         if not rid or "/" in rid or ".." in rid or not rid.startswith("psyweb-"):
@@ -999,11 +1286,45 @@ def analysis_job_start(payload: dict[str, Any] | None = None) -> dict[str, Any]:
     if run_dir is None or not run_dir.is_dir():
         return {"accepted": False, "error": "run directory not found"}
 
+    # Duplicate-equivalent guard: same source+run with non-terminal active job.
+    for job_id, rec in list(_ANALYSIS_JOBS.items()):
+        if rec.get("source") != source or str(rec.get("run_id") or "") != str(rid or ""):
+            continue
+        if _analysis_job_alive(rec):
+            prog = _analysis_job_progress(Path(rec["out_dir"]))
+            if not prog.get("terminal"):
+                return {
+                    "accepted": False,
+                    "error": "equivalent_job_active",
+                    "job_id": job_id,
+                    "existing": True,
+                    "phase": prog.get("phase"),
+                    "state": prog.get("state") or prog.get("status"),
+                    "snapshot_terminal_tick": prog.get("snapshot_terminal_tick"),
+                }
+
     job_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S") + "-" + uuid.uuid4().hex[:8]
     out_dir = _analysis_jobs_root() / job_id
     out_dir.mkdir(parents=True, exist_ok=True)
-    # Never write analyzer artifacts into the live/forensic run directory.
+    # Freeze authoritative input boundary before worker starts.
+    snapshot = build_evidence_snapshot(
+        run_dir,
+        run_id=rid,
+        job_id=job_id,
+        source=source,
+        runtime_generation=int(runtime_generation) if runtime_generation is not None else None,
+    )
+    # Honor explicit cutoff only if it does not expand past frozen terminal.
     max_tick = body.get("cutoff_tick")
+    term = snapshot.get("snapshot_terminal_tick")
+    if max_tick is not None and term is not None:
+        max_tick = min(int(max_tick), int(term))
+    elif max_tick is None and term is not None:
+        max_tick = int(term)
+    if max_tick is not None:
+        snapshot["snapshot_terminal_tick"] = int(max_tick)
+    (out_dir / "snapshot.json").write_text(json.dumps(snapshot, indent=2, default=str) + "\n", encoding="utf-8")
+    # Never write analyzer artifacts into the live/forensic run directory.
     cmd = [
         sys.executable, "-m", "mechanistic_mind.scientific_v3.analyzer_next.job",
         "--run-dir", str(run_dir),
@@ -1013,14 +1334,45 @@ def analysis_job_start(payload: dict[str, Any] | None = None) -> dict[str, Any]:
         cmd.extend(["--max-tick", str(int(max_tick))])
     env = dict(os.environ)
     env.setdefault("PYTHONUNBUFFERED", "1")
-    proc = subprocess.Popen(cmd, cwd=str(Path(__file__).resolve().parents[3]), env=env)
+    from .instance_lifecycle import linux_pdeathsig_preexec
+
+    proc = subprocess.Popen(
+        cmd,
+        cwd=str(Path(__file__).resolve().parents[3]),
+        env=env,
+        start_new_session=False,
+        preexec_fn=linux_pdeathsig_preexec if os.name == "posix" else None,
+    )
+    from mechanistic_mind.scientific_v3.analyzer_next.job import write_progress
+    from .process_ownership import stamp_job_owner
+
+    owner_prog = stamp_job_owner({
+        "job_id": job_id,
+        "state": "QUEUED",
+        "status": "QUEUED",
+        "phase": "QUEUED",
+        "terminal": False,
+        "complete": False,
+        "scientific_complete": False,
+        "run_id": rid,
+        "source": source,
+        "run_dir": str(run_dir),
+        "worker_pid": proc.pid,
+        "snapshot_id": snapshot.get("snapshot_id") or snapshot.get("snapshot_at"),
+        "snapshot_terminal_tick": snapshot.get("snapshot_terminal_tick"),
+    })
+    write_progress(out_dir / "progress.json", owner_prog)
     _ANALYSIS_JOBS[job_id] = {
         "pid": proc.pid,
         "out_dir": str(out_dir),
         "run_dir": str(run_dir),
         "run_id": rid,
         "source": source,
+        "snapshot_terminal_tick": snapshot.get("snapshot_terminal_tick"),
         "proc": proc,
+        **{k: owner_prog.get(k) for k in (
+            "owner_instance_id", "owner_package_identity", "owner_backend_pid", "owner_backend_starttime",
+        )},
     }
     return {
         "accepted": True,
@@ -1030,7 +1382,12 @@ def analysis_job_start(payload: dict[str, Any] | None = None) -> dict[str, Any]:
         "run_dir": str(run_dir),
         "run_id": rid,
         "phase": "QUEUED",
+        "state": "QUEUED",
+        "snapshot_terminal_tick": snapshot.get("snapshot_terminal_tick"),
+        "snapshot_record_count": snapshot.get("snapshot_record_count"),
+        "snapshot_at": snapshot.get("snapshot_at"),
         "isolates_observer": True,
+        "mutates_runtime": False,
     }
 
 
@@ -1040,20 +1397,46 @@ def analysis_job_status(job_id: str) -> dict[str, Any]:
         return {"error": "invalid job_id"}
     rec = _ANALYSIS_JOBS.get(job_id)
     out_dir = Path(rec["out_dir"]) if rec else (_analysis_jobs_root() / job_id)
-    progress_path = out_dir / "progress.json"
-    progress = {}
-    if progress_path.is_file():
+    progress = _analysis_job_progress(out_dir)
+    alive = _analysis_job_alive(rec)
+    if rec is None and out_dir.is_dir():
+        from .process_ownership import job_is_terminal, job_owned_by_this_backend
+
+        # Refresh reconnect: restore only jobs owned by this live instance.
+        if job_owned_by_this_backend(progress) and not job_is_terminal(progress):
+            _ANALYSIS_JOBS.setdefault(job_id, {
+                "pid": None,
+                "out_dir": str(out_dir),
+                "run_dir": progress.get("run_dir"),
+                "run_id": progress.get("run_id"),
+                "source": None,
+                "proc": None,
+            })
+    if alive is False and progress.get("status") not in ("COMPLETE", "FAILED", "CANCELLED", "COMPLETED"):
+        progress.setdefault("status", "FAILED")
+        progress.setdefault("state", "FAILED")
+        progress.setdefault("phase", "FAILED")
+        code = None
         try:
-            progress = json.loads(progress_path.read_text(encoding="utf-8"))
+            code = (rec or {}).get("proc").returncode  # type: ignore[union-attr]
         except Exception:
-            progress = {}
-    alive = None
-    if rec and rec.get("proc") is not None:
-        alive = rec["proc"].poll() is None
-        if not alive and progress.get("status") not in ("COMPLETE", "FAILED", "CANCELLED"):
-            progress.setdefault("status", "FAILED")
-            progress.setdefault("phase", "FAILED")
-            progress.setdefault("error", f"analyzer process exited {rec['proc'].returncode}")
+            code = None
+        progress.setdefault("error", f"analyzer process exited {code}")
+        progress.setdefault("error_message", progress.get("error"))
+    # Derive UI health without claiming progress from polls alone.
+    hb = progress.get("worker_heartbeat_at") or progress.get("updated_at")
+    lp = progress.get("last_progress_at")
+    health = "UNKNOWN"
+    if progress.get("terminal") or progress.get("state") in (
+        "COMPLETED", "FAILED", "CANCELLED", "INTERRUPTED_BY_APPLICATION_EXIT",
+    ):
+        health = str(progress.get("state") or progress.get("status") or "COMPLETED")
+    elif alive is False:
+        health = "WORKER_UNREACHABLE"
+    elif alive is True or hb:
+        health = "WORKING"
+    progress["ui_health"] = health
+    progress["heartbeat_at"] = hb
     return {
         "job_id": job_id,
         "pid": (rec or {}).get("pid"),
@@ -1072,13 +1455,24 @@ def analysis_job_cancel(job_id: str) -> dict[str, Any]:
     out_dir = Path(rec["out_dir"]) if rec else (_analysis_jobs_root() / job_id)
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "CANCEL").write_text("1", encoding="utf-8")
-    proc = (rec or {}).get("proc")
-    if proc is not None and proc.poll() is None:
-        try:
-            proc.terminate()
-        except Exception:
-            pass
-    return {"accepted": True, "job_id": job_id, "phase": "CANCELLED"}
+    # Mark cancel requested in progress without claiming scientific failure.
+    prog = _analysis_job_progress(out_dir)
+    prog["state"] = "CANCEL_REQUESTED"
+    prog["cancel_requested"] = True
+    prog["status_text"] = "Cancel requested — stopping at next safe point"
+    prog["message"] = prog["status_text"]
+    from mechanistic_mind.scientific_v3.analyzer_next.job import write_progress
+    write_progress(out_dir / "progress.json", prog)
+    # Cooperative only: worker stops at next ProgressReporter safe point (CANCEL file).
+    # Do not SIGTERM — that would skip cleanup and could orphan partial exports as "complete".
+    return {
+        "accepted": True,
+        "job_id": job_id,
+        "phase": "CANCEL_REQUESTED",
+        "state": "CANCEL_REQUESTED",
+        "mutates_runtime": False,
+        "cooperative": True,
+    }
 
 
 @app.get("/api/analysis/jobs/{job_id}/result")
@@ -1170,6 +1564,8 @@ class ObserverDetailBody(BaseModel):
     products: list[str] | None = None
     product: str | None = None
     enabled: bool | None = None
+    surface_static_payload_id: str | None = None
+    volume_static_payload_id: str | None = None
 
 
 @app.get("/api/observer/detail")
@@ -1187,6 +1583,10 @@ def set_observer_detail(body: ObserverDetailBody) -> dict[str, Any]:
     Does NOT change cognition, mechanisms, scientific evidence, or RNG.
     """
     sess = get_session()
+    if body.volume_static_payload_id is not None and hasattr(sess, "set_volume_static_held"):
+        return sess.set_volume_static_held(body.volume_static_payload_id)
+    if body.surface_static_payload_id is not None and hasattr(sess, "set_surface_static_held"):
+        return sess.set_surface_static_held(body.surface_static_payload_id)
     if body.product is not None and body.enabled is not None and hasattr(sess, "update_observer_product"):
         return sess.update_observer_product(str(body.product), bool(body.enabled))
     if body.products is not None and hasattr(sess, "set_observer_products"):
@@ -1743,6 +2143,16 @@ async def _startup() -> None:
     sess.subscribe(_on_frame, eager=False)
     sess.set_publish_demand(lambda: bool(hub.clients))
     sess.subscribe_heartbeat(_on_heartbeat)
+    from .process_ownership import interrupt_unowned_jobs, start_supervisor_watchdog
+
+    start_supervisor_watchdog(interval_s=1.0)
+    # Only launcher-owned backends reconcile persisted jobs. TestClient must not
+    # rewrite the user's analysis_jobs tree.
+    if os.environ.get("PSY_OBSERVER_SUPERVISOR_PID"):
+        try:
+            interrupt_unowned_jobs(reason="owner_instance_gone")
+        except Exception:
+            pass
 
 
 @app.on_event("shutdown")

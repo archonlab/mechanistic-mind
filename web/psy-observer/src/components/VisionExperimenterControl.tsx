@@ -1,5 +1,7 @@
 /** Prominent Vision enable + R1/R2/R3 experimenter control (Sensors). */
 
+import { SettingInfoHelp } from './SettingInfoHelp';
+
 type IntegrityRow = {
   mechanism?: string;
   configured?: boolean;
@@ -25,6 +27,7 @@ type Props = {
   opticalMapping?: 'INDEPENDENT' | 'CORRELATED' | 'SHUFFLED' | 'UNIFORM';
   spatialVision?: 'LEGACY' | 'ANGULAR' | 'OCCLUSION' | 'TEMPORAL_SPATIAL';
   visionMechanismPresent?: boolean;
+  deferred?: boolean;
 };
 
 const RADIUS = [1, 2, 3] as const;
@@ -43,32 +46,60 @@ export function VisionExperimenterControl({
   opticalMapping = 'INDEPENDENT',
   spatialVision = 'LEGACY',
   visionMechanismPresent = true,
+  deferred = false,
 }: Props) {
-  const cfgR = configuredRadius != null ? configuredRadius : runtimeRadius;
+  const cfgR = configuredRadius != null ? Number(configuredRadius) : runtimeRadius;
   const status = !visionMechanismPresent
     ? 'UNAVAILABLE'
     : mismatch
-      ? 'MISMATCH'
+      ? (deferred ? 'UNAPPLIED' : 'MISMATCH')
       : 'READY';
 
   return (
-    <div className="panel science-card" style={{ marginBottom: 8 }}>
+    <div className="panel science-card" style={{ marginBottom: 8 }} data-testid="vision-experimenter-control">
       <h3>VISION</h3>
-      <div className="subtle">Physical near-field optical transduction · Moore candidate radius</div>
       <div className="metric" style={{ alignItems: 'center' }}>
-        <span>Enabled</span>
+        <span className="setting-label-row">
+          Vision Enabled
+          <SettingInfoHelp
+            label="Vision Enabled"
+            brief="Physical near-field optical transduction. Draft until APPLY when deferred."
+            detail={
+              <p>
+                Toggles the vision mechanism in the experiment draft (deferred) or live authority.
+                Does not claim camera imagery or human RGB.
+              </p>
+            }
+            testId="info-vision-enabled"
+          />
+        </span>
         <button
           type="button"
           className={visionEnabled ? 'active' : ''}
           disabled={!onToggleVision || !visionMechanismPresent}
-          title={!visionMechanismPresent ? 'Vision mechanism not in registry' : !onToggleVision ? 'Control not wired' : 'LIVE mutable'}
+          title={!visionMechanismPresent ? 'Vision mechanism not in registry' : !onToggleVision ? 'Control not wired' : deferred ? 'Draft — applies with APPLY EXPERIMENT' : 'LIVE mutable'}
           onClick={() => onToggleVision?.()}
         >
           {visionEnabled ? 'ON' : 'OFF'}
         </button>
       </div>
       <div className="metric" style={{ alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-        <span>Range</span>
+        <span className="setting-label-row">
+          Range
+          <SettingInfoHelp
+            label="Range"
+            brief="Moore neighborhood radius R1–R3. Expands candidate cells only."
+            detail={
+              <p>
+                {deferred
+                  ? 'Changes stay in the experiment draft until global Apply (new run at tick 0).'
+                  : 'LIVE change updates CONFIG + RUNTIME together. FOV / distance / illumination unchanged.'}
+                {' '}Public Beta cap R3. R3 is not forced as a canonical public-model default in this repair.
+              </p>
+            }
+            testId="info-vision-range"
+          />
+        </span>
         <div style={{ display: 'flex', gap: 4 }}>
           {RADIUS.map((r) => (
             <button
@@ -77,7 +108,7 @@ export function VisionExperimenterControl({
               className={runtimeRadius === r ? 'active' : ''}
               disabled={!onSetRadius || !visionEnabled}
               aria-pressed={runtimeRadius === r}
-              title={!onSetRadius ? 'Radius control not wired' : !visionEnabled ? 'Vision OFF — enable the mechanism first' : `LIVE — Moore neighborhood R=${r}`}
+              title={!onSetRadius ? 'Radius control not wired' : !visionEnabled ? 'Vision OFF — enable the mechanism first' : deferred ? `Draft Moore neighborhood R=${r}` : `LIVE — Moore neighborhood R=${r}`}
               onClick={() => onSetRadius?.(r)}
             >
               R{r}
@@ -90,7 +121,7 @@ export function VisionExperimenterControl({
         <strong>R{cfgR}</strong>
       </div>
       <div className="metric">
-        <span>Runtime</span>
+        <span>{deferred ? 'Draft range' : 'Runtime'}</span>
         <strong>R{runtimeRadius}</strong>
       </div>
       <div className="metric">
@@ -98,7 +129,17 @@ export function VisionExperimenterControl({
         <strong style={{ color: status === 'READY' ? undefined : '#b00020' }}>{status}</strong>
       </div>
       <div className="metric" style={{ alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-        <span>Surface discrimination</span>
+        <span className="setting-label-row">
+          Surface Discrimination
+          <SettingInfoHelp
+            label="Surface Discrimination"
+            brief="OFF = intensity only. LOW/RICH add anonymous surface_c* channels."
+            detail={
+              <p>Not human RGB; not terrain labels. Agent-accessible optical channels through the existing FOV.</p>
+            }
+            testId="info-surface-discrimination"
+          />
+        </span>
         <div style={{ display: 'flex', gap: 4 }}>
           {(['OFF', 'LOW', 'RICH'] as const).map((m) => (
             <button
@@ -115,12 +156,21 @@ export function VisionExperimenterControl({
           ))}
         </div>
       </div>
-      <div className="subtle">
-        OFF matches Beta 3 (exo_* intensity only). LOW/RICH add anonymous surface_c* channels
-        through the existing FOV. Not human RGB; not terrain labels.
-      </div>
       <div className="metric" style={{ alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-        <span>Optical mapping</span>
+        <span className="setting-label-row">
+          Optical Mapping
+          <SettingInfoHelp
+            label="Optical Mapping"
+            brief="WORLD appearance mapping from deterministic seeds — not a cognition mode."
+            detail={
+              <p>
+                Regenerates the optical tensor from experiment seed namespaces. Not a world-size reset,
+                but observations change. Accessible surface_c* follow the new WORLD field.
+              </p>
+            }
+            testId="info-optical-mapping"
+          />
+        </span>
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {(['INDEPENDENT', 'CORRELATED', 'SHUFFLED', 'UNIFORM'] as const).map((m) => (
             <button
@@ -129,7 +179,7 @@ export function VisionExperimenterControl({
               className={opticalMapping === m ? 'active' : ''}
               disabled={!onSetOpticalMapping}
               aria-pressed={opticalMapping === m}
-              title="Regenerates WORLD optical appearance from deterministic seeds. Does not reset tick/history. Accessible surface_c* will follow the new WORLD field."
+              title="Regenerates WORLD optical appearance from deterministic seeds."
               onClick={() => onSetOpticalMapping?.(m)}
             >
               {m}
@@ -137,12 +187,21 @@ export function VisionExperimenterControl({
           ))}
         </div>
       </div>
-      <div className="subtle">
-        Mapping is WORLD appearance, not a cognition mode. Apply regenerates the optical tensor
-        (same experiment seed namespaces). Not a world-size reset, but observations change.
-      </div>
       <div className="metric" style={{ alignItems: 'center', flexWrap: 'wrap', gap: 6 }} data-testid="spatial-vision-control">
-        <span>SPATIAL VISION</span>
+        <span className="setting-label-row">
+          Spatial Vision
+          <SettingInfoHelp
+            label="Spatial Vision"
+            brief="LEGACY exo bins vs A0–A4 spatial bins. OCCLUSION not forced canonical here."
+            detail={
+              <p>
+                LEGACY keeps exo_0/1/2. ANGULAR / OCCLUSION / TEMPORAL_SPATIAL use spatial_exo_a* bins.
+                Does not reset history. OCCLUSION is not established as a canonical public-model default in S7C.
+              </p>
+            }
+            testId="info-spatial-vision"
+          />
+        </span>
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {(['LEGACY', 'ANGULAR', 'OCCLUSION', 'TEMPORAL_SPATIAL'] as const).map((m) => (
             <button
@@ -151,7 +210,7 @@ export function VisionExperimenterControl({
               className={spatialVision === m ? 'active' : ''}
               disabled={!onSetSpatialVision || !visionEnabled}
               aria-pressed={spatialVision === m}
-              title={!visionEnabled ? 'Vision OFF — enable the mechanism first' : `LIVE — near_field_exteroception.spatial_vision = ${m}`}
+              title={!visionEnabled ? 'Vision OFF — enable the mechanism first' : deferred ? `Draft spatial_vision = ${m}` : `LIVE — near_field_exteroception.spatial_vision = ${m}`}
               onClick={() => onSetSpatialVision?.(m)}
             >
               {m}
@@ -159,15 +218,11 @@ export function VisionExperimenterControl({
           ))}
         </div>
       </div>
-      <div className="subtle">
-        LEGACY keeps exo_0 / exo_1 / exo_2 (LEFT | FORWARD | RIGHT). ANGULAR / OCCLUSION /
-        TEMPORAL_SPATIAL use canonical A0–A4 spatial_exo_a* bins. OCCLUSION and TEMPORAL_SPATIAL
-        apply 2D nearest-in-sector occlusion on the same sampler. Does not reset history.
-      </div>
-      <div className="subtle">
-        R expands candidate cells only (Public Beta cap R3). FOV / distance / illumination unchanged.
-        Default new experiment: R3. LIVE change updates CONFIG + RUNTIME together.
-      </div>
+      {deferred ? (
+        <div className="subtle" data-testid="experiment-draft-hint">
+          Changes saved to experiment draft — current run unchanged
+        </div>
+      ) : null}
     </div>
   );
 }

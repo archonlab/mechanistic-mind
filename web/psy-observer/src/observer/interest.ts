@@ -10,6 +10,8 @@ export type InterestPlan = {
   pscShadow: 'never' | 'opt-in';
 };
 
+export type VolumeWorkspaceMode = 'MAP' | 'VOLUME' | 'SURFACE';
+
 const INSPECT_PRODUCTS: Record<InspectorId, string[]> = {
   WORLD: [],
   WORLD_STATUS: [],
@@ -75,5 +77,36 @@ export async function applyObserverInterest(plan: InterestPlan): Promise<void> {
     }
   } catch {
     /* presentation interest is best-effort */
+  }
+}
+
+/** P1: sync central viewport mode → derived payload products (VOLUME/SURFACE). Does not touch physics. */
+export async function syncDerivedViewportSubscription(mode: VolumeWorkspaceMode): Promise<void> {
+  try {
+    await fetch('/api/observer/detail', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product: 'volume_xray', enabled: mode === 'VOLUME' }),
+    });
+    await fetch('/api/observer/detail', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product: 'surface_light', enabled: mode === 'SURFACE' }),
+    });
+  } catch {
+    /* derived viewport subscription is best-effort */
+  }
+}
+
+/** Eye dock dual-agent latest FPV map — enabled while Eye dock open (Vision or Hearing). */
+export async function syncEyeDockDualFpvSubscription(enabled: boolean): Promise<void> {
+  try {
+    await fetch('/api/observer/detail', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product: 'eye_dock_dual_fpv', enabled: Boolean(enabled) }),
+    });
+  } catch {
+    /* dual FPV interest is best-effort */
   }
 }

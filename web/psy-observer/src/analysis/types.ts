@@ -70,7 +70,7 @@ export type AgentAnalysis = {
     move_pct: NaMetric;
     move_distribution: Record<string, number> | 'NOT AVAILABLE';
     /** Transitions across ordered unique simulation ticks only. */
-    action_transitions: Record<string, number> | 'NOT AVAILABLE';
+    action_transitions: Record<string, number> | number | 'NOT AVAILABLE';
     longest_wait_streak: NaMetric;
     longest_move_streak: NaMetric;
     /** Explicit semantics for report/UI. */

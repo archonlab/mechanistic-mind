@@ -137,6 +137,7 @@ def test_one_click_lifecycle_reuses_and_quits(tmp_path):
     time.sleep(0.2)
     port = L.choose_port(8876)
     env_port = port
+    first = None
     try:
         first = L.launch(
             root=root,
@@ -163,6 +164,12 @@ def test_one_click_lifecycle_reuses_and_quits(tmp_path):
         assert second["port"] == first["port"]
     finally:
         L.quit_existing(root)
+        if first:
+            deadline = time.monotonic() + 5.0
+            while time.monotonic() < deadline and L.port_in_use(first.get("port", -1)):
+                if not L.is_our_health(L.probe_health(first["url"]), first.get("instance_id")):
+                    break
+                time.sleep(0.05)
         time.sleep(0.2)
         assert L.existing_healthy(root) is None
 

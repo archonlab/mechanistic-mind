@@ -210,6 +210,11 @@ class NearFieldExteroceptionConfig:
     # Phase 4: 2D spatial vision control. LEGACY = exact Beta 3.1 contract.
     spatial_vision: str = DEFAULT_SPATIAL_VISION
     spatial_sectors: int = DEFAULT_SPATIAL_SECTORS
+    # Acanthostega-only: include world ResourceObject surfaces in this sampler.
+    # Default False. Missing snapshot key → False (Tiktaalik / Materials agent-invisible).
+    resource_object_vision_enabled: bool = False
+    # Acanthostega-only cell coating. Default False. Missing key → False.
+    surface_optical_coating_enabled: bool = False
 
     @property
     def enabled(self) -> bool:
@@ -251,6 +256,10 @@ class NearFieldExteroceptionConfig:
         d["optical_mapping"] = clamp_optical_mapping(d.get("optical_mapping", "INDEPENDENT"))
         d["spatial_vision"] = clamp_spatial_vision(d.get("spatial_vision", DEFAULT_SPATIAL_VISION))
         d["spatial_sectors"] = clamp_spatial_sectors(d.get("spatial_sectors", DEFAULT_SPATIAL_SECTORS))
+        if not d.get("resource_object_vision_enabled"):
+            d.pop("resource_object_vision_enabled", None)
+        if not d.get("surface_optical_coating_enabled"):
+            d.pop("surface_optical_coating_enabled", None)
         return d
 
     @classmethod
@@ -896,6 +905,34 @@ _SNF_TICK: int | None = None
 _SNF_CACHE: dict[tuple[Any, ...], dict[str, Any]] = {}
 
 
+def _snf_ro_key(world: Any, enabled: bool) -> tuple[tuple[Any, ...], ...]:
+    if not enabled:
+        return ()
+    objs = getattr(world, "resource_objects", None) or []
+    out: list[tuple[Any, ...]] = []
+    for obj in objs:
+        resp = getattr(obj, "optical_response", (0.0, 0.0, 0.0))
+        if isinstance(resp, dict):
+            c0, c1, c2 = resp.get("c0", 0.0), resp.get("c1", 0.0), resp.get("c2", 0.0)
+        else:
+            seq = list(resp or (0.0, 0.0, 0.0))
+            c0 = seq[0] if len(seq) > 0 else 0.0
+            c1 = seq[1] if len(seq) > 1 else 0.0
+            c2 = seq[2] if len(seq) > 2 else 0.0
+        out.append(
+            (
+                str(getattr(obj, "object_id", "")),
+                round(float(getattr(obj, "x", 0.0) or 0.0), 6),
+                round(float(getattr(obj, "y", 0.0) or 0.0), 6),
+                round(float(getattr(obj, "optical_radius", 0.0) or 0.0), 6),
+                round(float(c0 or 0.0), 6),
+                round(float(c1 or 0.0), 6),
+                round(float(c2 or 0.0), 6),
+            )
+        )
+    return tuple(out)
+
+
 def _snf_fb_key(
     foreign_bodies: list[tuple[Any, Any]] | tuple[tuple[Any, Any], ...] | None,
 ) -> tuple[tuple[int, float, float, float], ...]:
@@ -925,12 +962,14 @@ def sample_near_field(
     tick: int | None = None,
     foreign_bodies: list[tuple[Any, Any]] | tuple[tuple[Any, Any], ...] | None = None,
     diagnostic: bool = False,
+    physical_config: Any = None,
 ) -> dict[str, Any]:
     """Full physical sensor evaluation + Observer diagnostics.
 
     Cognition-visible fragments are only under key ``fragments`` (exo_0..exo_2).
     Optional ``foreign_bodies``: sequence of (PhysicalBodyState, PhysicalBodyConfig)
     excluding the observing body (self-exclusion by caller).
+    Optional ``physical_config``: parent PhysicalSystemConfig (VW6 activation).
     """
     global _SNF_TICK, _SNF_CACHE
     h, w = int(world.T.shape[0]), int(world.T.shape[1])
@@ -944,6 +983,20 @@ def sample_near_field(
     head_on = bool(getattr(body, "_articulated_head_enabled", False))
     head_rel = float(getattr(body, "head_relative_angle", 0.0) or 0.0)
     radius = clamp_vision_radius(getattr(cfg, "radius", DEFAULT_VISION_RADIUS))
+    phys_cfg = physical_config if physical_config is not None else getattr(world, "_physical_system_config", None)
+    vw6_occ_digest = ""
+    try:
+        from mechanistic_mind.physical_system.minimal_vision_3d_geometric_interface import (
+            minimal_vision_3d_geometric_interface_is_active as _vw6_on,
+        )
+        from mechanistic_mind.physical_system.volumetric_world_material_occupancy import (
+            state_of as _vo_state,
+        )
+        if phys_cfg is not None and _vw6_on(phys_cfg):
+            _st = _vo_state(world)
+            vw6_occ_digest = "" if _st is None else str(_st.digest())
+    except Exception:
+        vw6_occ_digest = ""
     cache_key = (
         id(world),
         id(body),
@@ -958,6 +1011,7 @@ def sample_near_field(
         float(getattr(cfg, "illumination_min", 0.0) or 0.0),
         float(getattr(cfg, "illumination_max", 0.0) or 0.0),
         bool(getattr(cfg, "illumination_enabled", True)),
+        float(getattr(cfg, "illumination_frozen", None) if getattr(cfg, "illumination_frozen", None) is not None else -1.0),
         float(getattr(cfg, "threshold", 0.0) or 0.0),
         bool(getattr(cfg, "body_optics_active", False)),
         bool(getattr(cfg, "vision_contributes", False)),
@@ -967,6 +1021,30 @@ def sample_near_field(
         id(getattr(world, "surface_optical", None)),
         float(np.sum(world.surface_response)) if getattr(world, "surface_response", None) is not None else 0.0,
         _snf_fb_key(foreign_bodies),
+        bool(getattr(cfg, "resource_object_vision_enabled", False)),
+        (
+            (
+                int(getattr(world, "spatial_index_generation", 0) or 0),
+                int(getattr(world, "spatial_pose_epoch", 0) or 0),
+            )
+            if getattr(world, "spatial_contents", None) is not None
+            else _snf_ro_key(world, bool(getattr(cfg, "resource_object_vision_enabled", False)))
+        ),
+        bool(getattr(cfg, "surface_optical_coating_enabled", False)),
+        (
+            int(getattr(world, "surface_optical_coating_generation", 0) or 0)
+            if getattr(cfg, "surface_optical_coating_enabled", False)
+            else 0
+        ),
+        vw6_occ_digest,
+        "o4v1",
+        bool(
+            phys_cfg is not None
+            and __import__(
+                "mechanistic_mind.physical_system.organism_physical_optical_reception",
+                fromlist=["organism_physical_optical_reception_is_active"],
+            ).organism_physical_optical_reception_is_active(phys_cfg)
+        ),
     )
     hit = _SNF_CACHE.get(cache_key)
     if hit is not None:
@@ -975,8 +1053,96 @@ def sample_near_field(
             tagged = dict(hit)
             tagged["fpv_receipts"] = compact_fpv_receipts(hit)
             return tagged
+        # Cache reuse must not skip researcher scientific publication.
+        # Observer pre-samples can fill this cache without capture context;
+        # the cognition-bound pass still needs SOVV/FPV publication while armed.
+        try:
+            stash = getattr(world, "_sovv_last_near_field_by_body", None)
+            if not isinstance(stash, dict):
+                stash = {}
+                setattr(world, "_sovv_last_near_field_by_body", stash)
+            stash[id(body)] = hit
+        except Exception:
+            pass
+        try:
+            from mechanistic_mind.physical_system.selected_organism_volumetric_vision_view import (
+                capture_from_near_field_sample,
+            )
+
+            capture_from_near_field_sample(world, hit, diagnostic=False)
+        except Exception:
+            pass
+        try:
+            from mechanistic_mind.physical_system.organism_receptor_grounded_3d_fpv import (
+                capture_from_o4_trace,
+            )
+
+            by_body = getattr(world, "_o4_last_reception_by_body", None)
+            full_o4 = by_body.get(id(body)) if isinstance(by_body, dict) else None
+            if not isinstance(full_o4, dict):
+                full_o4 = getattr(world, "_o4_last_reception_trace", None)
+            if isinstance(full_o4, dict):
+                capture_from_o4_trace(world, full_o4, diagnostic=False)
+        except Exception:
+            pass
         return hit
     _prof_count("vision_cache_miss")
+
+    # O4 authoritative physical optical reception — replaces legacy radiometry entirely.
+    try:
+        from mechanistic_mind.physical_system.organism_physical_optical_reception import (
+            organism_physical_optical_reception_is_active,
+            sample_physical_optical_reception,
+        )
+
+        if phys_cfg is not None and organism_physical_optical_reception_is_active(phys_cfg):
+            out = sample_physical_optical_reception(
+                world=world,
+                body=body,
+                nfe_cfg=cfg,
+                physical_config=phys_cfg,
+                tick=t,
+                foreign_bodies=foreign_bodies,
+                diagnostic=diagnostic,
+            )
+            _SNF_CACHE[cache_key] = out
+            try:
+                stash = getattr(world, "_sovv_last_near_field_by_body", None)
+                if not isinstance(stash, dict):
+                    stash = {}
+                    setattr(world, "_sovv_last_near_field_by_body", stash)
+                stash[id(body)] = out
+            except Exception:
+                pass
+            if not diagnostic:
+                try:
+                    from mechanistic_mind.physical_system.selected_organism_volumetric_vision_view import (
+                        capture_from_near_field_sample,
+                    )
+
+                    capture_from_near_field_sample(world, out, diagnostic=False)
+                except Exception:
+                    pass
+                try:
+                    from mechanistic_mind.physical_system.organism_receptor_grounded_3d_fpv import (
+                        capture_from_o4_trace,
+                    )
+
+                    by_body = getattr(world, "_o4_last_reception_by_body", None)
+                    full_o4 = by_body.get(id(body)) if isinstance(by_body, dict) else None
+                    if not isinstance(full_o4, dict):
+                        full_o4 = getattr(world, "_o4_last_reception_trace", None)
+                    if isinstance(full_o4, dict):
+                        capture_from_o4_trace(world, full_o4, diagnostic=False)
+                except Exception:
+                    pass
+            if diagnostic:
+                tagged = dict(out)
+                tagged["fpv_receipts"] = compact_fpv_receipts(out)
+                return tagged
+            return out
+    except Exception:
+        pass
 
     # Sensor orientation authority: head_world when articulated head enabled on body.
     if head_on:
@@ -997,6 +1163,13 @@ def sample_near_field(
         if cfg.body_optics_active
         else {}
     )
+    ro_on = bool(getattr(cfg, "resource_object_vision_enabled", False))
+    coating_on = bool(getattr(cfg, "surface_optical_coating_enabled", False))
+    from mechanistic_mind.physical_system.resource_objects import resource_object_optical_occupancy
+
+    indexed = getattr(world, "spatial_contents", None)
+    occupancy_cells = [(int(cell_x), int(cell_y)) for cell_x, cell_y in neighbors] if indexed is not None and not getattr(indexed, "dirty", False) else None
+    ro_int, ro_spec, ro_ids = resource_object_optical_occupancy(world, enabled=ro_on, cells=occupancy_cells)
 
     channels = [0.0] * N_EXO_CHANNELS
     disc_mode = clamp_surface_discrimination(
@@ -1024,7 +1197,11 @@ def sample_near_field(
             ang = angular_sensitivity(rel, cfg.fov_deg, cfg.angular_power)
             inside = ang > 0.0
             surf = float(surface[niy, nix]) if surface is not None else 0.0
-            body_opt = float(body_occ.get((int(niy), int(nix)), 0.0))
+            cell_key = (int(niy), int(nix))
+            body_opt = float(body_occ.get(cell_key, 0.0))
+            ro_opt = float(ro_int.get(cell_key, 0.0))
+            if ro_opt > body_opt:
+                body_opt = ro_opt
             composed = compose_surface_and_body_optical(surf, body_opt)
             raw = composed * illum
             dist_f = distance_attenuation(dist, cfg.distance_k)
@@ -1038,6 +1215,20 @@ def sample_near_field(
             if optical is not None:
                 for ck in range(min(N_SURFACE_OPTICAL_CHANNELS, int(optical.shape[0]))):
                     opt_triplet[ck] = float(optical[ck, niy, nix])
+            if coating_on:
+                from mechanistic_mind.physical_system.physical_surface_optical_coating import (
+                    coat_cell_optical,
+                )
+                coated, coat_info = coat_cell_optical(world, int(nix), int(niy), opt_triplet)
+                opt_triplet = [coated[0], coated[1], coated[2]]
+            else:
+                coat_info = None
+            ro_triplet = ro_spec.get(cell_key)
+            if ro_triplet is not None:
+                for ck in range(min(N_SURFACE_OPTICAL_CHANNELS, len(ro_triplet))):
+                    opt_triplet[ck] = compose_surface_and_body_optical(
+                        opt_triplet[ck], float(ro_triplet[ck])
+                    )
             if final > 0.0:
                 detectable += 1
                 aggregate += final
@@ -1054,8 +1245,14 @@ def sample_near_field(
                 "distance_factor": float(dist_f),
                 "surface_response": surf,
                 "body_optical": body_opt,
+                "resource_object_optical": float(ro_opt),
+                "resource_object_ids": list(ro_ids.get(cell_key) or []),
+                "source_kind": (
+                    "RESOURCE_OBJECT_SURFACE" if ro_opt > 0.0 else None
+                ),
                 "composed_optical": composed,
                 "surface_optical": opt_triplet,
+                "surface_optical_coating": coat_info,
                 "illumination": illum,
                 "raw_observable": float(raw),
                 "pre_threshold": float(pre),
@@ -1063,12 +1260,50 @@ def sample_near_field(
                 "final_contribution": float(final),
             })
 
+    # VW6: physical XYZ + occupancy LOS before 2D spatial occlusion assemble.
+    vw6_meta = None
+    vw6_eye = None
+    try:
+        from mechanistic_mind.physical_system.minimal_vision_3d_geometric_interface import (
+            apply_vw6_to_near_field_sample,
+            minimal_vision_3d_geometric_interface_is_active,
+        )
+
+        use_cfg = (
+            physical_config
+            if physical_config is not None
+            else getattr(world, "_physical_system_config", None)
+        )
+        if use_cfg is not None and minimal_vision_3d_geometric_interface_is_active(use_cfg):
+            tmp = {"neighbors": neighbor_rows, "tick": int(t)}
+            apply_vw6_to_near_field_sample(world, tmp, body=body, config=use_cfg)
+            neighbor_rows = list(tmp.get("neighbors") or neighbor_rows)
+            vw6_meta = tmp.get("vw6")
+            vw6_eye = tmp.get("eye_xyz")
+    except Exception:
+        vw6_meta = None
+        vw6_eye = None
+
     spatial_mode = clamp_spatial_vision(getattr(cfg, "spatial_vision", DEFAULT_SPATIAL_VISION))
     n_spat = clamp_spatial_sectors(getattr(cfg, "spatial_sectors", DEFAULT_SPATIAL_SECTORS))
     with _prof_span("vis_spatial"):
         apply_spatial_visibility(
             neighbor_rows, mode=spatial_mode, fov_deg=float(cfg.fov_deg), n_sectors=n_spat
         )
+    # Preserve occupancy-LOS occlusion labels across 2D spatial visibility pass.
+    for row in neighbor_rows:
+        if row.get("occluded_by_occupancy") or row.get("visibility") == "OUTSIDE_VERTICAL_ACCEPTANCE":
+            if row.get("occluded_by_occupancy"):
+                row["visibility"] = "OCCLUDED_BY_OCCUPANCY"
+            row["visible_contribution"] = 0.0
+            row["final_contribution"] = 0.0
+            row["detectable"] = False
+    if coating_on:
+        from mechanistic_mind.physical_system.physical_surface_optical_coating import (
+            note_visible_coating,
+        )
+        for row in neighbor_rows:
+            note_visible_coating(world, row)
     occlude = spatial_vision_uses_occlusion(spatial_mode)
     spatial_exo = [0.0] * n_spat if spatial_vision_uses_extra_bins(spatial_mode) else []
     spatial_surf = (
@@ -1149,9 +1384,38 @@ def sample_near_field(
         "surface_meta": dict(getattr(world, "surface_meta", None) or {}),
         "ACTIVE_SENSOR_ORIENTATION": sensor_status,
         "articulated_head_enabled": head_on,
-        "optical_composition": "composed = 1 - (1-surf)*(1-body_opt); body_opt = max foreign optical_response",
+        "optical_composition": (
+            "composed = 1 - (1-surf)*(1-body_opt); "
+            "body_opt = max(foreign optical_response, resource_object optical intensity when enabled)"
+        ),
+        "resource_object_vision_enabled": bool(ro_on),
+        **({"vw6": vw6_meta, "eye_xyz": vw6_eye} if vw6_meta is not None else {}),
+        "n_resource_object_optical_cells": sum(
+            1 for r in neighbor_rows if float(r.get("resource_object_optical") or 0.0) > 0.0
+        ),
     }
     _SNF_CACHE[cache_key] = out
+    # Researcher stash: last exact sample per body (not cognition). Used to finalize
+    # SELECTED_ORGANISM_VOLUMETRIC_VISION_VIEW_V1 from agent_observation.
+    try:
+        stash = getattr(world, "_sovv_last_near_field_by_body", None)
+        if not isinstance(stash, dict):
+            stash = {}
+            setattr(world, "_sovv_last_near_field_by_body", stash)
+        stash[id(body)] = out
+    except Exception:
+        pass
+    # Researcher-only VW6 volumetric-vision trace: scientific capture context only.
+    # Observer/diagnostic polls must not arm capture context → no duplicate traces.
+    if not diagnostic:
+        try:
+            from mechanistic_mind.physical_system.selected_organism_volumetric_vision_view import (
+                capture_from_near_field_sample,
+            )
+
+            capture_from_near_field_sample(world, out, diagnostic=False)
+        except Exception:
+            pass
     if diagnostic:
         tagged = dict(out)
         tagged["fpv_receipts"] = compact_fpv_receipts(out)
@@ -1165,6 +1429,7 @@ def cognition_exo_fragments(
     body: PhysicalBodyState,
     cfg: NearFieldExteroceptionConfig,
     foreign_bodies: list[tuple[Any, Any]] | tuple[tuple[Any, Any], ...] | None = None,
+    physical_config: Any = None,
 ) -> dict[str, float]:
     """Cognition-only: anonymous exo_* floats.
 
@@ -1174,7 +1439,8 @@ def cognition_exo_fragments(
     if not cfg.vision_contributes:
         return {}
     sample = sample_near_field(
-        world=world, body=body, cfg=cfg, foreign_bodies=foreign_bodies
+        world=world, body=body, cfg=cfg, foreign_bodies=foreign_bodies,
+        physical_config=physical_config
     )
     # Guarantee channel keys even if sample path is empty.
     out = {f"exo_{i}": 0.0 for i in range(N_EXO_CHANNELS)}
@@ -1188,6 +1454,7 @@ def cognition_surface_fragments(
     body: PhysicalBodyState,
     cfg: NearFieldExteroceptionConfig,
     foreign_bodies: list[tuple[Any, Any]] | tuple[tuple[Any, Any], ...] | None = None,
+    physical_config: Any = None,
 ) -> dict[str, float]:
     """Cognition-only: anonymous surface_c* floats. Empty when OFF / vision ablated."""
     if not cfg.vision_contributes:
@@ -1196,7 +1463,8 @@ def cognition_surface_fragments(
     if mode == "OFF":
         return {}
     sample = sample_near_field(
-        world=world, body=body, cfg=cfg, foreign_bodies=foreign_bodies
+        world=world, body=body, cfg=cfg, foreign_bodies=foreign_bodies,
+        physical_config=physical_config
     )
     keys = surface_observation_keys(mode)
     out = {k: 0.0 for k in keys}
@@ -1210,6 +1478,7 @@ def cognition_spatial_fragments(
     body: PhysicalBodyState,
     cfg: NearFieldExteroceptionConfig,
     foreign_bodies: list[tuple[Any, Any]] | tuple[tuple[Any, Any], ...] | None = None,
+    physical_config: Any = None,
 ) -> dict[str, float]:
     """Cognition-only spatial angular bins. Empty in LEGACY / vision OFF."""
     if not cfg.vision_contributes:
@@ -1218,7 +1487,8 @@ def cognition_spatial_fragments(
     if not spatial_vision_uses_extra_bins(mode):
         return {}
     sample = sample_near_field(
-        world=world, body=body, cfg=cfg, foreign_bodies=foreign_bodies
+        world=world, body=body, cfg=cfg, foreign_bodies=foreign_bodies,
+        physical_config=physical_config
     )
     keys = spatial_observation_keys(
         spatial_mode=mode,

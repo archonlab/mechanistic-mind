@@ -58,6 +58,9 @@ export type FovOverlayState = {
 export type EyeLayout = 'A0' | 'A1' | 'SPLIT';
 export type EyeDockMode = 'CLOSED' | 'NORMAL' | 'WIDE';
 
+/** Left sensory workspace: vision/FPV vs hearing (researcher UI only). */
+export type LeftSensoryMode = 'VISION' | 'HEARING';
+
 export type InspectorUiState = {
   tabs: Partial<Record<InspectorId, string>>;
   accordions: Record<string, boolean>;
@@ -66,6 +69,8 @@ export type InspectorUiState = {
   eyeLayout: EyeLayout;
   eyeDockMode: EyeDockMode;
   eyeDockWidth: number;
+  /** OBSERVER_LEFT_HEARING_WORKSPACE_V1 — not physics. */
+  leftSensoryMode: LeftSensoryMode;
 };
 
 function createStore<T>(initial: T) {
@@ -156,6 +161,7 @@ function statusEqual(a: SlimStatus, b: SlimStatus): boolean {
     && a.selectedAgentId === b.selectedAgentId
     && a.undercoverIn === b.undercoverIn
     && a.runtimeGeneration === b.runtimeGeneration
+    && a.modelName === b.modelName
     && a.heartbeat === b.heartbeat
   );
 }
@@ -210,6 +216,9 @@ export const statusStore = (() => {
 
 export const clockStore = createStore(0);
 
+/** P1: browser tab visibility — render suspension only; never pauses simulation. */
+export const tabVisibilityStore = createStore(false);
+
 export const workspaceStore = createStore<WorkspaceState>({
   workspace: 'RUN',
   inspector: 'SENSORS',
@@ -224,7 +233,18 @@ export const inspectorUiStore = createStore<InspectorUiState>({
   eyeLayout: 'A0',
   eyeDockMode: 'CLOSED',
   eyeDockWidth: 400,
+  leftSensoryMode: 'VISION',
 });
+
+/** Open left dock on HEARING tab (researcher UI only). */
+export function openLeftHearingWorkspace() {
+  const cur = inspectorUiStore.get();
+  inspectorUiStore.set({
+    ...cur,
+    leftSensoryMode: 'HEARING',
+    eyeDockMode: cur.eyeDockMode === 'CLOSED' ? 'NORMAL' : cur.eyeDockMode,
+  });
+}
 
 export const cameraFollowStore = {
   get: () => inspectorUiStore.get().cameraFollow,

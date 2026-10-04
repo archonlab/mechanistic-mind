@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="MM Observer">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2ec4b6"/>
+      <stop offset="55%" stop-color="#1a8fbf"/>
+      <stop offset="100%" stop-color="#0b5f8a"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#7ef0e0" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#0e7490" stop-opacity="0.35"/>
+    </linearGradient>
+  </defs>
+  <!-- rounded causal cube / volumetric boundary -->
+  <rect x="64" y="64" width="384" height="384" rx="72" ry="72" fill="url(#g)"/>
+  <rect x="96" y="96" width="320" height="320" rx="56" ry="56" fill="none" stroke="url(#edge)" stroke-width="18"/>
+  <!-- subtle M / causal-loop geometry (no text glyphs) -->
+  <path d="M150 330 V190 L256 290 L362 190 V330"
+        fill="none" stroke="#e8fbff" stroke-width="34" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
+  <circle cx="256" cy="256" r="28" fill="#e8fbff" opacity="0.85"/>
+  <path d="M210 256 A46 46 0 1 1 302 256" fill="none" stroke="#9be7ff" stroke-width="14" stroke-linecap="round" opacity="0.75"/>
+</svg>

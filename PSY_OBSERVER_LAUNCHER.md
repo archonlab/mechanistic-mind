@@ -1,75 +1,73 @@
-# Psy Observer Web launcher
+# MM Observer launcher
 
-**Psy Observer Web** is the Public Beta 3.1 interface for MM 1.0 Tiktaalik.
+**MM Observer** (Mechanistic Mind Observer — Acanthostega Beta 4.0) is the zero-setup local application for the public Tiktaalik Beta 3.1 and Acanthostega Beta 4.0 models.
 
-## Normal use (platform launchers)
+Scientific status: **Beta 4 partially validated — bounded supported claims** (post-V1B S6).
+
+## Normal use (packaged release)
 
 | Platform | File |
 |----------|------|
-| Linux | `launch_psy_observer.sh` (also `PsyObserver`) |
-| macOS | `launch_psy_observer.command` |
-| Windows | `launch_psy_observer.bat` (also `.cmd`) |
+| Linux | `MM Observer` (also `PsyObserver`) |
 
-Double-click or run the file for your OS. You do not need a terminal, a virtual environment activation step, a port number, or a localhost URL.
+Double-click or run `./PsyObserver`. You do not need a terminal, system Python, a virtual environment, Node/npm, a port number, or a localhost URL.
+
+Optional application menu entry:
+
+```bash
+./install-desktop-entry.sh
+```
 
 What happens:
 
-1. The launcher finds this project even if you started it from somewhere else.
-2. It prefers `.venv_psy_web` when present (Unix `bin/`, Windows `Scripts/`).
-3. If `.venv_psy_web` is missing or incomplete, first launch runs
-   `scripts/bootstrap_psy_observer_env.py`: it creates the environment and
-   installs `requirements-observer.txt`. **Internet access is required** for
-   that install. First launch can take several minutes. Later launches reuse
-   `.venv_psy_web` and do not reinstall unless the environment is broken.
-4. It checks that the production Observer interface is already built (`web_dist`).
-5. If Psy Observer Web is already running for this checkout, it opens that same local window again.
-6. Otherwise it starts one local server on `127.0.0.1`, picks a free port if needed (preferred **8768**), waits until healthy, and opens your browser.
+1. The launcher resolves its own install directory (cwd does not matter; the tree is relocatable).
+2. It uses the bundled `runtime/python` interpreter and packaged libraries (no user-created venv).
+3. Mutable state uses XDG directories (see below); the install directory may be read-only.
+4. It checks that the production Observer interface is present (`web_dist`).
+5. If MM Observer is already running for this user session, it reuses that instance.
+6. Otherwise it starts one local server on `127.0.0.1`, picks a free port if needed (preferred **8768**), waits until healthy, and opens a dedicated Chromium application window (private profile, no address bar).
 
-All platforms call the same Python entry:
+Window title: **Mechanistic Mind Observer — Acanthostega Beta 4.0**
 
-`python -m mechanistic_mind.ui.psy_observer_web.launcher`
+## User data (XDG)
 
-(`python -m mechanistic_mind.ui.psy_observer_web` is equivalent — it delegates to the launcher.)
+| Kind | Location |
+|------|----------|
+| Config | `${XDG_CONFIG_HOME:-$HOME/.config}/mm-observer/` |
+| Data (saved runs, exports) | `${XDG_DATA_HOME:-$HOME/.local/share}/mm-observer/` |
+| Cache | `${XDG_CACHE_HOME:-$HOME/.cache}/mm-observer/` |
+| State (logs, locks) | `${XDG_STATE_HOME:-$HOME/.local/state}/mm-observer/` |
 
-That is the single source of truth for port selection, lock/reuse, and browser open. They do **not** start Legacy Psychology Observer.
+Saved runs persist across application upgrades. Removing the install directory does not delete user data. Cache may be deleted safely.
+
+## Backup
+
+Copy `~/.local/share/mm-observer/` (and optionally `~/.config/mm-observer/`).
+
+## Uninstall
+
+Delete the extracted application directory. Optionally delete the XDG folders above. If you ran `install-desktop-entry.sh`, also remove `~/.local/share/applications/mm-observer.desktop`.
+
+## Portable relocation
+
+Move or rename the install directory, then launch `./PsyObserver` again (or re-run `install-desktop-entry.sh`).
 
 ## Shutdown
 
-Closing a browser tab does **not** stop the experiment.
+Close the MM Observer application window, or choose **More → Exit MM Observer**.
+That stops the backend, Analyzer workers, and researcher audio, and releases the loopback port.
 
-To stop Psy Observer Web:
-
-- click **Quit Psy Observer** in the small application window, or
-- press Ctrl+C in the launcher terminal, or
-- run `./launch_psy_observer.sh --quit` (Linux/macOS) / `launch_psy_observer.bat --quit` (Windows).
-
-## macOS notes
-
-- First launch may need **right-click → Open** if Gatekeeper quarantines the `.command` file.
-- Homebrew is not required by Psy Observer Web.
-
-## Windows notes
-
-- Double-click `launch_psy_observer.bat`. WSL is not required.
-- On failure the window stays open with a readable message (`pause`).
+Closing an ordinary browser tab is not the product shutdown path. Refreshing the
+application window does not stop the server.
 
 ## Logs
 
-`.psy_observer/launcher.log`
+`${XDG_STATE_HOME:-$HOME/.local/state}/mm-observer/launcher/launcher.log`
 
-## If first-run setup fails
+## Development checkout notes
 
-You do **not** need to create `.venv_psy_web` by hand. Typical causes: no
-network, blocked `pip`, or Python older than 3.11. Install a current Python,
-restore network access, then run the same launcher again. Details are in
-`.psy_observer/launcher.log`. To force a clean retry, delete `.venv_psy_web`
-and relaunch.
+The Experiment → PSC panel shows **CURRENT RUNTIME** first (live ON/OFF, enabled-at tick, transition count). **NEXT RUN** is draft only. An initial-OFF next-run schedule does not mean the current run is OFF.
 
-## Development
-
-```bash
-cd web/psy-observer && npm run build
-python -m mechanistic_mind.ui.psy_observer_web.launcher --no-browser
-```
+Developer checkouts may still create `.venv_psy_web` via `scripts/bootstrap_psy_observer_env.py` when a bundled runtime is absent. Packaged releases never require that path.
 
 Useful flags: `--quit` `--no-browser` `--no-window` `--no-wait`

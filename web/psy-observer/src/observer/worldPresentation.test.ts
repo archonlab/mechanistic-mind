@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import { resolvedWorldTheme, worldChrome } from './worldPresentation.ts';
 
 describe('world presentation theme', () => {
-  it('resolves light only from data-theme=light', () => {
+  it('resolves light from data-theme=light or aquatic; dark otherwise', () => {
     assert.equal(resolvedWorldTheme({ dataset: { theme: 'light' } } as any), 'light');
+    assert.equal(resolvedWorldTheme({ dataset: { theme: 'aquatic' } } as any), 'light');
     assert.equal(resolvedWorldTheme({ dataset: { theme: 'dark' } } as any), 'dark');
     assert.equal(resolvedWorldTheme({ dataset: {} } as any), 'dark');
   });

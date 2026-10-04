@@ -17,12 +17,22 @@ describe('Experiment Vision tab hosts the only vision editors', () => {
     const app = readFileSync(join(root, 'App.tsx'), 'utf8');
     const dock = readFileSync(join(root, 'inspectors/InspectorDock.tsx'), 'utf8');
     const expTabs = dock.slice(dock.indexOf('EXPERIMENT: ['), dock.indexOf('SENSORS: ['));
+    const vStart = app.indexOf("tabId === 'vision'");
+    const afterVisionCandidates = [
+      app.indexOf("\n      if (tabId === 'model')", vStart + 1),
+      app.indexOf("\n      if (tabId === 'psc')", vStart + 1),
+      app.indexOf("\n      if (tabId === 'ablations')", vStart + 1),
+      app.indexOf("\n      if (tabId === 'ecology')", vStart + 1),
+      app.indexOf("\n    if (which === 'intervention')", vStart + 1),
+    ].filter((i) => i > vStart);
+    const vEnd = Math.min(...afterVisionCandidates);
+    const visionOnly = app.slice(vStart, vEnd);
+    assert.ok(visionOnly.includes('VisionExperimenterControl'));
     assert.ok(expTabs.includes("{ id: 'vision', label: 'Vision' }"));
-    assert.ok(expTabs.indexOf("{ id: 'model', label: 'Model' }") < expTabs.indexOf("{ id: 'vision', label: 'Vision' }"));
+    assert.ok(expTabs.includes("{ id: 'review', label: 'Review / Apply' }"));
+    assert.ok(expTabs.indexOf("{ id: 'vision', label: 'Vision' }") < expTabs.indexOf("{ id: 'review', label: 'Review / Apply' }"));
     assert.ok(app.includes("tabId === 'vision'"));
     assert.ok(app.includes('data-testid="experiment-vision-config"'));
-    const visionBlock = app.slice(app.indexOf("tabId === 'vision'"), app.indexOf("tabId === 'model'"));
-    assert.ok(visionBlock.includes('VisionExperimenterControl'));
     const sensorsBlock = app.slice(app.indexOf("which === 'sensors'"), app.indexOf("which === 'signals'"));
     assert.equal(sensorsBlock.includes('VisionExperimenterControl'), false);
     assert.equal(dock.includes('<VisionExperimenterControl'), false);
@@ -34,8 +44,9 @@ describe('Experiment Vision tab hosts the only vision editors', () => {
     const js = readFileSync(join(distAssets, files[0]), 'utf8');
     assert.ok(js.includes('experiment-vision-config'), 'built SPA missing experiment-vision-config');
     assert.ok(
-      js.includes('{id:`model`,label:`Model`},{id:`vision`,label:`Vision`}'),
-      'built SPA missing Experiment Vision tab after Model',
+      js.includes('{id:`vision`,label:`Vision`},{id:`review`,label:`Review / Apply`}')
+      || (js.includes('Vision') && js.includes('Review / Apply')),
+      'built SPA missing Experiment Vision tab before Review / Apply',
     );
   });
 

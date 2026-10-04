@@ -21,20 +21,20 @@ import {
   type InspectorId,
 } from '../observer/stores';
 import { useFrameStore, useStatusStore, useWorkspaceStore } from '../observer/useExternalStore';
+import { overlayMechanismEnabled } from '../observer/experimentDraft';
 import { InspectorAccordion, InspectorTabs, ReadOnlyMetric, SemanticChip } from './primitives';
 import { FovOverlayControls } from './FovOverlayControls';
 
 export const SECTION_TABS: Record<string, { id: string; label: string }[]> = {
   EXPERIMENT: [
-    { id: 'ecology', label: 'Ecology' },
-    { id: 'perception', label: 'Perception' },
-    { id: 'body', label: 'Body' },
-    { id: 'cognition', label: 'Cognition' },
-    { id: 'predictive', label: 'Predictive' },
-    { id: 'ablations', label: 'Ablations' },
     { id: 'world', label: 'World' },
+    { id: 'ecology', label: 'Ecology' },
     { id: 'model', label: 'Model' },
+    { id: 'body', label: 'Body' },
+    { id: 'psc', label: 'PSC' },
+    { id: 'ablations', label: 'Ablations' },
     { id: 'vision', label: 'Vision' },
+    { id: 'review', label: 'Review / Apply' },
   ],
   SENSORS: [
     { id: 'vision', label: 'Vision' },
@@ -74,7 +74,7 @@ export const SECTION_TABS: Record<string, { id: string; label: string }[]> = {
 };
 
 const DEFAULT_TAB: Record<string, string> = {
-  EXPERIMENT: 'ecology',
+  EXPERIMENT: 'world',
   SENSORS: 'vision',
   SIGNALS: 'physical',
   INTERVENTION: 'agent',
@@ -124,6 +124,8 @@ type Props = {
   expPressed?: string | null;
   extras?: Extras;
   onSectionTab?: (inspector: InspectorId, tab: string) => void;
+  experimentApplyBar?: ReactNode;
+  experimentMechanismDraft?: Record<string, boolean>;
 };
 
 function num(v: any, d = 3) {
@@ -138,6 +140,26 @@ function BodyMetrics({ physical, body, frame }: { physical: any; body: any; fram
       <ReadOnlyMetric name="action" value={physical.selected_action || body.selected_action || '—'} />
       <ReadOnlyMetric name="work reservoir" value={num(physical.resources?.reservoir)} kind="GT" />
       <ReadOnlyMetric name="R_A / R_B" value={`${num(physical.resources?.A)} / ${num(physical.resources?.B)}`} kind="GT" />
+      {(frame?.world?.resource_objects || []).length > 0 ? (
+        <ReadOnlyMetric
+          name="resource objects (researcher-only)"
+          value={(frame.world.resource_objects as any[]).map((o: any) => {
+            const opt = o.optical_response || {};
+            const vis = o.agent_optical_contribution_enabled ? 'agent-optics-on' : 'agent-optics-off';
+            const hold = o.holder_body_id ? ` holder=${o.holder_body_id}` : '';
+            const props = o.passive_material_properties;
+            const passive = props
+              ? ` compliance=${Number(props.compliance).toFixed(3)} surface_affinity=${Number(props.surface_affinity).toFixed(3)} derivation=${props.derivation_version || props.derivation} researcher-only not agent-accessible passive — no consequence kernel`
+              : '';
+            const sgObj = o.size_geometry;
+            const sg = sgObj
+              ? ` size_geo=${sgObj.clamp_status || sgObj.scope_classification || 'scaled'} profile=${sgObj.profile_version || '—'} raw_r=${sgObj.raw_radius != null ? Number(sgObj.raw_radius).toFixed(3) : '—'} resize=NO`
+              : '';
+            return `${o.object_id} ${o.physical_state}${hold} coll_r=${Number(o.collision_radius ?? 0.25).toFixed(3)} opt_r=${Number(o.optical_radius || 0).toFixed(2)} vhe=${o.vertical_half_extent != null ? Number(o.vertical_half_extent).toFixed(3) : '—'} qty=${Number(o.quantity || 0).toFixed(3)} mass=${Number(o.mass || 0).toFixed(3)}${sg} ${vis} c0=${Number(opt.c0 ?? 0).toFixed(2)}${passive}`;
+          }).join(' | ')}
+          kind="GT"
+        />
+      ) : null}
       <MotionCausalInspector whyMove={frame?.causal_chain?.why_did_it_move} physical={physical} />
       <WhyDidItsShapeChange whyMove={frame?.causal_chain?.why_did_it_move} physical={physical} />
       <WhyDidItRotate whyMove={frame?.causal_chain?.why_did_it_move} physical={physical} />
@@ -147,7 +169,7 @@ function BodyMetrics({ physical, body, frame }: { physical: any; body: any; fram
 
 export const InspectorDock = memo(function InspectorDock({
   mechanisms, onToggleMechanism, onSetVisionRadius, onSetSurfaceDiscrimination, onSetOpticalMapping, onSetSpatialVision, expPressed, extras,
-  onSectionTab,
+  onSectionTab, experimentApplyBar, experimentMechanismDraft,
 }: Props) {
   void onSetVisionRadius;
   void onSetSurfaceDiscrimination;
@@ -174,7 +196,14 @@ export const InspectorDock = memo(function InspectorDock({
   const physical = frame?.physical || {};
   const body = frame?.body || {};
   const header = frame?.header || {};
-  const pscOn = Boolean((mechanisms || []).find((m: any) => m.id === 'prospective_scenario_competition')?.enabled);
+  const experimentInspector = inspector === 'EXPERIMENT' || inspector === 'MECHANISMS' || inspector === 'PREDICTIVE';
+  /** Global Apply only on Review / Apply — never inside Vision/World/Model category panels. */
+  const showGlobalApply = inspector === 'EXPERIMENT' && activeTab === 'review';
+  const displayedMechanisms = (experimentInspector && experimentMechanismDraft
+    ? overlayMechanismEnabled(mechanisms || [], experimentMechanismDraft)
+    : (mechanisms || [])
+  ).filter((m: any) => m?.model_line !== 'ACANTHOSTEGA' || String(header.model_line || '') === 'ACANTHOSTEGA');
+  const pscOn = Boolean((displayedMechanisms || []).find((m: any) => m.id === 'prospective_scenario_competition')?.enabled);
   const agentLabel = String(status.selectedAgentId || header.selected_agent_id || 'agent_0').toUpperCase();
   const runStatus = String(status.status || header.status || 'UNKNOWN');
 
@@ -210,7 +239,7 @@ export const InspectorDock = memo(function InspectorDock({
   const mechanismsBody = (
     <>
       <MechanismPreflightPanel integrity={frame?.mechanism_integrity} />
-      <MechanismsPanel data={{ mechanisms }} onToggle={onToggleMechanism} />
+      <MechanismsPanel data={{ mechanisms: displayedMechanisms }} onToggle={onToggleMechanism} />
     </>
   );
 
@@ -221,7 +250,7 @@ export const InspectorDock = memo(function InspectorDock({
         <VestibularProprioceptionPanel
           physical={physical}
           agentObservation={frame?.agent_observation}
-          mechanisms={mechanisms}
+          mechanisms={displayedMechanisms}
           onToggleMechanism={toggleMechObj}
         />
       );
@@ -230,7 +259,7 @@ export const InspectorDock = memo(function InspectorDock({
     } else if (activeTab === 'ambient') {
       bodyContent = (
         <InspectorAccordion id="ambient-gt" title="Illumination / ambient" defaultOpen>
-          <ReadOnlyMetric name="Illumination cycle" value={(mechanisms || []).find((m: any) => m.id === 'illumination_cycle')?.enabled ? 'ON' : 'OFF'} kind="LIVE" />
+          <ReadOnlyMetric name="Illumination cycle" value={(displayedMechanisms || []).find((m: any) => m.id === 'illumination_cycle')?.enabled ? 'ON' : 'OFF'} kind="LIVE" />
           <ReadOnlyMetric name="Illumination" value={physical?.near_field_exteroception?.illumination} kind="GT" />
           <div className="subtle">Observer ground truth — not an agent-accessible map.</div>
         </InspectorAccordion>
@@ -242,7 +271,7 @@ export const InspectorDock = memo(function InspectorDock({
           <NearFieldSensorPanel
             physical={physical}
             agentObservation={frame?.agent_observation}
-            mechanisms={mechanisms}
+            mechanisms={displayedMechanisms}
             onToggleMechanism={toggleMechObj}
           />
           <FovOverlayControls
@@ -261,22 +290,17 @@ export const InspectorDock = memo(function InspectorDock({
         <OscillatorySignalingPanel
           physical={physical}
           agentObservation={frame?.agent_observation}
-          mechanisms={mechanisms}
+          mechanisms={displayedMechanisms}
           onToggleMechanism={toggleMechObj}
         />
         {(activeTab === 'internal' || activeTab === 'physical') && <SignalSensorimotorPanel />}
         <div className="subtle">Physical signal coupling is not communication.</div>
       </>
     );
-  } else if (inspector === 'EXPERIMENT' || inspector === 'MECHANISMS' || inspector === 'PREDICTIVE') {
-    bodyContent = (
-      <>
-        {extras?.experiment}
-        {inspector === 'PREDICTIVE' && predictiveBody}
-        {(activeTab === 'ablations' || inspector === 'MECHANISMS') && mechanismsBody}
-        {activeTab === 'cognition' && cognitionBody}
-      </>
-    );
+  } else if (inspector === 'EXPERIMENT') {
+    bodyContent = extras?.experiment || null;
+  } else if (inspector === 'MECHANISMS' || inspector === 'PREDICTIVE') {
+    bodyContent = extras?.experiment || (inspector === 'PREDICTIVE' ? predictiveBody : mechanismsBody);
   } else if (inspector === 'INTERVENTION' || inspector === 'EXPERIMENTER') {
     bodyContent = (
       <>
@@ -332,7 +356,7 @@ export const InspectorDock = memo(function InspectorDock({
           ) : inspector === 'OBSERVE' || inspector === 'COGNITION' ? (
             <SemanticChip kind="OBSERVER">OBSERVER</SemanticChip>
           ) : inspector === 'EXPERIMENT' || inspector === 'MECHANISMS' || inspector === 'PREDICTIVE' ? (
-            <SemanticChip kind="LIVE">LIVE / PRE-RUN</SemanticChip>
+            <SemanticChip kind="STATUS">PREPARE RUN</SemanticChip>
           ) : null}
         </div>
         <InspectorTabs tabs={tabs} active={activeTab} onChange={setTab} />
@@ -340,6 +364,17 @@ export const InspectorDock = memo(function InspectorDock({
       <div className="inspector-body">
         {bodyContent}
       </div>
+      {showGlobalApply && experimentApplyBar ? (
+        <footer className="inspector-apply-bar" data-testid="experiment-apply-bar">
+          {experimentApplyBar}
+        </footer>
+      ) : experimentInspector && activeTab !== 'review' ? (
+        <footer className="inspector-apply-bar inspector-apply-hint" data-testid="experiment-apply-hint">
+          <span className="subtle">
+            Draft edits only — current run unchanged. Use Experiment → Review / Apply to apply configuration and start a new run at tick 0.
+          </span>
+        </footer>
+      ) : null}
     </aside>
   );
 });
